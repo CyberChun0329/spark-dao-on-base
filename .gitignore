@@ -1,0 +1,21 @@
+# Foundry
+cache/
+out/
+broadcast/
+
+# Node
+node_modules/
+
+# Local environment
+.env
+
+# Local generated ABI/bin artefacts
+*.abi
+*.bin
+src_*.abi
+src_*.bin
+test_*.abi
+test_*.bin
+
+# OS files
+.DS_Store

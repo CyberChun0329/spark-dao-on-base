@@ -1,0 +1,29 @@
+{
+  "name": "spark-dao-on-base",
+  "private": true,
+  "type": "module",
+  "license": "UNLICENSED",
+  "scripts": {
+    "build": "forge build",
+    "build:sizes": "forge build --sizes --skip script",
+    "test": "forge test -vvv",
+    "fmt": "forge fmt",
+    "client:typecheck": "tsc --noEmit -p tsconfig.json",
+    "client:inspect": "tsx client/scripts/inspect.ts",
+    "deploy:tokens": "forge script script/DeployTokens.s.sol:DeployTokens --rpc-url $BASE_RPC_URL --broadcast",
+    "deploy:registry": "forge script script/DeployRegistry.s.sol:DeployRegistry --rpc-url $BASE_RPC_URL --broadcast",
+    "deploy:set-minters": "forge script script/SetTokenMinters.s.sol:SetTokenMinters --rpc-url $BASE_RPC_URL --broadcast",
+    "demo:research": "forge script script/DemoResearch.s.sol:DemoResearch --rpc-url $BASE_RPC_URL --broadcast",
+    "demo:teaching": "forge script script/DemoTeaching.s.sol:DemoTeaching --rpc-url $BASE_RPC_URL --broadcast"
+  },
+  "dependencies": {
+    "dotenv": "^17.2.3",
+    "viem": "^2.38.2"
+  },
+  "devDependencies": {
+    "@types/node": "^25.6.0",
+    "solc": "^0.8.34",
+    "tsx": "^4.21.0",
+    "typescript": "^6.0.2"
+  }
+}
