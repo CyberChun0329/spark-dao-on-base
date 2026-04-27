@@ -398,7 +398,7 @@ contract TeachingRegistry is TeachingRewardRegistry {
     ) internal {
         if (session.teacherBondReleasedAt != 0) revert SparkDaoErrors.InvalidTeachingStatus();
 
-        uint256 distributedResearchUnits = _autoRecordTeachingRewardsForSettlement(session);
+        uint256 distributedResearchUnits = _recordSettlementRewards(session);
         uint256 teacherBondUnits = _teacherBondUnits(session);
         uint256 daoResidualUnits = _daoResidualUnits(session);
         uint256 undistributedResearchUnits = _researchPoolUnits(session) - distributedResearchUnits;

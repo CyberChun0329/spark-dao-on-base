@@ -142,7 +142,7 @@ abstract contract TeachingRewardRegistry is ResearchRegistry {
         }
     }
 
-    function _autoRecordTeachingRewardsForSettlement(SparkDaoTypes.TeachingSession storage session)
+    function _recordSettlementRewards(SparkDaoTypes.TeachingSession storage session)
         internal
         returns (uint256 distributedUnits)
     {
@@ -161,7 +161,7 @@ abstract contract TeachingRewardRegistry is ResearchRegistry {
             (uint64 assetId, uint16 assetWeightBps) =
                 _unpackResearchLink(session.linkedResearchLinks[assetIndex]);
             (uint16 snapshotActiveLayer, uint256 assetDistributedUnits) =
-                _recordTeachingRewardsForAsset(
+                _recordAssetRewards(
                     session,
                     assetId,
                     assetWeightBps,
@@ -177,7 +177,7 @@ abstract contract TeachingRewardRegistry is ResearchRegistry {
         }
     }
 
-    function _recordTeachingRewardsForAsset(
+    function _recordAssetRewards(
         SparkDaoTypes.TeachingSession storage session,
         uint64 assetId,
         uint16 assetWeightBps,
@@ -213,14 +213,14 @@ abstract contract TeachingRewardRegistry is ResearchRegistry {
                 }
                 continue;
             }
-            distributedUnits += _recordTeachingRewardForPosition(rewardContext, positionId, position);
+            distributedUnits += _recordPositionReward(rewardContext, positionId, position);
             unchecked {
                 ++positionIndex;
             }
         }
     }
 
-    function _recordTeachingRewardForPosition(
+    function _recordPositionReward(
         TeachingRewardContext memory rewardContext,
         uint64 positionId,
         SparkDaoTypes.ResearchPosition storage position
@@ -391,7 +391,7 @@ abstract contract TeachingRewardRegistry is ResearchRegistry {
             return exactUnlockAt;
         }
         uint64 daySeconds = SparkDaoTypes.DAY_SECONDS;
-        // Bucket unlock times by day so repeated rewards can share one claim slot.
+        // Round to day buckets so repeated rewards share one claim slot.
         // forge-lint: disable-next-line(divide-before-multiply)
         return ((exactUnlockAt + daySeconds - 1) / daySeconds) * daySeconds;
     }

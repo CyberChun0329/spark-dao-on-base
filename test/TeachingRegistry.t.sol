@@ -426,7 +426,7 @@ contract TeachingRegistryTest {
         registry.getTeachingRewardLedgerBuckets(assetId, positionId);
     }
 
-    function testUpdatedRewardUnlockSecondsZeroAllowsImmediateTeachingRewardClaim() public {
+    function testImmediateTeachingRewardClaimWhenUnlockZero() public {
         VM.prank(authority);
         registry.updateRewardUnlockSeconds(0);
 
@@ -523,7 +523,7 @@ contract TeachingRegistryTest {
         assertTrue(afterRefund == beforeRefund + 800_000);
     }
 
-    function testResearchBackedTeachingDistributesAndClaimsSnapshotRewards() public {
+    function testResearchBackedTeachingDistributesSnapshotRewards() public {
         VM.startPrank(coordinator);
         uint64 assetId = registry.createResearchAsset("Research Core", "ipfs://research-core");
         uint64 layerOnePositionA = registry.createPatchPosition(
@@ -994,7 +994,7 @@ contract TeachingRegistryTest {
         assertTrue(amountsTwo[0] == 60_000);
     }
 
-    function testTeachingRewardBatchClaimCollectsMultipleLedgers() public {
+    function testBatchTeachingRewardClaim() public {
         VM.startPrank(coordinator);
         uint64 assetOne = registry.createResearchAsset("Batch One", "ipfs://batch-one");
         uint64 positionOne = registry.createPatchPosition(
@@ -1064,7 +1064,7 @@ contract TeachingRegistryTest {
         assertTrue(afterClaim == beforeClaim + 200_000);
     }
 
-    function testTinyTeachingRewardSkipsZeroAmountPositions() public {
+    function testDustTeachingRewardSkipsZeroAmountPositions() public {
         VM.startPrank(coordinator);
         uint64 assetId = registry.createResearchAsset("Dust Asset", "ipfs://dust-asset");
         uint64 positionA = registry.createPatchPosition(
@@ -1119,7 +1119,7 @@ contract TeachingRegistryTest {
         registry.getTeachingRewardLedgerBuckets(assetId, positionB);
     }
 
-    function testTeachingRewardBatchRejectsDuplicateEntriesAtomically() public {
+    function testBatchTeachingRewardRejectsDuplicateEntries() public {
         VM.startPrank(coordinator);
         uint64 assetId = registry.createResearchAsset("Duplicate Batch", "ipfs://duplicate-batch");
         uint64 positionId = registry.createPatchPosition(
@@ -1174,7 +1174,7 @@ contract TeachingRegistryTest {
         assertTrue(afterClaim == beforeClaim + 200_000);
     }
 
-    function testTeachingRewardBatchRejectsMixedHoldersAfterTransfer() public {
+    function testBatchTeachingRewardRejectsMixedHolders() public {
         VM.startPrank(coordinator);
         uint64 assetOne = registry.createResearchAsset("Mixed Batch One", "ipfs://mixed-batch-one");
         uint64 positionOne = registry.createPatchPosition(
@@ -1417,7 +1417,7 @@ contract TeachingRegistryTest {
         registry.getTeachingRewardLedgerBuckets(assetTwo, assetTwoLayerTwo);
     }
 
-    function testPastDeadlineResearchBackedTeachingRequiresCoordinatorAndStillSnapshotsCorrectly()
+    function testPastDeadlineResearchBackedTeachingNeedsCoordinatorAndKeepsSnapshot()
         public
     {
         VM.startPrank(coordinator);
@@ -1598,7 +1598,7 @@ contract TeachingRegistryTest {
         registry.getTeachingRewardLedgerBuckets(assetId, positionId);
     }
 
-    function testForceValidMultiAssetSnapshotPreservesWeightedHistoricalStructure() public {
+    function testForceValidPreservesWeightedHistoricalSnapshot() public {
         VM.startPrank(coordinator);
         uint64 assetOne = registry.createResearchAsset("Force Asset One", "ipfs://force-asset-one");
         uint64 assetOneLayerOne = registry.createPatchPosition(
@@ -1726,7 +1726,7 @@ contract TeachingRegistryTest {
         registry.getTeachingRewardLedgerBuckets(assetTwo, assetTwoLayerTwo);
     }
 
-    function testTeachingRewardLedgerSupportsStagedClaimsAcrossUnlockBuckets() public {
+    function testTeachingRewardLedgerSupportsStagedClaims() public {
         VM.startPrank(coordinator);
         uint64 assetId = registry.createResearchAsset("Bucket Research", "ipfs://bucket-research");
         uint64 positionId = registry.createPatchPosition(
@@ -1816,7 +1816,7 @@ contract TeachingRegistryTest {
         registry.getTeachingRewardLedgerBuckets(assetId, positionId);
     }
 
-    function testTeachingRewardBatchClaimRevertsAtomicallyWhenOneLedgerIsStillLocked() public {
+    function testBatchTeachingRewardClaimRevertsWhenOneLedgerIsLocked() public {
         VM.startPrank(coordinator);
         uint64 assetOne = registry.createResearchAsset("Atomic One", "ipfs://atomic-one");
         uint64 positionOne = registry.createPatchPosition(
@@ -1928,7 +1928,7 @@ contract TeachingRegistryTest {
         assertTrue(afterSecondClaim == beforeBatch + 400_000);
     }
 
-    function testVaultReservedUnitsTrackTeachingSettlementRedeemAndRewardClaim() public {
+    function testVaultReservedUnitsTrackTeachingSettlementFlow() public {
         VM.startPrank(coordinator);
         uint64 assetId = registry.createResearchAsset("Reserved Research", "ipfs://reserved-research");
         uint64 positionId = registry.createPatchPosition(

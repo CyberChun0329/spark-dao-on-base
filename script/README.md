@@ -1,6 +1,6 @@
 # Scripts
 
-This directory contains the deployment and demo scripts for the Base version of Spark DAO.
+Deployment and demo scripts for the Base version of Spark DAO.
 
 ## Deployment scripts
 
@@ -14,7 +14,7 @@ This directory contains the deployment and demo scripts for the Base version of 
 - `RESEARCH_BASE_URI`
 - `TEACHING_BASE_URI`
 
-Typical usage:
+Usage:
 
 ```bash
 forge script script/DeployTokens.s.sol:DeployTokens --rpc-url <BASE_RPC> --broadcast
@@ -30,7 +30,7 @@ forge script script/DeployTokens.s.sol:DeployTokens --rpc-url <BASE_RPC> --broad
 - `REWARD_UNLOCK_SECONDS`
 - `BUYBACK_WAIT_SECONDS`
 
-Typical usage:
+Usage:
 
 ```bash
 forge script script/DeployRegistry.s.sol:DeployRegistry --rpc-url <BASE_RPC> --broadcast
@@ -42,7 +42,7 @@ forge script script/DeployRegistry.s.sol:DeployRegistry --rpc-url <BASE_RPC> --b
 - `RESEARCH_POSITION_TOKEN`
 - `TEACHING_NFT_TOKEN`
 
-Typical usage:
+Usage:
 
 ```bash
 forge script script/SetTokenMinters.s.sol:SetTokenMinters --rpc-url <BASE_RPC> --broadcast
@@ -53,7 +53,7 @@ forge script script/SetTokenMinters.s.sol:SetTokenMinters --rpc-url <BASE_RPC> -
 - `DemoResearch.s.sol`
 - `DemoTeaching.s.sol`
 
-Both demo scripts deploy their own `MockERC20`, token contracts, and registry instance. They set `rewardUnlockSeconds` and `buybackWaitSeconds` to `0` so the full path can be exercised in one local run.
+Both demo scripts deploy their own `MockERC20`, token contracts, and registry instance. They set `rewardUnlockSeconds` and `buybackWaitSeconds` to `0` so the full path runs in one local pass.
 
 Additional environment variables:
 
