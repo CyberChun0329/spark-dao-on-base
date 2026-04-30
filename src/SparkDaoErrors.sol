@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.26;
 
 library SparkDaoErrors {
@@ -57,6 +57,7 @@ library SparkDaoErrors {
     error TeachingAlreadyRedeemed();
     error TeachingNotRedeemableYet();
     error InvalidTeachingResolutionCode();
+    error FaultSettlementInsolvent();
     error InvalidTeachingRewardLedger();
     error TeachingRewardLedgerFull();
 }

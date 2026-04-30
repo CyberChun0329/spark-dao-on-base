@@ -1,0 +1,1087 @@
+{
+  "gasRows": [
+    {
+      "path": "ORD_NR",
+      "category": "ordinary",
+      "total_gas": 478069,
+      "setup_gas": 0,
+      "lesson_gas": 478069,
+      "valid_lesson": true,
+      "revenue_weight_bps": 10000
+    },
+    {
+      "path": "ORD_ZS",
+      "category": "ordinary",
+      "total_gas": 809746,
+      "setup_gas": 375030,
+      "lesson_gas": 434716,
+      "valid_lesson": true,
+      "revenue_weight_bps": 10000
+    },
+    {
+      "path": "ORD_RB",
+      "category": "ordinary",
+      "total_gas": 1188995,
+      "setup_gas": 581434,
+      "lesson_gas": 607561,
+      "valid_lesson": true,
+      "revenue_weight_bps": 10000
+    },
+    {
+      "path": "ORD_WM",
+      "category": "ordinary",
+      "total_gas": 1273327,
+      "setup_gas": 683687,
+      "lesson_gas": 589640,
+      "valid_lesson": true,
+      "revenue_weight_bps": 10000
+    },
+    {
+      "path": "ORD_ML",
+      "category": "ordinary",
+      "total_gas": 1793753,
+      "setup_gas": 1163387,
+      "lesson_gas": 630366,
+      "valid_lesson": true,
+      "revenue_weight_bps": 10000
+    },
+    {
+      "path": "FV_NR",
+      "category": "forced_valid",
+      "total_gas": 367104,
+      "setup_gas": 0,
+      "lesson_gas": 367104,
+      "valid_lesson": true,
+      "revenue_weight_bps": 10000
+    },
+    {
+      "path": "FV_ZS",
+      "category": "forced_valid",
+      "total_gas": 753120,
+      "setup_gas": 341865,
+      "lesson_gas": 411255,
+      "valid_lesson": true,
+      "revenue_weight_bps": 10000
+    },
+    {
+      "path": "FV_RB",
+      "category": "forced_valid",
+      "total_gas": 1138823,
+      "setup_gas": 557523,
+      "lesson_gas": 581300,
+      "valid_lesson": true,
+      "revenue_weight_bps": 10000
+    },
+    {
+      "path": "FV_WM",
+      "category": "forced_valid",
+      "total_gas": 1269839,
+      "setup_gas": 683756,
+      "lesson_gas": 586083,
+      "valid_lesson": true,
+      "revenue_weight_bps": 10000
+    },
+    {
+      "path": "FV_ML",
+      "category": "forced_valid",
+      "total_gas": 1746498,
+      "setup_gas": 1119689,
+      "lesson_gas": 626809,
+      "valid_lesson": true,
+      "revenue_weight_bps": 10000
+    },
+    {
+      "path": "CF_NR",
+      "category": "customer_fault",
+      "total_gas": 431545,
+      "setup_gas": 0,
+      "lesson_gas": 431545,
+      "valid_lesson": false,
+      "revenue_weight_bps": 5000
+    },
+    {
+      "path": "CF_ZS",
+      "category": "customer_fault",
+      "total_gas": 817597,
+      "setup_gas": 341902,
+      "lesson_gas": 475695,
+      "valid_lesson": false,
+      "revenue_weight_bps": 5000
+    },
+    {
+      "path": "CF_RB",
+      "category": "customer_fault",
+      "total_gas": 1033272,
+      "setup_gas": 557571,
+      "lesson_gas": 475701,
+      "valid_lesson": false,
+      "revenue_weight_bps": 5000
+    },
+    {
+      "path": "CF_WM",
+      "category": "customer_fault",
+      "total_gas": 1161804,
+      "setup_gas": 683826,
+      "lesson_gas": 477978,
+      "valid_lesson": false,
+      "revenue_weight_bps": 5000
+    },
+    {
+      "path": "CF_ML",
+      "category": "customer_fault",
+      "total_gas": 1633191,
+      "setup_gas": 1119791,
+      "lesson_gas": 513400,
+      "valid_lesson": false,
+      "revenue_weight_bps": 5000
+    },
+    {
+      "path": "TF_NR",
+      "category": "teacher_fault",
+      "total_gas": 434876,
+      "setup_gas": 0,
+      "lesson_gas": 434876,
+      "valid_lesson": false,
+      "revenue_weight_bps": 5000
+    },
+    {
+      "path": "TF_ZS",
+      "category": "teacher_fault",
+      "total_gas": 820965,
+      "setup_gas": 341937,
+      "lesson_gas": 479028,
+      "valid_lesson": false,
+      "revenue_weight_bps": 5000
+    },
+    {
+      "path": "TF_RB",
+      "category": "teacher_fault",
+      "total_gas": 1206757,
+      "setup_gas": 557683,
+      "lesson_gas": 649074,
+      "valid_lesson": false,
+      "revenue_weight_bps": 5000
+    },
+    {
+      "path": "TF_WM",
+      "category": "teacher_fault",
+      "total_gas": 1337765,
+      "setup_gas": 683895,
+      "lesson_gas": 653870,
+      "valid_lesson": false,
+      "revenue_weight_bps": 5000
+    },
+    {
+      "path": "TF_ML",
+      "category": "teacher_fault",
+      "total_gas": 1814489,
+      "setup_gas": 1119893,
+      "lesson_gas": 694596,
+      "valid_lesson": false,
+      "revenue_weight_bps": 5000
+    }
+  ],
+  "researchGasRows": [
+    {
+      "path": "createResearchAsset",
+      "gas": 128473
+    },
+    {
+      "path": "createPatchPosition_current",
+      "gas": 249622
+    },
+    {
+      "path": "sealLayer_current",
+      "gas": 3768
+    },
+    {
+      "path": "createPatchPosition_prepared",
+      "gas": 237054
+    },
+    {
+      "path": "sealLayer_prepared",
+      "gas": 3803
+    },
+    {
+      "path": "approveEarlyDecay",
+      "gas": 6802
+    },
+    {
+      "path": "advanceLayer",
+      "gas": 8897
+    }
+  ],
+  "summaries": [
+    {
+      "window": "Demand-first",
+      "coordinatorCase": "No coordinator",
+      "feeMultiplier": 1,
+      "pFV": 0,
+      "pCF": 0,
+      "pTF": 0,
+      "ordinaryGas": 482347.6,
+      "forcedValidGas": 397353.8,
+      "customerFaultGas": 444790.6,
+      "teacherFaultGas": 465126.19999999995,
+      "expectedGas": 482347.6,
+      "revenueWeight": 1,
+      "costPerAttemptedLesson": 0.0072161833510497675,
+      "shares": [
+        0.014432366702099535,
+        0.0072161833510497675,
+        0.004810788900699845
+      ]
+    },
+    {
+      "window": "Demand-first",
+      "coordinatorCase": "No coordinator",
+      "feeMultiplier": 5,
+      "pFV": 0,
+      "pCF": 0,
+      "pTF": 0,
+      "ordinaryGas": 482347.6,
+      "forcedValidGas": 397353.8,
+      "customerFaultGas": 444790.6,
+      "teacherFaultGas": 465126.19999999995,
+      "expectedGas": 482347.6,
+      "revenueWeight": 1,
+      "costPerAttemptedLesson": 0.03608091675524884,
+      "shares": [
+        0.07216183351049768,
+        0.03608091675524884,
+        0.024053944503499226
+      ]
+    },
+    {
+      "window": "Demand-first",
+      "coordinatorCase": "No coordinator",
+      "feeMultiplier": 10,
+      "pFV": 0,
+      "pCF": 0,
+      "pTF": 0,
+      "ordinaryGas": 482347.6,
+      "forcedValidGas": 397353.8,
+      "customerFaultGas": 444790.6,
+      "teacherFaultGas": 465126.19999999995,
+      "expectedGas": 482347.6,
+      "revenueWeight": 1,
+      "costPerAttemptedLesson": 0.07216183351049768,
+      "shares": [
+        0.14432366702099536,
+        0.07216183351049768,
+        0.04810788900699845
+      ]
+    },
+    {
+      "window": "Demand-first",
+      "coordinatorCase": "Low coordinator",
+      "feeMultiplier": 1,
+      "pFV": 0.01,
+      "pCF": 0.003,
+      "pTF": 0.002,
+      "ordinaryGas": 482347.6,
+      "forcedValidGas": 397353.8,
+      "customerFaultGas": 444790.6,
+      "teacherFaultGas": 465126.19999999995,
+      "expectedGas": 481350.5482,
+      "revenueWeight": 0.9975,
+      "costPerAttemptedLesson": 0.007201266911952125,
+      "shares": [
+        0.014438630399904012,
+        0.007219315199952006,
+        0.004812876799968004
+      ]
+    },
+    {
+      "window": "Demand-first",
+      "coordinatorCase": "Low coordinator",
+      "feeMultiplier": 5,
+      "pFV": 0.01,
+      "pCF": 0.003,
+      "pTF": 0.002,
+      "ordinaryGas": 482347.6,
+      "forcedValidGas": 397353.8,
+      "customerFaultGas": 444790.6,
+      "teacherFaultGas": 465126.19999999995,
+      "expectedGas": 481350.5482,
+      "revenueWeight": 0.9975,
+      "costPerAttemptedLesson": 0.03600633455976063,
+      "shares": [
+        0.07219315199952006,
+        0.03609657599976003,
+        0.024064383999840018
+      ]
+    },
+    {
+      "window": "Demand-first",
+      "coordinatorCase": "Low coordinator",
+      "feeMultiplier": 10,
+      "pFV": 0.01,
+      "pCF": 0.003,
+      "pTF": 0.002,
+      "ordinaryGas": 482347.6,
+      "forcedValidGas": 397353.8,
+      "customerFaultGas": 444790.6,
+      "teacherFaultGas": 465126.19999999995,
+      "expectedGas": 481350.5482,
+      "revenueWeight": 0.9975,
+      "costPerAttemptedLesson": 0.07201266911952126,
+      "shares": [
+        0.14438630399904012,
+        0.07219315199952006,
+        0.048128767999680036
+      ]
+    },
+    {
+      "window": "Demand-first",
+      "coordinatorCase": "Elevated coordinator",
+      "feeMultiplier": 1,
+      "pFV": 0.05,
+      "pCF": 0.02,
+      "pTF": 0.01,
+      "ordinaryGas": 482347.6,
+      "forcedValidGas": 397353.8,
+      "customerFaultGas": 444790.6,
+      "teacherFaultGas": 465126.19999999995,
+      "expectedGas": 477174.5559999999,
+      "revenueWeight": 0.985,
+      "costPerAttemptedLesson": 0.007138791789472498,
+      "shares": [
+        0.014495008709588829,
+        0.007247504354794414,
+        0.004831669569862943
+      ]
+    },
+    {
+      "window": "Demand-first",
+      "coordinatorCase": "Elevated coordinator",
+      "feeMultiplier": 5,
+      "pFV": 0.05,
+      "pCF": 0.02,
+      "pTF": 0.01,
+      "ordinaryGas": 482347.6,
+      "forcedValidGas": 397353.8,
+      "customerFaultGas": 444790.6,
+      "teacherFaultGas": 465126.19999999995,
+      "expectedGas": 477174.5559999999,
+      "revenueWeight": 0.985,
+      "costPerAttemptedLesson": 0.03569395894736249,
+      "shares": [
+        0.07247504354794415,
+        0.036237521773972076,
+        0.024158347849314716
+      ]
+    },
+    {
+      "window": "Demand-first",
+      "coordinatorCase": "Elevated coordinator",
+      "feeMultiplier": 10,
+      "pFV": 0.05,
+      "pCF": 0.02,
+      "pTF": 0.01,
+      "ordinaryGas": 482347.6,
+      "forcedValidGas": 397353.8,
+      "customerFaultGas": 444790.6,
+      "teacherFaultGas": 465126.19999999995,
+      "expectedGas": 477174.5559999999,
+      "revenueWeight": 0.985,
+      "costPerAttemptedLesson": 0.07138791789472498,
+      "shares": [
+        0.1449500870958883,
+        0.07247504354794415,
+        0.04831669569862943
+      ]
+    },
+    {
+      "window": "Demand-first",
+      "coordinatorCase": "Coordinator stress",
+      "feeMultiplier": 1,
+      "pFV": 0.1,
+      "pCF": 0.05,
+      "pTF": 0.03,
+      "ordinaryGas": 482347.6,
+      "forcedValidGas": 397353.8,
+      "customerFaultGas": 444790.6,
+      "teacherFaultGas": 465126.19999999995,
+      "expectedGas": 471453.72799999994,
+      "revenueWeight": 0.96,
+      "costPerAttemptedLesson": 0.007053205080286386,
+      "shares": [
+        0.014694177250596636,
+        0.007347088625298318,
+        0.004898059083532212
+      ]
+    },
+    {
+      "window": "Demand-first",
+      "coordinatorCase": "Coordinator stress",
+      "feeMultiplier": 5,
+      "pFV": 0.1,
+      "pCF": 0.05,
+      "pTF": 0.03,
+      "ordinaryGas": 482347.6,
+      "forcedValidGas": 397353.8,
+      "customerFaultGas": 444790.6,
+      "teacherFaultGas": 465126.19999999995,
+      "expectedGas": 471453.72799999994,
+      "revenueWeight": 0.96,
+      "costPerAttemptedLesson": 0.03526602540143193,
+      "shares": [
+        0.07347088625298319,
+        0.036735443126491595,
+        0.02449029541766106
+      ]
+    },
+    {
+      "window": "Demand-first",
+      "coordinatorCase": "Coordinator stress",
+      "feeMultiplier": 10,
+      "pFV": 0.1,
+      "pCF": 0.05,
+      "pTF": 0.03,
+      "ordinaryGas": 482347.6,
+      "forcedValidGas": 397353.8,
+      "customerFaultGas": 444790.6,
+      "teacherFaultGas": 465126.19999999995,
+      "expectedGas": 471453.72799999994,
+      "revenueWeight": 0.96,
+      "costPerAttemptedLesson": 0.07053205080286386,
+      "shares": [
+        0.14694177250596638,
+        0.07347088625298319,
+        0.04898059083532212
+      ]
+    },
+    {
+      "window": "Supply-first",
+      "coordinatorCase": "No coordinator",
+      "feeMultiplier": 1,
+      "pFV": 0,
+      "pCF": 0,
+      "pTF": 0,
+      "ordinaryGas": 504286.25000000006,
+      "forcedValidGas": 442878.85000000003,
+      "customerFaultGas": 456057,
+      "teacherFaultGas": 510653,
+      "expectedGas": 504286.25000000006,
+      "revenueWeight": 1,
+      "costPerAttemptedLesson": 0.007544397528697814,
+      "shares": [
+        0.015088795057395627,
+        0.007544397528697813,
+        0.0050295983524652095
+      ]
+    },
+    {
+      "window": "Supply-first",
+      "coordinatorCase": "No coordinator",
+      "feeMultiplier": 5,
+      "pFV": 0,
+      "pCF": 0,
+      "pTF": 0,
+      "ordinaryGas": 504286.25000000006,
+      "forcedValidGas": 442878.85000000003,
+      "customerFaultGas": 456057,
+      "teacherFaultGas": 510653,
+      "expectedGas": 504286.25000000006,
+      "revenueWeight": 1,
+      "costPerAttemptedLesson": 0.03772198764348907,
+      "shares": [
+        0.07544397528697815,
+        0.03772198764348907,
+        0.025147991762326048
+      ]
+    },
+    {
+      "window": "Supply-first",
+      "coordinatorCase": "No coordinator",
+      "feeMultiplier": 10,
+      "pFV": 0,
+      "pCF": 0,
+      "pTF": 0,
+      "ordinaryGas": 504286.25000000006,
+      "forcedValidGas": 442878.85000000003,
+      "customerFaultGas": 456057,
+      "teacherFaultGas": 510653,
+      "expectedGas": 504286.25000000006,
+      "revenueWeight": 1,
+      "costPerAttemptedLesson": 0.07544397528697815,
+      "shares": [
+        0.1508879505739563,
+        0.07544397528697815,
+        0.050295983524652095
+      ]
+    },
+    {
+      "window": "Supply-first",
+      "coordinatorCase": "Low coordinator",
+      "feeMultiplier": 1,
+      "pFV": 0.01,
+      "pCF": 0.003,
+      "pTF": 0.002,
+      "ordinaryGas": 504286.25000000006,
+      "forcedValidGas": 442878.85000000003,
+      "customerFaultGas": 456057,
+      "teacherFaultGas": 510653,
+      "expectedGas": 503540.22175,
+      "revenueWeight": 0.9975,
+      "costPerAttemptedLesson": 0.007533236538911479,
+      "shares": [
+        0.015104233661977905,
+        0.007552116830988952,
+        0.005034744553992635
+      ]
+    },
+    {
+      "window": "Supply-first",
+      "coordinatorCase": "Low coordinator",
+      "feeMultiplier": 5,
+      "pFV": 0.01,
+      "pCF": 0.003,
+      "pTF": 0.002,
+      "ordinaryGas": 504286.25000000006,
+      "forcedValidGas": 442878.85000000003,
+      "customerFaultGas": 456057,
+      "teacherFaultGas": 510653,
+      "expectedGas": 503540.22175,
+      "revenueWeight": 0.9975,
+      "costPerAttemptedLesson": 0.0376661826945574,
+      "shares": [
+        0.07552116830988952,
+        0.03776058415494476,
+        0.025173722769963172
+      ]
+    },
+    {
+      "window": "Supply-first",
+      "coordinatorCase": "Low coordinator",
+      "feeMultiplier": 10,
+      "pFV": 0.01,
+      "pCF": 0.003,
+      "pTF": 0.002,
+      "ordinaryGas": 504286.25000000006,
+      "forcedValidGas": 442878.85000000003,
+      "customerFaultGas": 456057,
+      "teacherFaultGas": 510653,
+      "expectedGas": 503540.22175,
+      "revenueWeight": 0.9975,
+      "costPerAttemptedLesson": 0.0753323653891148,
+      "shares": [
+        0.15104233661977903,
+        0.07552116830988952,
+        0.050347445539926344
+      ]
+    },
+    {
+      "window": "Supply-first",
+      "coordinatorCase": "Elevated coordinator",
+      "feeMultiplier": 1,
+      "pFV": 0.05,
+      "pCF": 0.02,
+      "pTF": 0.01,
+      "ordinaryGas": 504286.25000000006,
+      "forcedValidGas": 442878.85000000003,
+      "customerFaultGas": 456057,
+      "teacherFaultGas": 510653,
+      "expectedGas": 500314.9625000001,
+      "revenueWeight": 0.985,
+      "costPerAttemptedLesson": 0.007484984900253655,
+      "shares": [
+        0.015197938883763766,
+        0.007598969441881883,
+        0.005065979627921256
+      ]
+    },
+    {
+      "window": "Supply-first",
+      "coordinatorCase": "Elevated coordinator",
+      "feeMultiplier": 5,
+      "pFV": 0.05,
+      "pCF": 0.02,
+      "pTF": 0.01,
+      "ordinaryGas": 504286.25000000006,
+      "forcedValidGas": 442878.85000000003,
+      "customerFaultGas": 456057,
+      "teacherFaultGas": 510653,
+      "expectedGas": 500314.9625000001,
+      "revenueWeight": 0.985,
+      "costPerAttemptedLesson": 0.037424924501268275,
+      "shares": [
+        0.07598969441881884,
+        0.03799484720940942,
+        0.025329898139606278
+      ]
+    },
+    {
+      "window": "Supply-first",
+      "coordinatorCase": "Elevated coordinator",
+      "feeMultiplier": 10,
+      "pFV": 0.05,
+      "pCF": 0.02,
+      "pTF": 0.01,
+      "ordinaryGas": 504286.25000000006,
+      "forcedValidGas": 442878.85000000003,
+      "customerFaultGas": 456057,
+      "teacherFaultGas": 510653,
+      "expectedGas": 500314.9625000001,
+      "revenueWeight": 0.985,
+      "costPerAttemptedLesson": 0.07484984900253655,
+      "shares": [
+        0.15197938883763767,
+        0.07598969441881884,
+        0.050659796279212556
+      ]
+    },
+    {
+      "window": "Supply-first",
+      "coordinatorCase": "Coordinator stress",
+      "feeMultiplier": 1,
+      "pFV": 0.1,
+      "pCF": 0.05,
+      "pTF": 0.03,
+      "ordinaryGas": 504286.25000000006,
+      "forcedValidGas": 442878.85000000003,
+      "customerFaultGas": 456057,
+      "teacherFaultGas": 510653,
+      "expectedGas": 495925.05000000005,
+      "revenueWeight": 0.96,
+      "costPerAttemptedLesson": 0.007419309413332883,
+      "shares": [
+        0.015456894611110173,
+        0.007728447305555087,
+        0.0051522982037033906
+      ]
+    },
+    {
+      "window": "Supply-first",
+      "coordinatorCase": "Coordinator stress",
+      "feeMultiplier": 5,
+      "pFV": 0.1,
+      "pCF": 0.05,
+      "pTF": 0.03,
+      "ordinaryGas": 504286.25000000006,
+      "forcedValidGas": 442878.85000000003,
+      "customerFaultGas": 456057,
+      "teacherFaultGas": 510653,
+      "expectedGas": 495925.05000000005,
+      "revenueWeight": 0.96,
+      "costPerAttemptedLesson": 0.03709654706666442,
+      "shares": [
+        0.07728447305555088,
+        0.03864223652777544,
+        0.025761491018516956
+      ]
+    },
+    {
+      "window": "Supply-first",
+      "coordinatorCase": "Coordinator stress",
+      "feeMultiplier": 10,
+      "pFV": 0.1,
+      "pCF": 0.05,
+      "pTF": 0.03,
+      "ordinaryGas": 504286.25000000006,
+      "forcedValidGas": 442878.85000000003,
+      "customerFaultGas": 456057,
+      "teacherFaultGas": 510653,
+      "expectedGas": 495925.05000000005,
+      "revenueWeight": 0.96,
+      "costPerAttemptedLesson": 0.07419309413332884,
+      "shares": [
+        0.15456894611110175,
+        0.07728447305555088,
+        0.05152298203703391
+      ]
+    },
+    {
+      "window": "Synchronised",
+      "coordinatorCase": "No coordinator",
+      "feeMultiplier": 1,
+      "pFV": 0,
+      "pCF": 0,
+      "pTF": 0,
+      "ordinaryGas": 531700.4500000001,
+      "forcedValidGas": 486264.25000000006,
+      "customerFaultGas": 464793.35,
+      "teacherFaultGas": 554040.7000000001,
+      "expectedGas": 531700.4500000001,
+      "revenueWeight": 1,
+      "costPerAttemptedLesson": 0.00795452892278446,
+      "shares": [
+        0.01590905784556892,
+        0.00795452892278446,
+        0.005303019281856307
+      ]
+    },
+    {
+      "window": "Synchronised",
+      "coordinatorCase": "No coordinator",
+      "feeMultiplier": 5,
+      "pFV": 0,
+      "pCF": 0,
+      "pTF": 0,
+      "ordinaryGas": 531700.4500000001,
+      "forcedValidGas": 486264.25000000006,
+      "customerFaultGas": 464793.35,
+      "teacherFaultGas": 554040.7000000001,
+      "expectedGas": 531700.4500000001,
+      "revenueWeight": 1,
+      "costPerAttemptedLesson": 0.039772644613922305,
+      "shares": [
+        0.07954528922784461,
+        0.039772644613922305,
+        0.026515096409281538
+      ]
+    },
+    {
+      "window": "Synchronised",
+      "coordinatorCase": "No coordinator",
+      "feeMultiplier": 10,
+      "pFV": 0,
+      "pCF": 0,
+      "pTF": 0,
+      "ordinaryGas": 531700.4500000001,
+      "forcedValidGas": 486264.25000000006,
+      "customerFaultGas": 464793.35,
+      "teacherFaultGas": 554040.7000000001,
+      "expectedGas": 531700.4500000001,
+      "revenueWeight": 1,
+      "costPerAttemptedLesson": 0.07954528922784461,
+      "shares": [
+        0.15909057845568922,
+        0.07954528922784461,
+        0.053030192818563075
+      ]
+    },
+    {
+      "window": "Synchronised",
+      "coordinatorCase": "Low coordinator",
+      "feeMultiplier": 1,
+      "pFV": 0.01,
+      "pCF": 0.003,
+      "pTF": 0.002,
+      "ordinaryGas": 531700.4500000001,
+      "forcedValidGas": 486264.25000000006,
+      "customerFaultGas": 464793.35,
+      "teacherFaultGas": 554040.7000000001,
+      "expectedGas": 531090.0472000001,
+      "revenueWeight": 0.9975,
+      "costPerAttemptedLesson": 0.007945396963751612,
+      "shares": [
+        0.015930620478699975,
+        0.007965310239349987,
+        0.005310206826233324
+      ]
+    },
+    {
+      "window": "Synchronised",
+      "coordinatorCase": "Low coordinator",
+      "feeMultiplier": 5,
+      "pFV": 0.01,
+      "pCF": 0.003,
+      "pTF": 0.002,
+      "ordinaryGas": 531700.4500000001,
+      "forcedValidGas": 486264.25000000006,
+      "customerFaultGas": 464793.35,
+      "teacherFaultGas": 554040.7000000001,
+      "expectedGas": 531090.0472000001,
+      "revenueWeight": 0.9975,
+      "costPerAttemptedLesson": 0.03972698481875806,
+      "shares": [
+        0.07965310239349987,
+        0.03982655119674994,
+        0.026551034131166624
+      ]
+    },
+    {
+      "window": "Synchronised",
+      "coordinatorCase": "Low coordinator",
+      "feeMultiplier": 10,
+      "pFV": 0.01,
+      "pCF": 0.003,
+      "pTF": 0.002,
+      "ordinaryGas": 531700.4500000001,
+      "forcedValidGas": 486264.25000000006,
+      "customerFaultGas": 464793.35,
+      "teacherFaultGas": 554040.7000000001,
+      "expectedGas": 531090.0472000001,
+      "revenueWeight": 0.9975,
+      "costPerAttemptedLesson": 0.07945396963751612,
+      "shares": [
+        0.15930620478699975,
+        0.07965310239349987,
+        0.05310206826233325
+      ]
+    },
+    {
+      "window": "Synchronised",
+      "coordinatorCase": "Elevated coordinator",
+      "feeMultiplier": 1,
+      "pFV": 0.05,
+      "pCF": 0.02,
+      "pTF": 0.01,
+      "ordinaryGas": 531700.4500000001,
+      "forcedValidGas": 486264.25000000006,
+      "customerFaultGas": 464793.35,
+      "teacherFaultGas": 554040.7000000001,
+      "expectedGas": 528313.9005000001,
+      "revenueWeight": 0.985,
+      "costPerAttemptedLesson": 0.007903864293957853,
+      "shares": [
+        0.01604845541920376,
+        0.00802422770960188,
+        0.005349485139734588
+      ]
+    },
+    {
+      "window": "Synchronised",
+      "coordinatorCase": "Elevated coordinator",
+      "feeMultiplier": 5,
+      "pFV": 0.05,
+      "pCF": 0.02,
+      "pTF": 0.01,
+      "ordinaryGas": 531700.4500000001,
+      "forcedValidGas": 486264.25000000006,
+      "customerFaultGas": 464793.35,
+      "teacherFaultGas": 554040.7000000001,
+      "expectedGas": 528313.9005000001,
+      "revenueWeight": 0.985,
+      "costPerAttemptedLesson": 0.039519321469789266,
+      "shares": [
+        0.08024227709601882,
+        0.04012113854800941,
+        0.026747425698672937
+      ]
+    },
+    {
+      "window": "Synchronised",
+      "coordinatorCase": "Elevated coordinator",
+      "feeMultiplier": 10,
+      "pFV": 0.05,
+      "pCF": 0.02,
+      "pTF": 0.01,
+      "ordinaryGas": 531700.4500000001,
+      "forcedValidGas": 486264.25000000006,
+      "customerFaultGas": 464793.35,
+      "teacherFaultGas": 554040.7000000001,
+      "expectedGas": 528313.9005000001,
+      "revenueWeight": 0.985,
+      "costPerAttemptedLesson": 0.07903864293957853,
+      "shares": [
+        0.16048455419203764,
+        0.08024227709601882,
+        0.053494851397345874
+      ]
+    },
+    {
+      "window": "Synchronised",
+      "coordinatorCase": "Coordinator stress",
+      "feeMultiplier": 1,
+      "pFV": 0.1,
+      "pCF": 0.05,
+      "pTF": 0.03,
+      "ordinaryGas": 531700.4500000001,
+      "forcedValidGas": 486264.25000000006,
+      "customerFaultGas": 464793.35,
+      "teacherFaultGas": 554040.7000000001,
+      "expectedGas": 524481.6825,
+      "revenueWeight": 0.96,
+      "costPerAttemptedLesson": 0.007846532221134864,
+      "shares": [
+        0.0163469421273643,
+        0.00817347106368215,
+        0.0054489807091214326
+      ]
+    },
+    {
+      "window": "Synchronised",
+      "coordinatorCase": "Coordinator stress",
+      "feeMultiplier": 5,
+      "pFV": 0.1,
+      "pCF": 0.05,
+      "pTF": 0.03,
+      "ordinaryGas": 531700.4500000001,
+      "forcedValidGas": 486264.25000000006,
+      "customerFaultGas": 464793.35,
+      "teacherFaultGas": 554040.7000000001,
+      "expectedGas": 524481.6825,
+      "revenueWeight": 0.96,
+      "costPerAttemptedLesson": 0.03923266110567432,
+      "shares": [
+        0.0817347106368215,
+        0.04086735531841075,
+        0.027244903545607168
+      ]
+    },
+    {
+      "window": "Synchronised",
+      "coordinatorCase": "Coordinator stress",
+      "feeMultiplier": 10,
+      "pFV": 0.1,
+      "pCF": 0.05,
+      "pTF": 0.03,
+      "ordinaryGas": 531700.4500000001,
+      "forcedValidGas": 486264.25000000006,
+      "customerFaultGas": 464793.35,
+      "teacherFaultGas": 554040.7000000001,
+      "expectedGas": 524481.6825,
+      "revenueWeight": 0.96,
+      "costPerAttemptedLesson": 0.07846532221134864,
+      "shares": [
+        0.163469421273643,
+        0.0817347106368215,
+        0.054489807091214336
+      ]
+    }
+  ],
+  "chapterScaleSummaries": [
+    {
+      "window": "Demand-first",
+      "teachers": 100,
+      "students": 480,
+      "bottleneck": "demand side",
+      "realisedLessons": 2880,
+      "costPerLesson": 0.0072161833510497675,
+      "monthlyCost": 20.78260805102333
+    },
+    {
+      "window": "Demand-first",
+      "teachers": 110,
+      "students": 545,
+      "bottleneck": "demand side",
+      "realisedLessons": 3270,
+      "costPerLesson": 0.0072161833510497675,
+      "monthlyCost": 23.59691955793274
+    },
+    {
+      "window": "Demand-first",
+      "teachers": 125,
+      "students": 620,
+      "bottleneck": "demand side, near-balanced",
+      "realisedLessons": 3720,
+      "costPerLesson": 0.0072161833510497675,
+      "monthlyCost": 26.844202065905137
+    },
+    {
+      "window": "Supply-first",
+      "teachers": 100,
+      "students": 500,
+      "mainResearchNfts": 50,
+      "bottleneck": "balanced",
+      "realisedLessons": 3000,
+      "costPerLesson": 0.007544397528697814,
+      "monthlyCost": 22.633192586093443
+    },
+    {
+      "window": "Supply-first",
+      "teachers": 120,
+      "students": 540,
+      "mainResearchNfts": 80,
+      "bottleneck": "student side",
+      "realisedLessons": 3240,
+      "costPerLesson": 0.007544397528697814,
+      "monthlyCost": 24.443847992980917
+    },
+    {
+      "window": "Supply-first",
+      "teachers": 145,
+      "students": 600,
+      "mainResearchNfts": 120,
+      "bottleneck": "student side",
+      "realisedLessons": 3600,
+      "costPerLesson": 0.007544397528697814,
+      "monthlyCost": 27.159831103312133
+    },
+    {
+      "window": "Synchronised",
+      "teachers": 100,
+      "students": 500,
+      "mainResearchNfts": 45,
+      "bottleneck": "balanced",
+      "realisedLessons": 3000,
+      "costPerLesson": 0.00795452892278446,
+      "monthlyCost": 23.863586768353382
+    },
+    {
+      "window": "Synchronised",
+      "teachers": 120,
+      "students": 600,
+      "mainResearchNfts": 52,
+      "bottleneck": "balanced",
+      "realisedLessons": 3600,
+      "costPerLesson": 0.00795452892278446,
+      "monthlyCost": 28.636304122024058
+    },
+    {
+      "window": "Synchronised",
+      "teachers": 150,
+      "students": 750,
+      "mainResearchNfts": 62,
+      "bottleneck": "balanced",
+      "realisedLessons": 4500,
+      "costPerLesson": 0.00795452892278446,
+      "monthlyCost": 35.79538015253007
+    }
+  ],
+  "researchMaintenanceSummaries": [
+    {
+      "teachers": 120,
+      "students": 600,
+      "existingMainResearchNfts": 60,
+      "newMainResearchNfts": "0",
+      "updateCadence": "annual",
+      "extraStructure": "none",
+      "monthlyMaintenanceCostLow": 0.019472945596481456,
+      "monthlyMaintenanceCostHigh": 0.019472945596481456,
+      "fixedMixCostLow": 28.655777067620537,
+      "fixedMixCostHigh": 28.655777067620537,
+      "upliftLow": 0.06800090372522932,
+      "upliftHigh": 0.06800090372522932
+    },
+    {
+      "teachers": 120,
+      "students": 600,
+      "existingMainResearchNfts": 60,
+      "newMainResearchNfts": "0",
+      "updateCadence": "semiannual",
+      "extraStructure": "none",
+      "monthlyMaintenanceCostLow": 0.03894589119296291,
+      "monthlyMaintenanceCostHigh": 0.03894589119296291,
+      "fixedMixCostLow": 28.67525001321702,
+      "fixedMixCostHigh": 28.67525001321702,
+      "upliftLow": 0.13600180745045864,
+      "upliftHigh": 0.13600180745045864
+    },
+    {
+      "teachers": 120,
+      "students": 600,
+      "existingMainResearchNfts": 60,
+      "newMainResearchNfts": "0",
+      "updateCadence": "semiannual",
+      "extraStructure": "+20 extra prepared positions across the catalogue per cycle",
+      "monthlyMaintenanceCostLow": 0.05076741525638213,
+      "monthlyMaintenanceCostHigh": 0.05076741525638213,
+      "fixedMixCostLow": 28.68707153728044,
+      "fixedMixCostHigh": 28.68707153728044,
+      "upliftLow": 0.1772834058475344,
+      "upliftHigh": 0.1772834058475344
+    },
+    {
+      "teachers": 120,
+      "students": 600,
+      "existingMainResearchNfts": 60,
+      "newMainResearchNfts": "6 per 6 months",
+      "updateCadence": "semiannual",
+      "extraStructure": "none",
+      "monthlyMaintenanceCostLow": 0.044602398749163386,
+      "monthlyMaintenanceCostHigh": 0.044602398749163386,
+      "fixedMixCostLow": 28.68090652077322,
+      "fixedMixCostHigh": 28.68090652077322,
+      "upliftLow": 0.15575473203212656,
+      "upliftHigh": 0.15575473203212656
+    }
+  ],
+  "ordinaryCostRange": {
+    "min": 0.0072161833510497675,
+    "max": 0.00795452892278446
+  }
+}

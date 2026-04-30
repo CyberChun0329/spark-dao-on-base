@@ -2,7 +2,7 @@
   "name": "spark-dao-on-base",
   "private": true,
   "type": "module",
-  "license": "UNLICENSED",
+  "license": "MIT",
   "scripts": {
     "build": "forge build",
     "build:sizes": "forge build --sizes --skip script",

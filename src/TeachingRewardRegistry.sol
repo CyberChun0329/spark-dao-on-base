@@ -1,10 +1,10 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.26;
 
-import {ResearchRegistry} from "./ResearchRegistry.sol";
-import {SparkDaoErrors} from "./SparkDaoErrors.sol";
-import {SparkDaoTypes} from "./SparkDaoTypes.sol";
-import {IERC20} from "./interfaces/IERC20.sol";
+import { ResearchRegistry } from "./ResearchRegistry.sol";
+import { SparkDaoErrors } from "./SparkDaoErrors.sol";
+import { SparkDaoTypes } from "./SparkDaoTypes.sol";
+import { IERC20 } from "./interfaces/IERC20.sol";
 
 abstract contract TeachingRewardRegistry is ResearchRegistry {
     struct TeachingRewardContext {
@@ -27,10 +27,7 @@ abstract contract TeachingRewardRegistry is ResearchRegistry {
         uint64 unlockAt
     );
     event TeachingRewardClaimed(
-        uint64 indexed assetId,
-        uint64 indexed positionId,
-        address indexed holder,
-        uint256 amount
+        uint64 indexed assetId, uint64 indexed positionId, address indexed holder, uint256 amount
     );
 
     constructor(
@@ -49,14 +46,15 @@ abstract contract TeachingRewardRegistry is ResearchRegistry {
             buybackWaitSeconds_,
             researchPositionToken_
         )
-    {}
+    { }
 
     function getTeachingRewardLedgerBuckets(uint64 assetId, uint64 positionId)
         external
         view
         returns (uint64[] memory unlockAts, uint256[] memory amounts)
     {
-        SparkDaoTypes.TeachingRewardLedger storage ledger = teachingRewardLedgers[assetId][positionId];
+        SparkDaoTypes.TeachingRewardLedger storage ledger =
+            teachingRewardLedgers[assetId][positionId];
         if (ledger.unlockedUnits == 0 && ledger.pendingBuckets.length == 0) {
             revert SparkDaoErrors.InvalidTeachingRewardLedger();
         }
@@ -77,7 +75,8 @@ abstract contract TeachingRewardRegistry is ResearchRegistry {
         SparkDaoTypes.ResearchPosition storage position = _requirePosition(assetId, positionId);
         if (position.currentHolder != msg.sender) revert SparkDaoErrors.UnauthorizedHolder();
 
-        SparkDaoTypes.TeachingRewardLedger storage ledger = _requireTeachingRewardLedger(assetId, positionId);
+        SparkDaoTypes.TeachingRewardLedger storage ledger =
+            _requireTeachingRewardLedger(assetId, positionId);
         _compactMaturedTeachingRewards(ledger, uint64(block.timestamp));
 
         uint256 claimAmount = ledger.unlockedUnits;
@@ -146,6 +145,13 @@ abstract contract TeachingRewardRegistry is ResearchRegistry {
         internal
         returns (uint256 distributedUnits)
     {
+        return _recordSettlementRewardsWithPool(session, _researchPoolUnits(session));
+    }
+
+    function _recordSettlementRewardsWithPool(
+        SparkDaoTypes.TeachingSession storage session,
+        uint256 researchPoolUnits
+    ) internal returns (uint256 distributedUnits) {
         if (!_requiresResearchDistribution(session)) {
             _clearSettlementResearchLayers(session);
             return 0;
@@ -153,22 +159,15 @@ abstract contract TeachingRewardRegistry is ResearchRegistry {
 
         uint64 snapshotAt = session.scheduledAt;
         uint64 exactUnlockAt = uint64(block.timestamp) + daoState.rewardUnlockSeconds;
-        uint256 researchPoolUnits = _researchPoolUnits(session);
         uint256 linkCount = session.linkedResearchLinks.length;
 
         _clearSettlementResearchLayers(session);
         for (uint256 assetIndex = 0; assetIndex < linkCount;) {
             (uint64 assetId, uint16 assetWeightBps) =
                 _unpackResearchLink(session.linkedResearchLinks[assetIndex]);
-            (uint16 snapshotActiveLayer, uint256 assetDistributedUnits) =
-                _recordAssetRewards(
-                    session,
-                    assetId,
-                    assetWeightBps,
-                    researchPoolUnits,
-                    snapshotAt,
-                    exactUnlockAt
-                );
+            (uint16 snapshotActiveLayer, uint256 assetDistributedUnits) = _recordAssetRewards(
+                session, assetId, assetWeightBps, researchPoolUnits, snapshotAt, exactUnlockAt
+            );
             _pushSettlementResearchLayer(session, snapshotActiveLayer);
             distributedUnits += assetDistributedUnits;
             unchecked {
@@ -273,7 +272,8 @@ abstract contract TeachingRewardRegistry is ResearchRegistry {
         uint64 exactUnlockAt,
         uint256 amount
     ) internal {
-        SparkDaoTypes.TeachingRewardLedger storage ledger = teachingRewardLedgers[assetId][positionId];
+        SparkDaoTypes.TeachingRewardLedger storage ledger =
+            teachingRewardLedgers[assetId][positionId];
         _compactMaturedTeachingRewards(ledger, uint64(block.timestamp));
 
         uint64 bucketUnlockAt =
@@ -295,9 +295,10 @@ abstract contract TeachingRewardRegistry is ResearchRegistry {
             if (pendingLength >= SparkDaoTypes.MAX_TEACHING_REWARD_BUCKETS) {
                 revert SparkDaoErrors.TeachingRewardLedgerFull();
             }
-            ledger.pendingBuckets.push(
-                SparkDaoTypes.TeachingRewardBucket({unlockAt: bucketUnlockAt, amount: amount})
-            );
+            ledger.pendingBuckets
+                .push(
+                    SparkDaoTypes.TeachingRewardBucket({ unlockAt: bucketUnlockAt, amount: amount })
+                );
         }
 
         emit TeachingRewardAccrued(teachingNftId, assetId, positionId, amount, bucketUnlockAt);
@@ -349,7 +350,9 @@ abstract contract TeachingRewardRegistry is ResearchRegistry {
         weightBps = uint16(packedLink >> 64);
     }
 
-    function _clearSettlementResearchLayers(SparkDaoTypes.TeachingSession storage session) internal {
+    function _clearSettlementResearchLayers(SparkDaoTypes.TeachingSession storage session)
+        internal
+    {
         session.settlementResearchActiveLayersPacked = 0;
         session.settlementResearchLayerCount = 0;
     }
@@ -363,12 +366,17 @@ abstract contract TeachingRewardRegistry is ResearchRegistry {
         session.settlementResearchLayerCount += 1;
     }
 
-    function _snapshotActiveLayer(uint64 assetId, uint64 snapshotAt) internal view returns (uint16) {
+    function _snapshotActiveLayer(uint64 assetId, uint64 snapshotAt)
+        internal
+        view
+        returns (uint16)
+    {
         uint64[] storage positionIds = researchAssetPositionIds[assetId];
         uint16 activeLayer = 0;
         uint256 positionCount = positionIds.length;
         for (uint256 i = 0; i < positionCount;) {
-            SparkDaoTypes.ResearchPosition storage position = researchPositions[assetId][positionIds[i]];
+            SparkDaoTypes.ResearchPosition storage position =
+                researchPositions[assetId][positionIds[i]];
             if (position.exists && position.isActivated && position.activatedAt <= snapshotAt) {
                 if (position.layerIndex > activeLayer) {
                     activeLayer = position.layerIndex;

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.26;
 
 library SparkDaoTypes {
@@ -7,6 +7,7 @@ library SparkDaoTypes {
     uint256 internal constant MAX_URI_LEN = 200;
     uint256 internal constant MAX_COURSE_TYPE_NAME_LEN = 48;
     uint256 internal constant MAX_TEACHING_RESEARCH_LINKS = 8;
+    uint16 internal constant MAX_TEACHING_RESEARCH_SHARE_BPS = 2_500;
     uint64 internal constant DAY_SECONDS = 86_400;
     uint64 internal constant YEAR_SECONDS = 365 * DAY_SECONDS;
     uint64 internal constant DEFAULT_RESEARCH_DECAY_PERIOD_SECONDS = YEAR_SECONDS;
@@ -108,6 +109,11 @@ library SparkDaoTypes {
         address customer;
         uint256 listPriceUnits;
         uint256 teacherSalaryUnits;
+        uint256 faultCustomerChargeUnits;
+        uint256 faultCustomerRefundUnits;
+        uint256 faultTeacherPayoutUnits;
+        uint256 faultResearchRewardUnits;
+        uint256 faultServiceReserveUnits;
         uint256 settlementResearchActiveLayersPacked;
         uint64 teachingNftId;
         uint64 courseTypeId;
@@ -120,6 +126,7 @@ library SparkDaoTypes {
         uint16 customerDiscountBps;
         uint16 researchShareBps;
         uint8 status;
+        uint8 remedialLessonCount;
         uint8 settlementResearchLayerCount;
         bool exists;
         bool teacherConfirmedSchedule;

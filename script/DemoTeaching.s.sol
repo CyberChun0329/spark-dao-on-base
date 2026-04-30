@@ -1,11 +1,11 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.26;
 
-import {TeachingRegistry} from "../src/TeachingRegistry.sol";
-import {TeachingNftToken} from "../src/TeachingNftToken.sol";
-import {ResearchPositionToken} from "../src/ResearchPositionToken.sol";
-import {SparkDaoTypes} from "../src/SparkDaoTypes.sol";
-import {MockERC20} from "../test/mocks/MockERC20.sol";
+import { TeachingRegistry } from "../src/TeachingRegistry.sol";
+import { TeachingNftToken } from "../src/TeachingNftToken.sol";
+import { ResearchPositionToken } from "../src/ResearchPositionToken.sol";
+import { SparkDaoTypes } from "../src/SparkDaoTypes.sol";
+import { MockERC20 } from "../test/mocks/MockERC20.sol";
 
 interface Vm {
     function envUint(string calldata name) external returns (uint256);
@@ -51,7 +51,13 @@ contract DemoTeaching {
         TeachingNftToken teachingToken =
             new TeachingNftToken(authority, "Spark Teaching NFT", "STN", "ipfs://demo-teaching/");
         TeachingRegistry registry = new TeachingRegistry(
-            authority, coordinator, address(stable), 0, 0, address(researchToken), address(teachingToken)
+            authority,
+            coordinator,
+            address(stable),
+            0,
+            0,
+            address(researchToken),
+            address(teachingToken)
         );
         researchToken.setMinter(address(registry));
         teachingToken.setMinter(address(registry));
@@ -61,7 +67,8 @@ contract DemoTeaching {
         VM.stopBroadcast();
 
         VM.startBroadcast(coordinatorPk);
-        uint64 assetId = registry.createResearchAsset("Demo Teaching Research", "ipfs://demo-teaching-research");
+        uint64 assetId =
+            registry.createResearchAsset("Demo Teaching Research", "ipfs://demo-teaching-research");
         uint64 positionOneId = registry.createPatchPosition(
             SparkDaoTypes.CreatePatchPositionParams({
                 assetId: assetId,
