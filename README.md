@@ -1,8 +1,10 @@
 # Spark DAO on Base
 
-Base implementation of the Spark DAO protocol.
+Base/Solidity implementation of the Spark DAO protocol.
 
-This codebase is a protocol-focused migration from the earlier Solana implementation. It preserves the economic logic used in the paper and recasts it in an EVM-native form for Base.
+This repository contains the current EVM-native implementation for research assets,
+teaching settlement, claim-pull rewards, multi-stable reserves, deployment scripts,
+Foundry tests, and gas simulation.
 
 ## Scope
 
@@ -147,5 +149,5 @@ and `TEACHING_REGISTRY`, and record the distributor output as
 state without the distributor, but teaching reward preview and claim helpers require
 `TEACHING_REWARD_DISTRIBUTOR`.
 
-This live worktree is not a review-package or snapshot staging area. Snapshot packaging,
-archival uploads, and supplementary bundle assembly are separate workflows.
+This repository is maintained as the public Base implementation. Packaging,
+archival uploads, and review bundles are separate workflows.
