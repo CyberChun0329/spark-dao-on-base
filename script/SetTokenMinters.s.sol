@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.26;
 
-import {ResearchPositionToken} from "../src/ResearchPositionToken.sol";
-import {TeachingNftToken} from "../src/TeachingNftToken.sol";
+import { ResearchPositionToken } from "../src/ResearchPositionToken.sol";
+import { TeachingNftToken } from "../src/TeachingNftToken.sol";
 
 interface Vm {
     function envAddress(string calldata name) external returns (address);
@@ -22,6 +22,8 @@ contract SetTokenMinters {
 
         ResearchPositionToken(researchPositionToken).setMinter(registry);
         TeachingNftToken(teachingNftToken).setMinter(registry);
+        ResearchPositionToken(researchPositionToken).lockMinter();
+        TeachingNftToken(teachingNftToken).lockMinter();
 
         VM.stopBroadcast();
     }

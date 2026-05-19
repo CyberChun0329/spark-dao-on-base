@@ -6,7 +6,7 @@ library SparkDaoTypes {
     uint256 internal constant MAX_TITLE_LEN = 64;
     uint256 internal constant MAX_URI_LEN = 200;
     uint256 internal constant MAX_COURSE_TYPE_NAME_LEN = 48;
-    uint256 internal constant MAX_TEACHING_RESEARCH_LINKS = 8;
+    uint256 internal constant MAX_TEACHING_RESEARCH_LINKS = 2;
     uint16 internal constant MAX_TEACHING_RESEARCH_SHARE_BPS = 2_500;
     uint64 internal constant DAY_SECONDS = 86_400;
     uint64 internal constant YEAR_SECONDS = 365 * DAY_SECONDS;
@@ -14,10 +14,12 @@ library SparkDaoTypes {
     uint16 internal constant DEFAULT_RESEARCH_DECAY_RATE_BPS = 5_000;
     uint64 internal constant TEACHING_SECOND_ROUND_TIMEOUT_SECONDS = 30 * DAY_SECONDS;
     uint64 internal constant TEACHING_REDEEM_DELAY_SECONDS = 30 * DAY_SECONDS;
-    uint256 internal constant MAX_TEACHING_REWARD_BUCKETS = 128;
+    uint64 internal constant MIN_DECAY_PERIOD_SECONDS = DAY_SECONDS;
+    uint64 internal constant MAX_DECAY_STEPS = 64;
 
     struct DaoState {
         address authority;
+        address treasury;
         uint64 nextAssetId;
         uint64 rewardUnlockSeconds;
         address coordinator;
@@ -25,7 +27,6 @@ library SparkDaoTypes {
         uint64 nextCourseTypeId;
         address stableAsset;
         uint64 nextTeachingNftId;
-        uint256 vaultReservedUnits;
     }
 
     struct ResearchAsset {
@@ -43,6 +44,7 @@ library SparkDaoTypes {
         uint16 preparedNextLayerPositionCount;
         uint16 preparedNextLayerShareBpsTotal;
         uint16 preparedNextLayerPreparableCapacityBps;
+        uint16 teachingEffectiveShareBps;
         bool exists;
         bool currentLayerSealed;
         bool preparedNextLayerSealed;
@@ -53,6 +55,7 @@ library SparkDaoTypes {
     struct ResearchPosition {
         address beneficiary;
         address currentHolder;
+        address stableAsset;
         uint256 buybackFloor;
         uint256 totalClaimedUnits;
         uint256 boughtBackPrice;
@@ -79,6 +82,7 @@ library SparkDaoTypes {
     }
 
     struct RevenueEscrow {
+        address stableAsset;
         uint256 amount;
         uint64 unlockAt;
         bool claimed;
@@ -96,6 +100,7 @@ library SparkDaoTypes {
     }
 
     struct TeachingCourseType {
+        address stableAsset;
         uint256 listPriceUnits;
         uint256 teacherSalaryUnits;
         uint64 courseTypeId;
@@ -107,6 +112,7 @@ library SparkDaoTypes {
     struct TeachingSession {
         address teacher;
         address customer;
+        address stableAsset;
         uint256 listPriceUnits;
         uint256 teacherSalaryUnits;
         uint256 faultCustomerChargeUnits;
@@ -140,14 +146,28 @@ library SparkDaoTypes {
         uint80[] linkedResearchLinks;
     }
 
-    struct TeachingRewardBucket {
-        uint64 unlockAt;
-        uint256 amount;
+    struct LayerCheckpoint {
+        uint64 timestamp;
+        uint16 activeLayer;
     }
 
-    struct TeachingRewardLedger {
-        uint256 unlockedUnits;
-        TeachingRewardBucket[] pendingBuckets;
+    struct ShareCheckpoint {
+        uint64 timestamp;
+        uint16 effectiveShareBps;
+    }
+
+    struct TeachingRewardPool {
+        address stableAsset;
+        uint256 assetPoolUnits;
+        uint256 distributedUnits;
+        uint256 claimedUnits;
+        uint64 snapshotAt;
+        uint64 unlockAt;
+        uint16 snapshotActiveLayer;
+        uint16 totalEffectiveShareBps;
+        uint16 claimedShareBps;
+        bool exists;
+        bool dustReleased;
     }
 
     struct CreateTeachingSessionParams {

@@ -6,7 +6,7 @@ import {
   getResearchPosition,
 } from "../src/research.js";
 import {
-  getTeachingRewardBuckets,
+  getTeachingRewardPreview,
   getTeachingSessionSettlementLayers,
   getTeachingSessionState,
 } from "../src/teaching.js";
@@ -36,10 +36,12 @@ async function main() {
       "researchPosition",
       await getResearchPosition(config, assetId, positionId),
     );
-    console.log(
-      "teachingRewardBuckets",
-      await getTeachingRewardBuckets(config, assetId, positionId),
-    );
+    if (teachingNftId !== undefined) {
+      console.log(
+        "teachingRewardPreview",
+        await getTeachingRewardPreview(config, teachingNftId, assetId, positionId),
+      );
+    }
   }
 
   if (teachingNftId !== undefined) {

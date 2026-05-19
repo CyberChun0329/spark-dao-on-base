@@ -31,6 +31,7 @@ type CoordinatorCase = {
 const root = process.cwd();
 const gasCsvPath = join(root, "teaching_gas_calibration.csv");
 const researchGasCsvPath = join(root, "research_gas_calibration.csv");
+const feeAssumptionsPath = join(root, "simulation_inputs", "fee_assumptions.json");
 const outDir = join(root, "simulation_outputs");
 
 const scenarios: Scenario[] = [
@@ -58,10 +59,12 @@ const coordinatorCases: CoordinatorCase[] = [
 const revenues = [50, 100, 150];
 const feeMultipliers = [1, 5, 10];
 
-// Same reference translation used in the manuscript's no-research anchor.
-const referenceNoResearchUsd = 0.0133;
-const referenceNoResearchGas = 889_005;
-const referenceUsdPerGas = referenceNoResearchUsd / referenceNoResearchGas;
+type FeeAssumptions = {
+  referenceUsdPerGas: number;
+  source: string;
+  measurementWindow: string;
+  unit: string;
+};
 
 function parseCsv(path: string): GasRow[] {
   const [headerLine, ...lines] = readFileSync(path, "utf8").trim().split(/\r?\n/);
@@ -92,6 +95,20 @@ function parseResearchCsv(path: string): ResearchGasRow[] {
       gas: Number(row.gas),
     };
   });
+}
+
+function parseFeeAssumptions(path: string): FeeAssumptions {
+  const assumptions = JSON.parse(readFileSync(path, "utf8")) as FeeAssumptions;
+  if (
+    !Number.isFinite(assumptions.referenceUsdPerGas)
+    || assumptions.referenceUsdPerGas <= 0
+  ) {
+    throw new Error("Invalid referenceUsdPerGas in fee assumptions");
+  }
+  if (!assumptions.source || !assumptions.measurementWindow || !assumptions.unit) {
+    throw new Error("Incomplete fee assumptions");
+  }
+  return assumptions;
 }
 
 function weightedGas(
@@ -132,6 +149,8 @@ const gasRows = parseCsv(gasCsvPath);
 const gasByPath = new Map(gasRows.map((row) => [row.path, row]));
 const researchGasRows = parseResearchCsv(researchGasCsvPath);
 const researchGasByPath = new Map(researchGasRows.map((row) => [row.path, row.gas]));
+const feeAssumptions = parseFeeAssumptions(feeAssumptionsPath);
+const referenceUsdPerGas = feeAssumptions.referenceUsdPerGas;
 
 const simulationRows: string[] = [
   [
@@ -566,7 +585,9 @@ Reference translation coefficient:
 
 \`\`\`text
 referenceUsdPerGas = ${referenceUsdPerGas}
-source = ${referenceNoResearchUsd} / ${referenceNoResearchGas}
+source = ${feeAssumptions.source}
+measurementWindow = ${feeAssumptions.measurementWindow}
+unit = ${feeAssumptions.unit}
 \`\`\`
 
 The simulation uses \`lesson_gas\` for lesson-driven cost. \`setup_gas\` is reported separately because research setup and catalogue maintenance are low-frequency components in the model. Research maintenance rows are generated from \`research_gas_calibration.csv\`.
@@ -624,6 +645,7 @@ writeFileSync(
     {
       gasRows,
       researchGasRows,
+      feeAssumptions,
       summaries,
       chapterScaleSummaries,
       researchMaintenanceSummaries,

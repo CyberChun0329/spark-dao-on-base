@@ -3,180 +3,180 @@
     {
       "path": "ORD_NR",
       "category": "ordinary",
-      "total_gas": 478069,
+      "total_gas": 395611,
       "setup_gas": 0,
-      "lesson_gas": 478069,
+      "lesson_gas": 395611,
       "valid_lesson": true,
       "revenue_weight_bps": 10000
     },
     {
       "path": "ORD_ZS",
       "category": "ordinary",
-      "total_gas": 809746,
-      "setup_gas": 375030,
-      "lesson_gas": 434716,
+      "total_gas": 877122,
+      "setup_gas": 511525,
+      "lesson_gas": 365597,
       "valid_lesson": true,
       "revenue_weight_bps": 10000
     },
     {
       "path": "ORD_RB",
       "category": "ordinary",
-      "total_gas": 1188995,
-      "setup_gas": 581434,
-      "lesson_gas": 607561,
+      "total_gas": 1256333,
+      "setup_gas": 763998,
+      "lesson_gas": 492335,
       "valid_lesson": true,
       "revenue_weight_bps": 10000
     },
     {
       "path": "ORD_WM",
       "category": "ordinary",
-      "total_gas": 1273327,
-      "setup_gas": 683687,
-      "lesson_gas": 589640,
+      "total_gas": 1521201,
+      "setup_gas": 956677,
+      "lesson_gas": 564524,
       "valid_lesson": true,
       "revenue_weight_bps": 10000
     },
     {
       "path": "ORD_ML",
       "category": "ordinary",
-      "total_gas": 1793753,
-      "setup_gas": 1163387,
-      "lesson_gas": 630366,
+      "total_gas": 2225157,
+      "setup_gas": 1480721,
+      "lesson_gas": 744436,
       "valid_lesson": true,
       "revenue_weight_bps": 10000
     },
     {
       "path": "FV_NR",
       "category": "forced_valid",
-      "total_gas": 367104,
+      "total_gas": 297853,
       "setup_gas": 0,
-      "lesson_gas": 367104,
+      "lesson_gas": 297853,
       "valid_lesson": true,
       "revenue_weight_bps": 10000
     },
     {
       "path": "FV_ZS",
       "category": "forced_valid",
-      "total_gas": 753120,
-      "setup_gas": 341865,
-      "lesson_gas": 411255,
+      "total_gas": 820402,
+      "setup_gas": 478360,
+      "lesson_gas": 342042,
       "valid_lesson": true,
       "revenue_weight_bps": 10000
     },
     {
       "path": "FV_RB",
       "category": "forced_valid",
-      "total_gas": 1138823,
-      "setup_gas": 557523,
-      "lesson_gas": 581300,
+      "total_gas": 1201566,
+      "setup_gas": 740087,
+      "lesson_gas": 461479,
       "valid_lesson": true,
       "revenue_weight_bps": 10000
     },
     {
       "path": "FV_WM",
       "category": "forced_valid",
-      "total_gas": 1269839,
-      "setup_gas": 683756,
-      "lesson_gas": 586083,
+      "total_gas": 1517619,
+      "setup_gas": 956746,
+      "lesson_gas": 560873,
       "valid_lesson": true,
       "revenue_weight_bps": 10000
     },
     {
       "path": "FV_ML",
       "category": "forced_valid",
-      "total_gas": 1746498,
-      "setup_gas": 1119689,
-      "lesson_gas": 626809,
+      "total_gas": 2177808,
+      "setup_gas": 1437023,
+      "lesson_gas": 740785,
       "valid_lesson": true,
       "revenue_weight_bps": 10000
     },
     {
       "path": "CF_NR",
       "category": "customer_fault",
-      "total_gas": 431545,
+      "total_gas": 361977,
       "setup_gas": 0,
-      "lesson_gas": 431545,
+      "lesson_gas": 361977,
       "valid_lesson": false,
       "revenue_weight_bps": 5000
     },
     {
       "path": "CF_ZS",
       "category": "customer_fault",
-      "total_gas": 817597,
-      "setup_gas": 341902,
-      "lesson_gas": 475695,
+      "total_gas": 884564,
+      "setup_gas": 478397,
+      "lesson_gas": 406167,
       "valid_lesson": false,
       "revenue_weight_bps": 5000
     },
     {
       "path": "CF_RB",
       "category": "customer_fault",
-      "total_gas": 1033272,
-      "setup_gas": 557571,
-      "lesson_gas": 475701,
+      "total_gas": 1146340,
+      "setup_gas": 740135,
+      "lesson_gas": 406205,
       "valid_lesson": false,
       "revenue_weight_bps": 5000
     },
     {
       "path": "CF_WM",
       "category": "customer_fault",
-      "total_gas": 1161804,
-      "setup_gas": 683826,
-      "lesson_gas": 477978,
+      "total_gas": 1365371,
+      "setup_gas": 956816,
+      "lesson_gas": 408555,
       "valid_lesson": false,
       "revenue_weight_bps": 5000
     },
     {
       "path": "CF_ML",
       "category": "customer_fault",
-      "total_gas": 1633191,
-      "setup_gas": 1119791,
-      "lesson_gas": 513400,
+      "total_gas": 2023600,
+      "setup_gas": 1437125,
+      "lesson_gas": 586475,
       "valid_lesson": false,
       "revenue_weight_bps": 5000
     },
     {
       "path": "TF_NR",
       "category": "teacher_fault",
-      "total_gas": 434876,
+      "total_gas": 365343,
       "setup_gas": 0,
-      "lesson_gas": 434876,
+      "lesson_gas": 365343,
       "valid_lesson": false,
       "revenue_weight_bps": 5000
     },
     {
       "path": "TF_ZS",
       "category": "teacher_fault",
-      "total_gas": 820965,
-      "setup_gas": 341937,
-      "lesson_gas": 479028,
+      "total_gas": 887967,
+      "setup_gas": 478432,
+      "lesson_gas": 409535,
       "valid_lesson": false,
       "revenue_weight_bps": 5000
     },
     {
       "path": "TF_RB",
       "category": "teacher_fault",
-      "total_gas": 1206757,
-      "setup_gas": 557683,
-      "lesson_gas": 649074,
+      "total_gas": 1269214,
+      "setup_gas": 740247,
+      "lesson_gas": 528967,
       "valid_lesson": false,
       "revenue_weight_bps": 5000
     },
     {
       "path": "TF_WM",
       "category": "teacher_fault",
-      "total_gas": 1337765,
-      "setup_gas": 683895,
-      "lesson_gas": 653870,
+      "total_gas": 1585257,
+      "setup_gas": 956885,
+      "lesson_gas": 628372,
       "valid_lesson": false,
       "revenue_weight_bps": 5000
     },
     {
       "path": "TF_ML",
       "category": "teacher_fault",
-      "total_gas": 1814489,
-      "setup_gas": 1119893,
-      "lesson_gas": 694596,
+      "total_gas": 2245512,
+      "setup_gas": 1437227,
+      "lesson_gas": 808285,
       "valid_lesson": false,
       "revenue_weight_bps": 5000
     }
@@ -184,33 +184,39 @@
   "researchGasRows": [
     {
       "path": "createResearchAsset",
-      "gas": 128473
+      "gas": 218852
     },
     {
       "path": "createPatchPosition_current",
-      "gas": 249622
+      "gas": 297843
     },
     {
       "path": "sealLayer_current",
-      "gas": 3768
+      "gas": 3834
     },
     {
       "path": "createPatchPosition_prepared",
-      "gas": 237054
+      "gas": 259356
     },
     {
       "path": "sealLayer_prepared",
-      "gas": 3803
+      "gas": 3869
     },
     {
       "path": "approveEarlyDecay",
-      "gas": 6802
+      "gas": 30699
     },
     {
       "path": "advanceLayer",
-      "gas": 8897
+      "gas": 56161
     }
   ],
+  "feeAssumptions": {
+    "referenceUsdPerGas": 1.4960545778707655e-8,
+    "source": "trailing-twelve-month Base fee translation coefficient",
+    "measurementWindow": "trailing twelve months at calibration time",
+    "unit": "dollars per gas unit"
+  },
   "summaries": [
     {
       "window": "Demand-first",
@@ -219,17 +225,17 @@
       "pFV": 0,
       "pCF": 0,
       "pTF": 0,
-      "ordinaryGas": 482347.6,
-      "forcedValidGas": 397353.8,
-      "customerFaultGas": 444790.6,
-      "teacherFaultGas": 465126.19999999995,
-      "expectedGas": 482347.6,
+      "ordinaryGas": 399280.6,
+      "forcedValidGas": 323053.4,
+      "customerFaultGas": 375237.8,
+      "teacherFaultGas": 390543.8,
+      "expectedGas": 399280.6,
       "revenueWeight": 1,
-      "costPerAttemptedLesson": 0.0072161833510497675,
+      "costPerAttemptedLesson": 0.005973455694849859,
       "shares": [
-        0.014432366702099535,
-        0.0072161833510497675,
-        0.004810788900699845
+        0.011946911389699716,
+        0.005973455694849858,
+        0.003982303796566573
       ]
     },
     {
@@ -239,17 +245,17 @@
       "pFV": 0,
       "pCF": 0,
       "pTF": 0,
-      "ordinaryGas": 482347.6,
-      "forcedValidGas": 397353.8,
-      "customerFaultGas": 444790.6,
-      "teacherFaultGas": 465126.19999999995,
-      "expectedGas": 482347.6,
+      "ordinaryGas": 399280.6,
+      "forcedValidGas": 323053.4,
+      "customerFaultGas": 375237.8,
+      "teacherFaultGas": 390543.8,
+      "expectedGas": 399280.6,
       "revenueWeight": 1,
-      "costPerAttemptedLesson": 0.03608091675524884,
+      "costPerAttemptedLesson": 0.029867278474249297,
       "shares": [
-        0.07216183351049768,
-        0.03608091675524884,
-        0.024053944503499226
+        0.059734556948498586,
+        0.029867278474249293,
+        0.019911518982832863
       ]
     },
     {
@@ -259,17 +265,17 @@
       "pFV": 0,
       "pCF": 0,
       "pTF": 0,
-      "ordinaryGas": 482347.6,
-      "forcedValidGas": 397353.8,
-      "customerFaultGas": 444790.6,
-      "teacherFaultGas": 465126.19999999995,
-      "expectedGas": 482347.6,
+      "ordinaryGas": 399280.6,
+      "forcedValidGas": 323053.4,
+      "customerFaultGas": 375237.8,
+      "teacherFaultGas": 390543.8,
+      "expectedGas": 399280.6,
       "revenueWeight": 1,
-      "costPerAttemptedLesson": 0.07216183351049768,
+      "costPerAttemptedLesson": 0.05973455694849859,
       "shares": [
-        0.14432366702099536,
-        0.07216183351049768,
-        0.04810788900699845
+        0.11946911389699717,
+        0.059734556948498586,
+        0.03982303796566573
       ]
     },
     {
@@ -279,17 +285,17 @@
       "pFV": 0.01,
       "pCF": 0.003,
       "pTF": 0.002,
-      "ordinaryGas": 482347.6,
-      "forcedValidGas": 397353.8,
-      "customerFaultGas": 444790.6,
-      "teacherFaultGas": 465126.19999999995,
-      "expectedGas": 481350.5482,
+      "ordinaryGas": 399280.6,
+      "forcedValidGas": 323053.4,
+      "customerFaultGas": 375237.8,
+      "teacherFaultGas": 390543.8,
+      "expectedGas": 398428.72599999997,
       "revenueWeight": 0.9975,
-      "costPerAttemptedLesson": 0.007201266911952125,
+      "costPerAttemptedLesson": 0.005960711194875169,
       "shares": [
-        0.014438630399904012,
-        0.007219315199952006,
-        0.004812876799968004
+        0.011951300641353722,
+        0.005975650320676861,
+        0.003983766880451241
       ]
     },
     {
@@ -299,17 +305,17 @@
       "pFV": 0.01,
       "pCF": 0.003,
       "pTF": 0.002,
-      "ordinaryGas": 482347.6,
-      "forcedValidGas": 397353.8,
-      "customerFaultGas": 444790.6,
-      "teacherFaultGas": 465126.19999999995,
-      "expectedGas": 481350.5482,
+      "ordinaryGas": 399280.6,
+      "forcedValidGas": 323053.4,
+      "customerFaultGas": 375237.8,
+      "teacherFaultGas": 390543.8,
+      "expectedGas": 398428.72599999997,
       "revenueWeight": 0.9975,
-      "costPerAttemptedLesson": 0.03600633455976063,
+      "costPerAttemptedLesson": 0.029803555974375843,
       "shares": [
-        0.07219315199952006,
-        0.03609657599976003,
-        0.024064383999840018
+        0.059756503206768605,
+        0.029878251603384302,
+        0.0199188344022562
       ]
     },
     {
@@ -319,17 +325,17 @@
       "pFV": 0.01,
       "pCF": 0.003,
       "pTF": 0.002,
-      "ordinaryGas": 482347.6,
-      "forcedValidGas": 397353.8,
-      "customerFaultGas": 444790.6,
-      "teacherFaultGas": 465126.19999999995,
-      "expectedGas": 481350.5482,
+      "ordinaryGas": 399280.6,
+      "forcedValidGas": 323053.4,
+      "customerFaultGas": 375237.8,
+      "teacherFaultGas": 390543.8,
+      "expectedGas": 398428.72599999997,
       "revenueWeight": 0.9975,
-      "costPerAttemptedLesson": 0.07201266911952126,
+      "costPerAttemptedLesson": 0.059607111948751686,
       "shares": [
-        0.14438630399904012,
-        0.07219315199952006,
-        0.048128767999680036
+        0.11951300641353721,
+        0.059756503206768605,
+        0.0398376688045124
       ]
     },
     {
@@ -339,17 +345,17 @@
       "pFV": 0.05,
       "pCF": 0.02,
       "pTF": 0.01,
-      "ordinaryGas": 482347.6,
-      "forcedValidGas": 397353.8,
-      "customerFaultGas": 444790.6,
-      "teacherFaultGas": 465126.19999999995,
-      "expectedGas": 477174.5559999999,
+      "ordinaryGas": 399280.6,
+      "forcedValidGas": 323053.4,
+      "customerFaultGas": 375237.8,
+      "teacherFaultGas": 390543.8,
+      "expectedGas": 394901.01599999995,
       "revenueWeight": 0.985,
-      "costPerAttemptedLesson": 0.007138791789472498,
+      "costPerAttemptedLesson": 0.005907934727926163,
       "shares": [
-        0.014495008709588829,
-        0.007247504354794414,
-        0.004831669569862943
+        0.011995806554164799,
+        0.005997903277082399,
+        0.0039986021847215995
       ]
     },
     {
@@ -359,17 +365,17 @@
       "pFV": 0.05,
       "pCF": 0.02,
       "pTF": 0.01,
-      "ordinaryGas": 482347.6,
-      "forcedValidGas": 397353.8,
-      "customerFaultGas": 444790.6,
-      "teacherFaultGas": 465126.19999999995,
-      "expectedGas": 477174.5559999999,
+      "ordinaryGas": 399280.6,
+      "forcedValidGas": 323053.4,
+      "customerFaultGas": 375237.8,
+      "teacherFaultGas": 390543.8,
+      "expectedGas": 394901.01599999995,
       "revenueWeight": 0.985,
-      "costPerAttemptedLesson": 0.03569395894736249,
+      "costPerAttemptedLesson": 0.029539673639630816,
       "shares": [
-        0.07247504354794415,
-        0.036237521773972076,
-        0.024158347849314716
+        0.05997903277082399,
+        0.029989516385411995,
+        0.019993010923607998
       ]
     },
     {
@@ -379,17 +385,17 @@
       "pFV": 0.05,
       "pCF": 0.02,
       "pTF": 0.01,
-      "ordinaryGas": 482347.6,
-      "forcedValidGas": 397353.8,
-      "customerFaultGas": 444790.6,
-      "teacherFaultGas": 465126.19999999995,
-      "expectedGas": 477174.5559999999,
+      "ordinaryGas": 399280.6,
+      "forcedValidGas": 323053.4,
+      "customerFaultGas": 375237.8,
+      "teacherFaultGas": 390543.8,
+      "expectedGas": 394901.01599999995,
       "revenueWeight": 0.985,
-      "costPerAttemptedLesson": 0.07138791789472498,
+      "costPerAttemptedLesson": 0.05907934727926163,
       "shares": [
-        0.1449500870958883,
-        0.07247504354794415,
-        0.04831669569862943
+        0.11995806554164798,
+        0.05997903277082399,
+        0.039986021847215995
       ]
     },
     {
@@ -399,17 +405,17 @@
       "pFV": 0.1,
       "pCF": 0.05,
       "pTF": 0.03,
-      "ordinaryGas": 482347.6,
-      "forcedValidGas": 397353.8,
-      "customerFaultGas": 444790.6,
-      "teacherFaultGas": 465126.19999999995,
-      "expectedGas": 471453.72799999994,
+      "ordinaryGas": 399280.6,
+      "forcedValidGas": 323053.4,
+      "customerFaultGas": 375237.8,
+      "teacherFaultGas": 390543.8,
+      "expectedGas": 390193.636,
       "revenueWeight": 0.96,
-      "costPerAttemptedLesson": 0.007053205080286386,
+      "costPerAttemptedLesson": 0.005837509753938391,
       "shares": [
-        0.014694177250596636,
-        0.007347088625298318,
-        0.004898059083532212
+        0.012161478654038315,
+        0.006080739327019157,
+        0.004053826218012772
       ]
     },
     {
@@ -419,17 +425,17 @@
       "pFV": 0.1,
       "pCF": 0.05,
       "pTF": 0.03,
-      "ordinaryGas": 482347.6,
-      "forcedValidGas": 397353.8,
-      "customerFaultGas": 444790.6,
-      "teacherFaultGas": 465126.19999999995,
-      "expectedGas": 471453.72799999994,
+      "ordinaryGas": 399280.6,
+      "forcedValidGas": 323053.4,
+      "customerFaultGas": 375237.8,
+      "teacherFaultGas": 390543.8,
+      "expectedGas": 390193.636,
       "revenueWeight": 0.96,
-      "costPerAttemptedLesson": 0.03526602540143193,
+      "costPerAttemptedLesson": 0.029187548769691957,
       "shares": [
-        0.07347088625298319,
-        0.036735443126491595,
-        0.02449029541766106
+        0.06080739327019158,
+        0.03040369663509579,
+        0.02026913109006386
       ]
     },
     {
@@ -439,17 +445,17 @@
       "pFV": 0.1,
       "pCF": 0.05,
       "pTF": 0.03,
-      "ordinaryGas": 482347.6,
-      "forcedValidGas": 397353.8,
-      "customerFaultGas": 444790.6,
-      "teacherFaultGas": 465126.19999999995,
-      "expectedGas": 471453.72799999994,
+      "ordinaryGas": 399280.6,
+      "forcedValidGas": 323053.4,
+      "customerFaultGas": 375237.8,
+      "teacherFaultGas": 390543.8,
+      "expectedGas": 390193.636,
       "revenueWeight": 0.96,
-      "costPerAttemptedLesson": 0.07053205080286386,
+      "costPerAttemptedLesson": 0.05837509753938391,
       "shares": [
-        0.14694177250596638,
-        0.07347088625298319,
-        0.04898059083532212
+        0.12161478654038316,
+        0.06080739327019158,
+        0.04053826218012772
       ]
     },
     {
@@ -459,17 +465,17 @@
       "pFV": 0,
       "pCF": 0,
       "pTF": 0,
-      "ordinaryGas": 504286.25000000006,
-      "forcedValidGas": 442878.85000000003,
-      "customerFaultGas": 456057,
-      "teacherFaultGas": 510653,
-      "expectedGas": 504286.25000000006,
+      "ordinaryGas": 424343.60000000003,
+      "forcedValidGas": 367927.45,
+      "customerFaultGas": 386527.9,
+      "teacherFaultGas": 435418.7,
+      "expectedGas": 424343.60000000003,
       "revenueWeight": 1,
-      "costPerAttemptedLesson": 0.007544397528697814,
+      "costPerAttemptedLesson": 0.00634841185370161,
       "shares": [
-        0.015088795057395627,
-        0.007544397528697813,
-        0.0050295983524652095
+        0.01269682370740322,
+        0.00634841185370161,
+        0.0042322745691344065
       ]
     },
     {
@@ -479,17 +485,17 @@
       "pFV": 0,
       "pCF": 0,
       "pTF": 0,
-      "ordinaryGas": 504286.25000000006,
-      "forcedValidGas": 442878.85000000003,
-      "customerFaultGas": 456057,
-      "teacherFaultGas": 510653,
-      "expectedGas": 504286.25000000006,
+      "ordinaryGas": 424343.60000000003,
+      "forcedValidGas": 367927.45,
+      "customerFaultGas": 386527.9,
+      "teacherFaultGas": 435418.7,
+      "expectedGas": 424343.60000000003,
       "revenueWeight": 1,
-      "costPerAttemptedLesson": 0.03772198764348907,
+      "costPerAttemptedLesson": 0.03174205926850805,
       "shares": [
-        0.07544397528697815,
-        0.03772198764348907,
-        0.025147991762326048
+        0.0634841185370161,
+        0.03174205926850805,
+        0.021161372845672034
       ]
     },
     {
@@ -499,17 +505,17 @@
       "pFV": 0,
       "pCF": 0,
       "pTF": 0,
-      "ordinaryGas": 504286.25000000006,
-      "forcedValidGas": 442878.85000000003,
-      "customerFaultGas": 456057,
-      "teacherFaultGas": 510653,
-      "expectedGas": 504286.25000000006,
+      "ordinaryGas": 424343.60000000003,
+      "forcedValidGas": 367927.45,
+      "customerFaultGas": 386527.9,
+      "teacherFaultGas": 435418.7,
+      "expectedGas": 424343.60000000003,
       "revenueWeight": 1,
-      "costPerAttemptedLesson": 0.07544397528697815,
+      "costPerAttemptedLesson": 0.0634841185370161,
       "shares": [
-        0.1508879505739563,
-        0.07544397528697815,
-        0.050295983524652095
+        0.1269682370740322,
+        0.0634841185370161,
+        0.04232274569134407
       ]
     },
     {
@@ -519,17 +525,17 @@
       "pFV": 0.01,
       "pCF": 0.003,
       "pTF": 0.002,
-      "ordinaryGas": 504286.25000000006,
-      "forcedValidGas": 442878.85000000003,
-      "customerFaultGas": 456057,
-      "teacherFaultGas": 510653,
-      "expectedGas": 503540.22175,
+      "ordinaryGas": 424343.60000000003,
+      "forcedValidGas": 367927.45,
+      "customerFaultGas": 386527.9,
+      "teacherFaultGas": 435418.7,
+      "expectedGas": 423688.1416000001,
       "revenueWeight": 0.9975,
-      "costPerAttemptedLesson": 0.007533236538911479,
+      "costPerAttemptedLesson": 0.006338605838302373,
       "shares": [
-        0.015104233661977905,
-        0.007552116830988952,
-        0.005034744553992635
+        0.012708984136947113,
+        0.0063544920684735565,
+        0.004236328045649038
       ]
     },
     {
@@ -539,17 +545,17 @@
       "pFV": 0.01,
       "pCF": 0.003,
       "pTF": 0.002,
-      "ordinaryGas": 504286.25000000006,
-      "forcedValidGas": 442878.85000000003,
-      "customerFaultGas": 456057,
-      "teacherFaultGas": 510653,
-      "expectedGas": 503540.22175,
+      "ordinaryGas": 424343.60000000003,
+      "forcedValidGas": 367927.45,
+      "customerFaultGas": 386527.9,
+      "teacherFaultGas": 435418.7,
+      "expectedGas": 423688.1416000001,
       "revenueWeight": 0.9975,
-      "costPerAttemptedLesson": 0.0376661826945574,
+      "costPerAttemptedLesson": 0.03169302919151186,
       "shares": [
-        0.07552116830988952,
-        0.03776058415494476,
-        0.025173722769963172
+        0.06354492068473555,
+        0.031772460342367775,
+        0.021181640228245185
       ]
     },
     {
@@ -559,17 +565,17 @@
       "pFV": 0.01,
       "pCF": 0.003,
       "pTF": 0.002,
-      "ordinaryGas": 504286.25000000006,
-      "forcedValidGas": 442878.85000000003,
-      "customerFaultGas": 456057,
-      "teacherFaultGas": 510653,
-      "expectedGas": 503540.22175,
+      "ordinaryGas": 424343.60000000003,
+      "forcedValidGas": 367927.45,
+      "customerFaultGas": 386527.9,
+      "teacherFaultGas": 435418.7,
+      "expectedGas": 423688.1416000001,
       "revenueWeight": 0.9975,
-      "costPerAttemptedLesson": 0.0753323653891148,
+      "costPerAttemptedLesson": 0.06338605838302372,
       "shares": [
-        0.15104233661977903,
-        0.07552116830988952,
-        0.050347445539926344
+        0.1270898413694711,
+        0.06354492068473555,
+        0.04236328045649037
       ]
     },
     {
@@ -579,17 +585,17 @@
       "pFV": 0.05,
       "pCF": 0.02,
       "pTF": 0.01,
-      "ordinaryGas": 504286.25000000006,
-      "forcedValidGas": 442878.85000000003,
-      "customerFaultGas": 456057,
-      "teacherFaultGas": 510653,
-      "expectedGas": 500314.9625000001,
+      "ordinaryGas": 424343.60000000003,
+      "forcedValidGas": 367927.45,
+      "customerFaultGas": 386527.9,
+      "teacherFaultGas": 435418.7,
+      "expectedGas": 420877.2295,
       "revenueWeight": 0.985,
-      "costPerAttemptedLesson": 0.007484984900253655,
+      "costPerAttemptedLesson": 0.006296553059150398,
       "shares": [
-        0.015197938883763766,
-        0.007598969441881883,
-        0.005065979627921256
+        0.01278487930791959,
+        0.006392439653959795,
+        0.004261626435973197
       ]
     },
     {
@@ -599,17 +605,17 @@
       "pFV": 0.05,
       "pCF": 0.02,
       "pTF": 0.01,
-      "ordinaryGas": 504286.25000000006,
-      "forcedValidGas": 442878.85000000003,
-      "customerFaultGas": 456057,
-      "teacherFaultGas": 510653,
-      "expectedGas": 500314.9625000001,
+      "ordinaryGas": 424343.60000000003,
+      "forcedValidGas": 367927.45,
+      "customerFaultGas": 386527.9,
+      "teacherFaultGas": 435418.7,
+      "expectedGas": 420877.2295,
       "revenueWeight": 0.985,
-      "costPerAttemptedLesson": 0.037424924501268275,
+      "costPerAttemptedLesson": 0.03148276529575199,
       "shares": [
-        0.07598969441881884,
-        0.03799484720940942,
-        0.025329898139606278
+        0.06392439653959794,
+        0.03196219826979897,
+        0.021308132179865984
       ]
     },
     {
@@ -619,17 +625,17 @@
       "pFV": 0.05,
       "pCF": 0.02,
       "pTF": 0.01,
-      "ordinaryGas": 504286.25000000006,
-      "forcedValidGas": 442878.85000000003,
-      "customerFaultGas": 456057,
-      "teacherFaultGas": 510653,
-      "expectedGas": 500314.9625000001,
+      "ordinaryGas": 424343.60000000003,
+      "forcedValidGas": 367927.45,
+      "customerFaultGas": 386527.9,
+      "teacherFaultGas": 435418.7,
+      "expectedGas": 420877.2295,
       "revenueWeight": 0.985,
-      "costPerAttemptedLesson": 0.07484984900253655,
+      "costPerAttemptedLesson": 0.06296553059150398,
       "shares": [
-        0.15197938883763767,
-        0.07598969441881884,
-        0.050659796279212556
+        0.1278487930791959,
+        0.06392439653959794,
+        0.04261626435973197
       ]
     },
     {
@@ -639,17 +645,17 @@
       "pFV": 0.1,
       "pCF": 0.05,
       "pTF": 0.03,
-      "ordinaryGas": 504286.25000000006,
-      "forcedValidGas": 442878.85000000003,
-      "customerFaultGas": 456057,
-      "teacherFaultGas": 510653,
-      "expectedGas": 495925.05000000005,
+      "ordinaryGas": 424343.60000000003,
+      "forcedValidGas": 367927.45,
+      "customerFaultGas": 386527.9,
+      "teacherFaultGas": 435418.7,
+      "expectedGas": 417143.45300000004,
       "revenueWeight": 0.96,
-      "costPerAttemptedLesson": 0.007419309413332883,
+      "costPerAttemptedLesson": 0.006240693724894685,
       "shares": [
-        0.015456894611110173,
-        0.007728447305555087,
-        0.0051522982037033906
+        0.013001445260197262,
+        0.006500722630098631,
+        0.004333815086732421
       ]
     },
     {
@@ -659,17 +665,17 @@
       "pFV": 0.1,
       "pCF": 0.05,
       "pTF": 0.03,
-      "ordinaryGas": 504286.25000000006,
-      "forcedValidGas": 442878.85000000003,
-      "customerFaultGas": 456057,
-      "teacherFaultGas": 510653,
-      "expectedGas": 495925.05000000005,
+      "ordinaryGas": 424343.60000000003,
+      "forcedValidGas": 367927.45,
+      "customerFaultGas": 386527.9,
+      "teacherFaultGas": 435418.7,
+      "expectedGas": 417143.45300000004,
       "revenueWeight": 0.96,
-      "costPerAttemptedLesson": 0.03709654706666442,
+      "costPerAttemptedLesson": 0.031203468624473426,
       "shares": [
-        0.07728447305555088,
-        0.03864223652777544,
-        0.025761491018516956
+        0.0650072263009863,
+        0.03250361315049315,
+        0.021669075433662102
       ]
     },
     {
@@ -679,17 +685,17 @@
       "pFV": 0.1,
       "pCF": 0.05,
       "pTF": 0.03,
-      "ordinaryGas": 504286.25000000006,
-      "forcedValidGas": 442878.85000000003,
-      "customerFaultGas": 456057,
-      "teacherFaultGas": 510653,
-      "expectedGas": 495925.05000000005,
+      "ordinaryGas": 424343.60000000003,
+      "forcedValidGas": 367927.45,
+      "customerFaultGas": 386527.9,
+      "teacherFaultGas": 435418.7,
+      "expectedGas": 417143.45300000004,
       "revenueWeight": 0.96,
-      "costPerAttemptedLesson": 0.07419309413332884,
+      "costPerAttemptedLesson": 0.06240693724894685,
       "shares": [
-        0.15456894611110175,
-        0.07728447305555088,
-        0.05152298203703391
+        0.1300144526019726,
+        0.0650072263009863,
+        0.043338150867324204
       ]
     },
     {
@@ -699,17 +705,17 @@
       "pFV": 0,
       "pCF": 0,
       "pTF": 0,
-      "ordinaryGas": 531700.4500000001,
-      "forcedValidGas": 486264.25000000006,
-      "customerFaultGas": 464793.35,
-      "teacherFaultGas": 554040.7000000001,
-      "expectedGas": 531700.4500000001,
+      "ordinaryGas": 465013.05,
+      "forcedValidGas": 422347.9,
+      "customerFaultGas": 402412.5,
+      "teacherFaultGas": 489840.30000000005,
+      "expectedGas": 465013.05,
       "revenueWeight": 1,
-      "costPerAttemptedLesson": 0.00795452892278446,
+      "costPerAttemptedLesson": 0.006956849022221471,
       "shares": [
-        0.01590905784556892,
-        0.00795452892278446,
-        0.005303019281856307
+        0.013913698044442945,
+        0.006956849022221472,
+        0.004637899348147648
       ]
     },
     {
@@ -719,17 +725,17 @@
       "pFV": 0,
       "pCF": 0,
       "pTF": 0,
-      "ordinaryGas": 531700.4500000001,
-      "forcedValidGas": 486264.25000000006,
-      "customerFaultGas": 464793.35,
-      "teacherFaultGas": 554040.7000000001,
-      "expectedGas": 531700.4500000001,
+      "ordinaryGas": 465013.05,
+      "forcedValidGas": 422347.9,
+      "customerFaultGas": 402412.5,
+      "teacherFaultGas": 489840.30000000005,
+      "expectedGas": 465013.05,
       "revenueWeight": 1,
-      "costPerAttemptedLesson": 0.039772644613922305,
+      "costPerAttemptedLesson": 0.03478424511110736,
       "shares": [
-        0.07954528922784461,
-        0.039772644613922305,
-        0.026515096409281538
+        0.06956849022221472,
+        0.03478424511110736,
+        0.02318949674073824
       ]
     },
     {
@@ -739,17 +745,17 @@
       "pFV": 0,
       "pCF": 0,
       "pTF": 0,
-      "ordinaryGas": 531700.4500000001,
-      "forcedValidGas": 486264.25000000006,
-      "customerFaultGas": 464793.35,
-      "teacherFaultGas": 554040.7000000001,
-      "expectedGas": 531700.4500000001,
+      "ordinaryGas": 465013.05,
+      "forcedValidGas": 422347.9,
+      "customerFaultGas": 402412.5,
+      "teacherFaultGas": 489840.30000000005,
+      "expectedGas": 465013.05,
       "revenueWeight": 1,
-      "costPerAttemptedLesson": 0.07954528922784461,
+      "costPerAttemptedLesson": 0.06956849022221472,
       "shares": [
-        0.15909057845568922,
-        0.07954528922784461,
-        0.053030192818563075
+        0.13913698044442943,
+        0.06956849022221472,
+        0.04637899348147648
       ]
     },
     {
@@ -759,17 +765,17 @@
       "pFV": 0.01,
       "pCF": 0.003,
       "pTF": 0.002,
-      "ordinaryGas": 531700.4500000001,
-      "forcedValidGas": 486264.25000000006,
-      "customerFaultGas": 464793.35,
-      "teacherFaultGas": 554040.7000000001,
-      "expectedGas": 531090.0472000001,
+      "ordinaryGas": 465013.05,
+      "forcedValidGas": 422347.9,
+      "customerFaultGas": 402412.5,
+      "teacherFaultGas": 489840.30000000005,
+      "expectedGas": 464448.25135,
       "revenueWeight": 0.9975,
-      "costPerAttemptedLesson": 0.007945396963751612,
+      "costPerAttemptedLesson": 0.006948399326162394,
       "shares": [
-        0.015930620478699975,
-        0.007965310239349987,
-        0.005310206826233324
+        0.013931627721628861,
+        0.0069658138608144305,
+        0.00464387590720962
       ]
     },
     {
@@ -779,17 +785,17 @@
       "pFV": 0.01,
       "pCF": 0.003,
       "pTF": 0.002,
-      "ordinaryGas": 531700.4500000001,
-      "forcedValidGas": 486264.25000000006,
-      "customerFaultGas": 464793.35,
-      "teacherFaultGas": 554040.7000000001,
-      "expectedGas": 531090.0472000001,
+      "ordinaryGas": 465013.05,
+      "forcedValidGas": 422347.9,
+      "customerFaultGas": 402412.5,
+      "teacherFaultGas": 489840.30000000005,
+      "expectedGas": 464448.25135,
       "revenueWeight": 0.9975,
-      "costPerAttemptedLesson": 0.03972698481875806,
+      "costPerAttemptedLesson": 0.03474199663081197,
       "shares": [
-        0.07965310239349987,
-        0.03982655119674994,
-        0.026551034131166624
+        0.06965813860814431,
+        0.034829069304072154,
+        0.0232193795360481
       ]
     },
     {
@@ -799,17 +805,17 @@
       "pFV": 0.01,
       "pCF": 0.003,
       "pTF": 0.002,
-      "ordinaryGas": 531700.4500000001,
-      "forcedValidGas": 486264.25000000006,
-      "customerFaultGas": 464793.35,
-      "teacherFaultGas": 554040.7000000001,
-      "expectedGas": 531090.0472000001,
+      "ordinaryGas": 465013.05,
+      "forcedValidGas": 422347.9,
+      "customerFaultGas": 402412.5,
+      "teacherFaultGas": 489840.30000000005,
+      "expectedGas": 464448.25135,
       "revenueWeight": 0.9975,
-      "costPerAttemptedLesson": 0.07945396963751612,
+      "costPerAttemptedLesson": 0.06948399326162394,
       "shares": [
-        0.15930620478699975,
-        0.07965310239349987,
-        0.05310206826233325
+        0.13931627721628861,
+        0.06965813860814431,
+        0.0464387590720962
       ]
     },
     {
@@ -819,17 +825,17 @@
       "pFV": 0.05,
       "pCF": 0.02,
       "pTF": 0.01,
-      "ordinaryGas": 531700.4500000001,
-      "forcedValidGas": 486264.25000000006,
-      "customerFaultGas": 464793.35,
-      "teacherFaultGas": 554040.7000000001,
-      "expectedGas": 528313.9005000001,
+      "ordinaryGas": 465013.05,
+      "forcedValidGas": 422347.9,
+      "customerFaultGas": 402412.5,
+      "teacherFaultGas": 489840.30000000005,
+      "expectedGas": 461876.05399999995,
       "revenueWeight": 0.985,
-      "costPerAttemptedLesson": 0.007903864293957853,
+      "costPerAttemptedLesson": 0.006909917849955848,
       "shares": [
-        0.01604845541920376,
-        0.00802422770960188,
-        0.005349485139734588
+        0.014030290050671771,
+        0.007015145025335886,
+        0.004676763350223924
       ]
     },
     {
@@ -839,17 +845,17 @@
       "pFV": 0.05,
       "pCF": 0.02,
       "pTF": 0.01,
-      "ordinaryGas": 531700.4500000001,
-      "forcedValidGas": 486264.25000000006,
-      "customerFaultGas": 464793.35,
-      "teacherFaultGas": 554040.7000000001,
-      "expectedGas": 528313.9005000001,
+      "ordinaryGas": 465013.05,
+      "forcedValidGas": 422347.9,
+      "customerFaultGas": 402412.5,
+      "teacherFaultGas": 489840.30000000005,
+      "expectedGas": 461876.05399999995,
       "revenueWeight": 0.985,
-      "costPerAttemptedLesson": 0.039519321469789266,
+      "costPerAttemptedLesson": 0.03454958924977924,
       "shares": [
-        0.08024227709601882,
-        0.04012113854800941,
-        0.026747425698672937
+        0.07015145025335885,
+        0.035075725126679426,
+        0.02338381675111962
       ]
     },
     {
@@ -859,17 +865,17 @@
       "pFV": 0.05,
       "pCF": 0.02,
       "pTF": 0.01,
-      "ordinaryGas": 531700.4500000001,
-      "forcedValidGas": 486264.25000000006,
-      "customerFaultGas": 464793.35,
-      "teacherFaultGas": 554040.7000000001,
-      "expectedGas": 528313.9005000001,
+      "ordinaryGas": 465013.05,
+      "forcedValidGas": 422347.9,
+      "customerFaultGas": 402412.5,
+      "teacherFaultGas": 489840.30000000005,
+      "expectedGas": 461876.05399999995,
       "revenueWeight": 0.985,
-      "costPerAttemptedLesson": 0.07903864293957853,
+      "costPerAttemptedLesson": 0.06909917849955848,
       "shares": [
-        0.16048455419203764,
-        0.08024227709601882,
-        0.053494851397345874
+        0.1403029005067177,
+        0.07015145025335885,
+        0.04676763350223924
       ]
     },
     {
@@ -879,17 +885,17 @@
       "pFV": 0.1,
       "pCF": 0.05,
       "pTF": 0.03,
-      "ordinaryGas": 531700.4500000001,
-      "forcedValidGas": 486264.25000000006,
-      "customerFaultGas": 464793.35,
-      "teacherFaultGas": 554040.7000000001,
-      "expectedGas": 524481.6825,
+      "ordinaryGas": 465013.05,
+      "forcedValidGas": 422347.9,
+      "customerFaultGas": 402412.5,
+      "teacherFaultGas": 489840.30000000005,
+      "expectedGas": 458361.3249999999,
       "revenueWeight": 0.96,
-      "costPerAttemptedLesson": 0.007846532221134864,
+      "costPerAttemptedLesson": 0.0068573355858515955,
       "shares": [
-        0.0163469421273643,
-        0.00817347106368215,
-        0.0054489807091214326
+        0.014286115803857491,
+        0.007143057901928746,
+        0.004762038601285831
       ]
     },
     {
@@ -899,17 +905,17 @@
       "pFV": 0.1,
       "pCF": 0.05,
       "pTF": 0.03,
-      "ordinaryGas": 531700.4500000001,
-      "forcedValidGas": 486264.25000000006,
-      "customerFaultGas": 464793.35,
-      "teacherFaultGas": 554040.7000000001,
-      "expectedGas": 524481.6825,
+      "ordinaryGas": 465013.05,
+      "forcedValidGas": 422347.9,
+      "customerFaultGas": 402412.5,
+      "teacherFaultGas": 489840.30000000005,
+      "expectedGas": 458361.3249999999,
       "revenueWeight": 0.96,
-      "costPerAttemptedLesson": 0.03923266110567432,
+      "costPerAttemptedLesson": 0.03428667792925798,
       "shares": [
-        0.0817347106368215,
-        0.04086735531841075,
-        0.027244903545607168
+        0.07143057901928745,
+        0.03571528950964373,
+        0.023810193006429153
       ]
     },
     {
@@ -919,17 +925,17 @@
       "pFV": 0.1,
       "pCF": 0.05,
       "pTF": 0.03,
-      "ordinaryGas": 531700.4500000001,
-      "forcedValidGas": 486264.25000000006,
-      "customerFaultGas": 464793.35,
-      "teacherFaultGas": 554040.7000000001,
-      "expectedGas": 524481.6825,
+      "ordinaryGas": 465013.05,
+      "forcedValidGas": 422347.9,
+      "customerFaultGas": 402412.5,
+      "teacherFaultGas": 489840.30000000005,
+      "expectedGas": 458361.3249999999,
       "revenueWeight": 0.96,
-      "costPerAttemptedLesson": 0.07846532221134864,
+      "costPerAttemptedLesson": 0.06857335585851596,
       "shares": [
-        0.163469421273643,
-        0.0817347106368215,
-        0.054489807091214336
+        0.1428611580385749,
+        0.07143057901928745,
+        0.047620386012858305
       ]
     }
   ],
@@ -940,8 +946,8 @@
       "students": 480,
       "bottleneck": "demand side",
       "realisedLessons": 2880,
-      "costPerLesson": 0.0072161833510497675,
-      "monthlyCost": 20.78260805102333
+      "costPerLesson": 0.005973455694849859,
+      "monthlyCost": 17.203552401167595
     },
     {
       "window": "Demand-first",
@@ -949,8 +955,8 @@
       "students": 545,
       "bottleneck": "demand side",
       "realisedLessons": 3270,
-      "costPerLesson": 0.0072161833510497675,
-      "monthlyCost": 23.59691955793274
+      "costPerLesson": 0.005973455694849859,
+      "monthlyCost": 19.533200122159037
     },
     {
       "window": "Demand-first",
@@ -958,8 +964,8 @@
       "students": 620,
       "bottleneck": "demand side, near-balanced",
       "realisedLessons": 3720,
-      "costPerLesson": 0.0072161833510497675,
-      "monthlyCost": 26.844202065905137
+      "costPerLesson": 0.005973455694849859,
+      "monthlyCost": 22.221255184841475
     },
     {
       "window": "Supply-first",
@@ -968,8 +974,8 @@
       "mainResearchNfts": 50,
       "bottleneck": "balanced",
       "realisedLessons": 3000,
-      "costPerLesson": 0.007544397528697814,
-      "monthlyCost": 22.633192586093443
+      "costPerLesson": 0.00634841185370161,
+      "monthlyCost": 19.045235561104832
     },
     {
       "window": "Supply-first",
@@ -978,8 +984,8 @@
       "mainResearchNfts": 80,
       "bottleneck": "student side",
       "realisedLessons": 3240,
-      "costPerLesson": 0.007544397528697814,
-      "monthlyCost": 24.443847992980917
+      "costPerLesson": 0.00634841185370161,
+      "monthlyCost": 20.568854405993218
     },
     {
       "window": "Supply-first",
@@ -988,8 +994,8 @@
       "mainResearchNfts": 120,
       "bottleneck": "student side",
       "realisedLessons": 3600,
-      "costPerLesson": 0.007544397528697814,
-      "monthlyCost": 27.159831103312133
+      "costPerLesson": 0.00634841185370161,
+      "monthlyCost": 22.854282673325798
     },
     {
       "window": "Synchronised",
@@ -998,8 +1004,8 @@
       "mainResearchNfts": 45,
       "bottleneck": "balanced",
       "realisedLessons": 3000,
-      "costPerLesson": 0.00795452892278446,
-      "monthlyCost": 23.863586768353382
+      "costPerLesson": 0.006956849022221471,
+      "monthlyCost": 20.870547066664415
     },
     {
       "window": "Synchronised",
@@ -1008,8 +1014,8 @@
       "mainResearchNfts": 52,
       "bottleneck": "balanced",
       "realisedLessons": 3600,
-      "costPerLesson": 0.00795452892278446,
-      "monthlyCost": 28.636304122024058
+      "costPerLesson": 0.006956849022221471,
+      "monthlyCost": 25.044656479997297
     },
     {
       "window": "Synchronised",
@@ -1018,8 +1024,8 @@
       "mainResearchNfts": 62,
       "bottleneck": "balanced",
       "realisedLessons": 4500,
-      "costPerLesson": 0.00795452892278446,
-      "monthlyCost": 35.79538015253007
+      "costPerLesson": 0.006956849022221471,
+      "monthlyCost": 31.305820599996622
     }
   ],
   "researchMaintenanceSummaries": [
@@ -1030,12 +1036,12 @@
       "newMainResearchNfts": "0",
       "updateCadence": "annual",
       "extraStructure": "none",
-      "monthlyMaintenanceCostLow": 0.019472945596481456,
-      "monthlyMaintenanceCostHigh": 0.019472945596481456,
-      "fixedMixCostLow": 28.655777067620537,
-      "fixedMixCostHigh": 28.655777067620537,
-      "upliftLow": 0.06800090372522932,
-      "upliftHigh": 0.06800090372522932
+      "monthlyMaintenanceCostLow": 0.026474107007272173,
+      "monthlyMaintenanceCostHigh": 0.026474107007272173,
+      "fixedMixCostLow": 25.071130587004568,
+      "fixedMixCostHigh": 25.071130587004568,
+      "upliftLow": 0.10570760684386529,
+      "upliftHigh": 0.10570760684386529
     },
     {
       "teachers": 120,
@@ -1044,12 +1050,12 @@
       "newMainResearchNfts": "0",
       "updateCadence": "semiannual",
       "extraStructure": "none",
-      "monthlyMaintenanceCostLow": 0.03894589119296291,
-      "monthlyMaintenanceCostHigh": 0.03894589119296291,
-      "fixedMixCostLow": 28.67525001321702,
-      "fixedMixCostHigh": 28.67525001321702,
-      "upliftLow": 0.13600180745045864,
-      "upliftHigh": 0.13600180745045864
+      "monthlyMaintenanceCostLow": 0.052948214014544345,
+      "monthlyMaintenanceCostHigh": 0.052948214014544345,
+      "fixedMixCostLow": 25.097604694011842,
+      "fixedMixCostHigh": 25.097604694011842,
+      "upliftLow": 0.21141521368773059,
+      "upliftHigh": 0.21141521368773059
     },
     {
       "teachers": 120,
@@ -1058,12 +1064,12 @@
       "newMainResearchNfts": "0",
       "updateCadence": "semiannual",
       "extraStructure": "+20 extra prepared positions across the catalogue per cycle",
-      "monthlyMaintenanceCostLow": 0.05076741525638213,
-      "monthlyMaintenanceCostHigh": 0.05076741525638213,
-      "fixedMixCostLow": 28.68707153728044,
-      "fixedMixCostHigh": 28.68707153728044,
-      "upliftLow": 0.1772834058475344,
-      "upliftHigh": 0.1772834058475344
+      "monthlyMaintenanceCostLow": 0.06588190505115268,
+      "monthlyMaintenanceCostHigh": 0.06588190505115268,
+      "fixedMixCostLow": 25.11053838504845,
+      "fixedMixCostHigh": 25.11053838504845,
+      "upliftLow": 0.2630577309126653,
+      "upliftHigh": 0.2630577309126653
     },
     {
       "teachers": 120,
@@ -1072,16 +1078,16 @@
       "newMainResearchNfts": "6 per 6 months",
       "updateCadence": "semiannual",
       "extraStructure": "none",
-      "monthlyMaintenanceCostLow": 0.044602398749163386,
-      "monthlyMaintenanceCostHigh": 0.044602398749163386,
-      "fixedMixCostLow": 28.68090652077322,
-      "fixedMixCostHigh": 28.68090652077322,
-      "upliftLow": 0.15575473203212656,
-      "upliftHigh": 0.15575473203212656
+      "monthlyMaintenanceCostLow": 0.060678253215673696,
+      "monthlyMaintenanceCostHigh": 0.060678253215673696,
+      "fixedMixCostLow": 25.10533473321297,
+      "fixedMixCostHigh": 25.10533473321297,
+      "upliftLow": 0.24228023755940228,
+      "upliftHigh": 0.24228023755940228
     }
   ],
   "ordinaryCostRange": {
-    "min": 0.0072161833510497675,
-    "max": 0.00795452892278446
+    "min": 0.005973455694849859,
+    "max": 0.006956849022221471
   }
 }

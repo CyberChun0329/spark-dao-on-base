@@ -47,6 +47,7 @@ library SparkDaoErrors {
     error UnauthorizedTeacher();
     error UnauthorizedCustomer();
     error InvalidTeachingStatus();
+    error InvalidScheduledAt();
     error TeachingAlreadyFrozen();
     error TeachingAlreadySigned();
     error TeachingCollateralAlreadyLocked();
@@ -58,6 +59,9 @@ library SparkDaoErrors {
     error TeachingNotRedeemableYet();
     error InvalidTeachingResolutionCode();
     error FaultSettlementInsolvent();
-    error InvalidTeachingRewardLedger();
-    error TeachingRewardLedgerFull();
+    error InvalidTeachingRewardPool();
+    error TeachingRewardDistributorAlreadySet();
+    error UnauthorizedTeachingRewardDistributor();
+    error LinkedResearchLayerNotSealed();
+    error TeachingRewardAlreadyClaimed();
 }

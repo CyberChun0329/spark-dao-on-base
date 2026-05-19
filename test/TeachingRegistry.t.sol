@@ -2,6 +2,7 @@
 pragma solidity ^0.8.26;
 
 import { TeachingRegistry } from "../src/TeachingRegistry.sol";
+import { TeachingRewardDistributor } from "../src/TeachingRewardDistributor.sol";
 import { TeachingNftToken } from "../src/TeachingNftToken.sol";
 import { ResearchPositionToken } from "../src/ResearchPositionToken.sol";
 import { SparkDaoTypes } from "../src/SparkDaoTypes.sol";
@@ -19,12 +20,15 @@ contract TeachingRegistryTest {
     Vm internal constant VM = Vm(address(uint160(uint256(keccak256("hevm cheat code")))));
 
     TeachingRegistry internal registry;
+    TeachingRewardDistributor internal rewardDistributor;
     TeachingNftToken internal teachingToken;
     ResearchPositionToken internal researchToken;
     MockERC20 internal stable;
+    MockERC20 internal eurc;
 
     address internal authority = address(0xA11CE);
     address internal coordinator = address(0xC001);
+    address internal treasury = address(0xDA01);
     address internal teacher = address(0x7001);
     address internal customer = address(0x7002);
     address internal contributorOne = address(0x1001);
@@ -34,6 +38,7 @@ contract TeachingRegistryTest {
 
     function setUp() public {
         stable = new MockERC20("USD Coin", "USDC", 6);
+        eurc = new MockERC20("Euro Coin", "EURC", 6);
         researchToken = new ResearchPositionToken(
             authority, "Spark Research Position", "SRP", "ipfs://research-position/"
         );
@@ -42,12 +47,16 @@ contract TeachingRegistryTest {
         registry = new TeachingRegistry(
             authority,
             coordinator,
+            treasury,
             address(stable),
             90 days,
             30 days,
             address(researchToken),
             address(teachingToken)
         );
+        rewardDistributor = new TeachingRewardDistributor(address(registry));
+        VM.prank(authority);
+        registry.setTeachingRewardDistributor(address(rewardDistributor));
         VM.prank(authority);
         researchToken.setMinter(address(registry));
         VM.prank(authority);
@@ -56,6 +65,166 @@ contract TeachingRegistryTest {
         stable.mint(authority, 1_000_000_000);
         stable.mint(teacher, 1_000_000_000);
         stable.mint(customer, 1_000_000_000);
+        eurc.mint(authority, 1_000_000_000);
+        eurc.mint(teacher, 1_000_000_000);
+        eurc.mint(customer, 1_000_000_000);
+    }
+
+    function testSetTeachingRewardDistributorRequiresAuthorityNonZeroAndOneTime() public {
+        TeachingRegistry unwired = _deployUnwiredRegistry();
+        TeachingRewardDistributor matchingDistributor =
+            new TeachingRewardDistributor(address(unwired));
+
+        VM.expectRevert();
+        VM.prank(coordinator);
+        unwired.setTeachingRewardDistributor(address(matchingDistributor));
+
+        VM.expectRevert();
+        VM.prank(authority);
+        unwired.setTeachingRewardDistributor(address(0));
+
+        VM.prank(authority);
+        unwired.setTeachingRewardDistributor(address(matchingDistributor));
+
+        TeachingRewardDistributor secondMatchingDistributor =
+            new TeachingRewardDistributor(address(unwired));
+        VM.expectRevert();
+        VM.prank(authority);
+        unwired.setTeachingRewardDistributor(address(secondMatchingDistributor));
+    }
+
+    function testSetTeachingRewardDistributorRejectsMismatchedOrNonContractDistributor() public {
+        TeachingRegistry unwired = _deployUnwiredRegistry();
+        TeachingRewardDistributor wrongDistributor =
+            new TeachingRewardDistributor(address(registry));
+
+        VM.expectRevert();
+        VM.prank(authority);
+        unwired.setTeachingRewardDistributor(address(wrongDistributor));
+
+        VM.expectRevert();
+        VM.prank(authority);
+        unwired.setTeachingRewardDistributor(address(0xBEEF));
+    }
+
+    function testSettleTeachingRewardClaimRejectsNonDistributor() public {
+        VM.expectRevert();
+        registry.settleTeachingRewardClaim(address(stable), contributorOne, 0, 0, 0, 0);
+    }
+
+    function testResearchSettlementRevertsWhenRewardDistributorUnset() public {
+        TeachingRegistry unwired = _deployUnwiredRegistry();
+        _wireTokensTo(unwired);
+
+        VM.startPrank(coordinator);
+        uint64 assetId = unwired.createResearchAsset("Unwired Research", "ipfs://unwired");
+        unwired.createPatchPosition(
+            SparkDaoTypes.CreatePatchPositionParams({
+                assetId: assetId,
+                layerIndex: 1,
+                layerShareBps: 10_000,
+                buybackFloor: 250_000,
+                decayWaitSeconds: 365 days,
+                decayPeriodSeconds: 365 days,
+                decayRateBps: 5_000,
+                beneficiary: contributorOne
+            })
+        );
+        unwired.sealLayer(assetId, 1);
+        uint64 courseTypeId =
+            unwired.createTeachingCourseType("Unwired Course", 1_000_000, 400_000, 2_500);
+        uint64[] memory linkedAssetIds = new uint64[](1);
+        linkedAssetIds[0] = assetId;
+        uint64 teachingNftId = unwired.createTeachingSession(
+            SparkDaoTypes.CreateTeachingSessionParams({
+                courseTypeId: courseTypeId,
+                teacher: teacher,
+                customer: customer,
+                scheduledAt: uint64(block.timestamp + 7 days),
+                customerDiscountBps: 8_000,
+                linkedResearchAssetIds: linkedAssetIds,
+                linkedResearchWeightBps: new uint16[](0)
+            })
+        );
+        VM.stopPrank();
+
+        VM.prank(teacher);
+        unwired.confirmTeachingSchedule(teachingNftId, true);
+        VM.prank(customer);
+        unwired.confirmTeachingSchedule(teachingNftId, false);
+
+        VM.startPrank(teacher);
+        stable.approve(address(unwired), 800_000);
+        unwired.lockTeachingCollateral(teachingNftId, true);
+        VM.stopPrank();
+
+        VM.startPrank(customer);
+        stable.approve(address(unwired), 800_000);
+        unwired.lockTeachingCollateral(teachingNftId, false);
+        VM.stopPrank();
+
+        VM.warp(block.timestamp + 8 days);
+        VM.prank(teacher);
+        unwired.confirmTeachingCompletion(teachingNftId, true);
+        VM.expectRevert();
+        VM.prank(customer);
+        unwired.confirmTeachingCompletion(teachingNftId, false);
+    }
+
+    function testRewardDistributorRecordPoolIsRegistryOnlyAndRejectsDuplicatePool() public {
+        VM.expectRevert();
+        rewardDistributor.recordTeachingRewardPool(
+            77,
+            88,
+            address(stable),
+            100,
+            100,
+            uint64(block.timestamp),
+            uint64(block.timestamp),
+            1,
+            10_000
+        );
+
+        VM.expectRevert();
+        VM.prank(address(0xBEEF));
+        rewardDistributor.recordTeachingRewardPool(
+            77,
+            88,
+            address(stable),
+            100,
+            100,
+            uint64(block.timestamp),
+            uint64(block.timestamp),
+            1,
+            10_000
+        );
+
+        VM.prank(address(registry));
+        rewardDistributor.recordTeachingRewardPool(
+            77,
+            88,
+            address(stable),
+            100,
+            100,
+            uint64(block.timestamp),
+            uint64(block.timestamp),
+            1,
+            10_000
+        );
+
+        VM.expectRevert();
+        VM.prank(address(registry));
+        rewardDistributor.recordTeachingRewardPool(
+            77,
+            88,
+            address(stable),
+            100,
+            100,
+            uint64(block.timestamp),
+            uint64(block.timestamp),
+            1,
+            10_000
+        );
     }
 
     function testCreateCourseTypeAndFreezeRoundOne() public {
@@ -86,6 +255,92 @@ contract TeachingRegistryTest {
         assertTrue(status == 1);
         assertTrue(teachingToken.ownerOf(teachingNftId) == teacher);
         assertTrue(teachingToken.balanceOf(teacher) == 1);
+    }
+
+    function testCreateTeachingSessionRejectsPastOrCurrentScheduledAt() public {
+        VM.prank(coordinator);
+        uint64 courseTypeId =
+            registry.createTeachingCourseType("Schedule Bounds", 1_000_000, 400_000, 0);
+
+        VM.expectRevert();
+        VM.prank(coordinator);
+        registry.createTeachingSession(
+            SparkDaoTypes.CreateTeachingSessionParams({
+                courseTypeId: courseTypeId,
+                teacher: teacher,
+                customer: customer,
+                scheduledAt: uint64(block.timestamp),
+                customerDiscountBps: 8_000,
+                linkedResearchAssetIds: new uint64[](0),
+                linkedResearchWeightBps: new uint16[](0)
+            })
+        );
+
+        VM.expectRevert();
+        VM.prank(coordinator);
+        registry.createTeachingSession(
+            SparkDaoTypes.CreateTeachingSessionParams({
+                courseTypeId: courseTypeId,
+                teacher: teacher,
+                customer: customer,
+                scheduledAt: uint64(block.timestamp - 1),
+                customerDiscountBps: 8_000,
+                linkedResearchAssetIds: new uint64[](0),
+                linkedResearchWeightBps: new uint16[](0)
+            })
+        );
+
+        VM.prank(coordinator);
+        uint64 teachingNftId = registry.createTeachingSession(
+            SparkDaoTypes.CreateTeachingSessionParams({
+                courseTypeId: courseTypeId,
+                teacher: teacher,
+                customer: customer,
+                scheduledAt: uint64(block.timestamp + 1),
+                customerDiscountBps: 8_000,
+                linkedResearchAssetIds: new uint64[](0),
+                linkedResearchWeightBps: new uint16[](0)
+            })
+        );
+        assertTrue(teachingToken.ownerOf(teachingNftId) == teacher);
+    }
+
+    function testScheduledSnapshotCannotBeBackfilledAfterResearchUpdate() public {
+        VM.startPrank(coordinator);
+        uint64 assetId = registry.createResearchAsset("No Backfill", "ipfs://no-backfill");
+        registry.createPatchPosition(
+            SparkDaoTypes.CreatePatchPositionParams({
+                assetId: assetId,
+                layerIndex: 1,
+                layerShareBps: 10_000,
+                buybackFloor: 250_000,
+                decayWaitSeconds: 365 days,
+                decayPeriodSeconds: 365 days,
+                decayRateBps: 5_000,
+                beneficiary: contributorOne
+            })
+        );
+        registry.sealLayer(assetId, 1);
+        uint64 courseTypeId =
+            registry.createTeachingCourseType("No Backfill Course", 1_000_000, 400_000, 2_500);
+        uint64[] memory linkedAssetIds = new uint64[](1);
+        linkedAssetIds[0] = assetId;
+        VM.stopPrank();
+
+        VM.warp(block.timestamp + 1 days);
+        VM.expectRevert();
+        VM.prank(coordinator);
+        registry.createTeachingSession(
+            SparkDaoTypes.CreateTeachingSessionParams({
+                courseTypeId: courseTypeId,
+                teacher: teacher,
+                customer: customer,
+                scheduledAt: uint64(block.timestamp - 1),
+                customerDiscountBps: 8_000,
+                linkedResearchAssetIds: linkedAssetIds,
+                linkedResearchWeightBps: new uint16[](0)
+            })
+        );
     }
 
     function testTeachingResearchShareCannotExceedFaultSolvencyCap() public {
@@ -357,15 +612,9 @@ contract TeachingRegistryTest {
         assertTrue(settlementLayers.length == 1);
         assertTrue(settlementLayers[0] == 1);
 
-        (, uint256[] memory amountsA) =
-            registry.getTeachingRewardLedgerBuckets(assetId, layerOnePositionA);
-        (, uint256[] memory amountsB) =
-            registry.getTeachingRewardLedgerBuckets(assetId, layerOnePositionB);
-        assertTrue(amountsA[0] == 120_000);
-        assertTrue(amountsB[0] == 80_000);
-
-        VM.expectRevert();
-        registry.getTeachingRewardLedgerBuckets(assetId, layerTwoPosition);
+        assertTrue(_claimableAmount(teachingNftId, assetId, layerOnePositionA) == 120_000);
+        assertTrue(_claimableAmount(teachingNftId, assetId, layerOnePositionB) == 80_000);
+        assertTrue(_claimableAmount(teachingNftId, assetId, layerTwoPosition) == 0);
     }
 
     function testLinkedResearchWithZeroShareSkipsDistributionCleanly() public {
@@ -433,7 +682,7 @@ contract TeachingRegistryTest {
         assertTrue(settlementLayers.length == 0);
 
         VM.expectRevert();
-        registry.getTeachingRewardLedgerBuckets(assetId, positionId);
+        rewardDistributor.getTeachingRewardClaimable(teachingNftId, assetId, positionId);
     }
 
     function testImmediateTeachingRewardClaimWhenUnlockZero() public {
@@ -475,15 +724,14 @@ contract TeachingRegistryTest {
 
         _completeTeachingLifecycle(teachingNftId);
 
-        (uint64[] memory unlocks, uint256[] memory amounts) =
-            registry.getTeachingRewardLedgerBuckets(assetId, positionId);
-        assertTrue(unlocks.length == 1);
-        assertTrue(unlocks[0] == block.timestamp);
-        assertTrue(amounts[0] == 200_000);
+        (uint256 amount, uint64 unlockAt,) =
+            rewardDistributor.getTeachingRewardClaimable(teachingNftId, assetId, positionId);
+        assertTrue(unlockAt == block.timestamp);
+        assertTrue(amount == 200_000);
 
         uint256 beforeClaim = stable.balanceOf(contributorOne);
         VM.prank(contributorOne);
-        registry.claimTeachingReward(assetId, positionId);
+        rewardDistributor.claimTeachingReward(teachingNftId, assetId, positionId);
         uint256 afterClaim = stable.balanceOf(contributorOne);
         assertTrue(afterClaim == beforeClaim + 200_000);
     }
@@ -710,29 +958,21 @@ contract TeachingRegistryTest {
         assertTrue(settlementLayers.length == 1);
         assertTrue(settlementLayers[0] == 1);
 
-        (uint64[] memory unlocksA, uint256[] memory amountsA) =
-            registry.getTeachingRewardLedgerBuckets(assetId, layerOnePositionA);
-        (uint64[] memory unlocksB, uint256[] memory amountsB) =
-            registry.getTeachingRewardLedgerBuckets(assetId, layerOnePositionB);
-        assertTrue(unlocksA.length == 1);
-        assertTrue(amountsA[0] == 120_000);
-        assertTrue(unlocksB.length == 1);
-        assertTrue(amountsB[0] == 80_000);
-
-        VM.expectRevert();
-        registry.getTeachingRewardLedgerBuckets(assetId, layerTwoPosition);
+        assertTrue(_claimableAmount(teachingNftId, assetId, layerOnePositionA) == 120_000);
+        assertTrue(_claimableAmount(teachingNftId, assetId, layerOnePositionB) == 80_000);
+        assertTrue(_claimableAmount(teachingNftId, assetId, layerTwoPosition) == 0);
 
         VM.warp(block.timestamp + 91 days);
 
         uint256 contributorOneBefore = stable.balanceOf(contributorOne);
         VM.prank(contributorOne);
-        registry.claimTeachingReward(assetId, layerOnePositionA);
+        rewardDistributor.claimTeachingReward(teachingNftId, assetId, layerOnePositionA);
         uint256 contributorOneAfter = stable.balanceOf(contributorOne);
         assertTrue(contributorOneAfter == contributorOneBefore + 120_000);
 
         uint256 contributorTwoBefore = stable.balanceOf(contributorTwo);
         VM.prank(contributorTwo);
-        registry.claimTeachingReward(assetId, layerOnePositionB);
+        rewardDistributor.claimTeachingReward(teachingNftId, assetId, layerOnePositionB);
         uint256 contributorTwoAfter = stable.balanceOf(contributorTwo);
         assertTrue(contributorTwoAfter == contributorTwoBefore + 80_000);
     }
@@ -827,12 +1067,8 @@ contract TeachingRegistryTest {
             registry.getTeachingSessionSettlementResearchLayers(teachingNftId);
         assertTrue(settlementLayers[0] == 1);
 
-        (, uint256[] memory amounts) =
-            registry.getTeachingRewardLedgerBuckets(assetId, layerOnePositionA);
-        assertTrue(amounts[0] == 120_000);
-
-        VM.expectRevert();
-        registry.getTeachingRewardLedgerBuckets(assetId, layerTwoPosition);
+        assertTrue(_claimableAmount(teachingNftId, assetId, layerOnePositionA) == 120_000);
+        assertTrue(_claimableAmount(teachingNftId, assetId, layerTwoPosition) == 0);
     }
 
     function testTransferredResearchPositionLetsNewHolderClaimTeachingReward() public {
@@ -882,16 +1118,16 @@ contract TeachingRegistryTest {
 
         VM.expectRevert();
         VM.prank(contributorOne);
-        registry.claimTeachingReward(assetId, layerOnePosition);
+        rewardDistributor.claimTeachingReward(teachingNftId, assetId, layerOnePosition);
 
         uint256 beforeClaim = stable.balanceOf(contributorTwo);
         VM.prank(contributorTwo);
-        registry.claimTeachingReward(assetId, layerOnePosition);
+        rewardDistributor.claimTeachingReward(teachingNftId, assetId, layerOnePosition);
         uint256 afterClaim = stable.balanceOf(contributorTwo);
         assertTrue(afterClaim == beforeClaim + 200_000);
     }
 
-    function testBoughtBackResearchPositionLetsDaoClaimTeachingReward() public {
+    function testBoughtBackResearchPositionLetsTreasuryClaimTeachingReward() public {
         VM.startPrank(coordinator);
         uint64 assetId = registry.createResearchAsset("Dao Buyback Research", "ipfs://dao-buyback");
         uint64 layerOnePosition = registry.createPatchPosition(
@@ -933,19 +1169,82 @@ contract TeachingRegistryTest {
         VM.warp(block.timestamp + 31 days);
         VM.prank(contributorOne);
         registry.sellPositionBackToDao(assetId, layerOnePosition);
-        assertTrue(researchToken.ownerOf(_researchTokenId(assetId, layerOnePosition)) == authority);
+        assertTrue(researchToken.ownerOf(_researchTokenId(assetId, layerOnePosition)) == treasury);
 
         VM.warp(block.timestamp + 91 days);
 
         VM.expectRevert();
         VM.prank(contributorOne);
-        registry.claimTeachingReward(assetId, layerOnePosition);
+        rewardDistributor.claimTeachingReward(teachingNftId, assetId, layerOnePosition);
 
-        uint256 beforeClaim = stable.balanceOf(authority);
-        VM.prank(authority);
-        registry.claimTeachingReward(assetId, layerOnePosition);
-        uint256 afterClaim = stable.balanceOf(authority);
+        uint256 beforeClaim = stable.balanceOf(treasury);
+        VM.prank(treasury);
+        rewardDistributor.claimTeachingReward(teachingNftId, assetId, layerOnePosition);
+        uint256 afterClaim = stable.balanceOf(treasury);
         assertTrue(afterClaim == beforeClaim + 200_000);
+    }
+
+    function testBoughtBackTeachingRewardClaimUsesTreasuryAfterAuthorityRotation() public {
+        VM.startPrank(coordinator);
+        uint64 assetId =
+            registry.createResearchAsset("Rotated Buyback Research", "ipfs://rotated-buyback");
+        uint64 layerOnePosition = registry.createPatchPosition(
+            SparkDaoTypes.CreatePatchPositionParams({
+                assetId: assetId,
+                layerIndex: 1,
+                layerShareBps: 10_000,
+                buybackFloor: 250_000,
+                decayWaitSeconds: 1 days,
+                decayPeriodSeconds: 365 days,
+                decayRateBps: 5_000,
+                beneficiary: contributorOne
+            })
+        );
+        registry.sealLayer(assetId, 1);
+
+        uint64 courseTypeId =
+            registry.createTeachingCourseType("Rotated Buyback", 1_000_000, 400_000, 2_500);
+        uint64[] memory linkedAssetIds = new uint64[](1);
+        linkedAssetIds[0] = assetId;
+        uint64 teachingNftId = registry.createTeachingSession(
+            SparkDaoTypes.CreateTeachingSessionParams({
+                courseTypeId: courseTypeId,
+                teacher: teacher,
+                customer: customer,
+                scheduledAt: uint64(block.timestamp + 7 days),
+                customerDiscountBps: 8_000,
+                linkedResearchAssetIds: linkedAssetIds,
+                linkedResearchWeightBps: new uint16[](0)
+            })
+        );
+        VM.stopPrank();
+
+        _completeTeachingLifecycle(teachingNftId);
+
+        VM.prank(authority);
+        assertTrue(stable.transfer(address(registry), 500_000));
+
+        VM.warp(block.timestamp + 31 days);
+        VM.prank(contributorOne);
+        registry.sellPositionBackToDao(assetId, layerOnePosition);
+
+        address newAuthority = address(0xA22CE);
+        VM.prank(authority);
+        registry.updateAuthority(newAuthority);
+
+        VM.warp(block.timestamp + 91 days);
+
+        VM.expectRevert();
+        VM.prank(authority);
+        rewardDistributor.claimTeachingReward(teachingNftId, assetId, layerOnePosition);
+        VM.expectRevert();
+        VM.prank(newAuthority);
+        rewardDistributor.claimTeachingReward(teachingNftId, assetId, layerOnePosition);
+
+        uint256 beforeClaim = stable.balanceOf(treasury);
+        VM.prank(treasury);
+        rewardDistributor.claimTeachingReward(teachingNftId, assetId, layerOnePosition);
+        assertTrue(stable.balanceOf(treasury) == beforeClaim + 200_000);
     }
 
     function testResearchForceValidStillDistributesSnapshotRewards() public {
@@ -1018,12 +1317,8 @@ contract TeachingRegistryTest {
         assertTrue(settlementLayers.length == 1);
         assertTrue(settlementLayers[0] == 1);
 
-        (, uint256[] memory amountsA) =
-            registry.getTeachingRewardLedgerBuckets(assetId, layerOnePositionA);
-        (, uint256[] memory amountsB) =
-            registry.getTeachingRewardLedgerBuckets(assetId, layerOnePositionB);
-        assertTrue(amountsA[0] == 120_000);
-        assertTrue(amountsB[0] == 80_000);
+        assertTrue(_claimableAmount(teachingNftId, assetId, layerOnePositionA) == 120_000);
+        assertTrue(_claimableAmount(teachingNftId, assetId, layerOnePositionB) == 80_000);
     }
 
     function testWeightedMultiAssetTeachingDistribution() public {
@@ -1081,14 +1376,8 @@ contract TeachingRegistryTest {
 
         _completeTeachingLifecycle(teachingNftId);
 
-        (, uint256[] memory amountsOne) =
-            registry.getTeachingRewardLedgerBuckets(assetOne, positionOne);
-        (, uint256[] memory amountsTwo) =
-            registry.getTeachingRewardLedgerBuckets(assetTwo, positionTwo);
-        assertTrue(amountsOne.length == 1);
-        assertTrue(amountsTwo.length == 1);
-        assertTrue(amountsOne[0] == 140_000);
-        assertTrue(amountsTwo[0] == 60_000);
+        assertTrue(_claimableAmount(teachingNftId, assetOne, positionOne) == 140_000);
+        assertTrue(_claimableAmount(teachingNftId, assetTwo, positionTwo) == 60_000);
     }
 
     function testBatchTeachingRewardClaim() public {
@@ -1150,13 +1439,16 @@ contract TeachingRegistryTest {
         uint64[] memory assetIds = new uint64[](2);
         assetIds[0] = assetOne;
         assetIds[1] = assetTwo;
+        uint64[] memory teachingNftIds = new uint64[](2);
+        teachingNftIds[0] = teachingNftId;
+        teachingNftIds[1] = teachingNftId;
         uint64[] memory positionIds = new uint64[](2);
         positionIds[0] = positionOne;
         positionIds[1] = positionTwo;
 
         uint256 beforeClaim = stable.balanceOf(contributorOne);
         VM.prank(contributorOne);
-        registry.claimTeachingRewardBatch(assetIds, positionIds);
+        rewardDistributor.claimTeachingRewardBatch(teachingNftIds, assetIds, positionIds);
         uint256 afterClaim = stable.balanceOf(contributorOne);
         assertTrue(afterClaim == beforeClaim + 200_000);
     }
@@ -1208,12 +1500,28 @@ contract TeachingRegistryTest {
 
         _completeTeachingLifecycle(teachingNftId);
 
-        (, uint256[] memory amountsA) = registry.getTeachingRewardLedgerBuckets(assetId, positionA);
-        assertTrue(amountsA.length == 1);
-        assertTrue(amountsA[0] == 2);
+        assertTrue(_claimableAmount(teachingNftId, assetId, positionA) == 2);
+        assertTrue(_claimableAmount(teachingNftId, assetId, positionB) == 0);
+
+        (, uint64 unlockAt,) =
+            rewardDistributor.getTeachingRewardClaimable(teachingNftId, assetId, positionA);
+        VM.warp(unlockAt);
+
+        uint256 reservedBeforeClaim = registry.getVaultReservedUnits(address(stable));
+        VM.prank(contributorOne);
+        rewardDistributor.claimTeachingReward(teachingNftId, assetId, positionA);
+        uint256 reservedAfterPositiveClaim = registry.getVaultReservedUnits(address(stable));
+        assertTrue(reservedAfterPositiveClaim == reservedBeforeClaim - 2);
+
+        VM.prank(contributorTwo);
+        rewardDistributor.claimTeachingReward(teachingNftId, assetId, positionB);
+        uint256 reservedAfterZeroClaim = registry.getVaultReservedUnits(address(stable));
+        assertTrue(reservedAfterZeroClaim == reservedAfterPositiveClaim - 1);
 
         VM.expectRevert();
-        registry.getTeachingRewardLedgerBuckets(assetId, positionB);
+        VM.prank(contributorTwo);
+        rewardDistributor.claimTeachingReward(teachingNftId, assetId, positionB);
+        assertTrue(registry.getVaultReservedUnits(address(stable)) == reservedAfterZeroClaim);
     }
 
     function testBatchTeachingRewardRejectsDuplicateEntries() public {
@@ -1256,17 +1564,20 @@ contract TeachingRegistryTest {
         uint64[] memory assetIds = new uint64[](2);
         assetIds[0] = assetId;
         assetIds[1] = assetId;
+        uint64[] memory teachingNftIds = new uint64[](2);
+        teachingNftIds[0] = teachingNftId;
+        teachingNftIds[1] = teachingNftId;
         uint64[] memory positionIds = new uint64[](2);
         positionIds[0] = positionId;
         positionIds[1] = positionId;
 
         VM.expectRevert();
         VM.prank(contributorOne);
-        registry.claimTeachingRewardBatch(assetIds, positionIds);
+        rewardDistributor.claimTeachingRewardBatch(teachingNftIds, assetIds, positionIds);
 
         uint256 beforeClaim = stable.balanceOf(contributorOne);
         VM.prank(contributorOne);
-        registry.claimTeachingReward(assetId, positionId);
+        rewardDistributor.claimTeachingReward(teachingNftId, assetId, positionId);
         uint256 afterClaim = stable.balanceOf(contributorOne);
         assertTrue(afterClaim == beforeClaim + 200_000);
     }
@@ -1334,23 +1645,26 @@ contract TeachingRegistryTest {
         uint64[] memory assetIds = new uint64[](2);
         assetIds[0] = assetOne;
         assetIds[1] = assetTwo;
+        uint64[] memory teachingNftIds = new uint64[](2);
+        teachingNftIds[0] = teachingNftId;
+        teachingNftIds[1] = teachingNftId;
         uint64[] memory positionIds = new uint64[](2);
         positionIds[0] = positionOne;
         positionIds[1] = positionTwo;
 
         VM.expectRevert();
         VM.prank(contributorOne);
-        registry.claimTeachingRewardBatch(assetIds, positionIds);
+        rewardDistributor.claimTeachingRewardBatch(teachingNftIds, assetIds, positionIds);
 
         uint256 oneBefore = stable.balanceOf(contributorOne);
         VM.prank(contributorOne);
-        registry.claimTeachingReward(assetOne, positionOne);
+        rewardDistributor.claimTeachingReward(teachingNftId, assetOne, positionOne);
         uint256 oneAfter = stable.balanceOf(contributorOne);
         assertTrue(oneAfter == oneBefore + 100_000);
 
         uint256 twoBefore = stable.balanceOf(contributorTwo);
         VM.prank(contributorTwo);
-        registry.claimTeachingReward(assetTwo, positionTwo);
+        rewardDistributor.claimTeachingReward(teachingNftId, assetTwo, positionTwo);
         uint256 twoAfter = stable.balanceOf(contributorTwo);
         assertTrue(twoAfter == twoBefore + 100_000);
     }
@@ -1493,27 +1807,21 @@ contract TeachingRegistryTest {
         VM.prank(customer);
         registry.confirmTeachingCompletion(teachingNftId, false);
 
-        (, uint256[] memory assetOneAmountsA) =
-            registry.getTeachingRewardLedgerBuckets(assetOne, assetOneLayerOneA);
-        (, uint256[] memory assetOneAmountsB) =
-            registry.getTeachingRewardLedgerBuckets(assetOne, assetOneLayerOneB);
-        (, uint256[] memory assetTwoAmountsA) =
-            registry.getTeachingRewardLedgerBuckets(assetTwo, assetTwoLayerOneA);
-        (, uint256[] memory assetTwoAmountsB) =
-            registry.getTeachingRewardLedgerBuckets(assetTwo, assetTwoLayerOneB);
+        uint256 assetOneAmountA = _claimableAmount(teachingNftId, assetOne, assetOneLayerOneA);
+        uint256 assetOneAmountB = _claimableAmount(teachingNftId, assetOne, assetOneLayerOneB);
+        uint256 assetTwoAmountA = _claimableAmount(teachingNftId, assetTwo, assetTwoLayerOneA);
+        uint256 assetTwoAmountB = _claimableAmount(teachingNftId, assetTwo, assetTwoLayerOneB);
 
         uint256 totalDistributed =
-            assetOneAmountsA[0] + assetOneAmountsB[0] + assetTwoAmountsA[0] + assetTwoAmountsB[0];
-        assertTrue(assetOneAmountsA[0] == 84_000);
-        assertTrue(assetOneAmountsB[0] == 56_000);
-        assertTrue(assetTwoAmountsA[0] == 45_000);
-        assertTrue(assetTwoAmountsB[0] == 15_000);
+            assetOneAmountA + assetOneAmountB + assetTwoAmountA + assetTwoAmountB;
+        assertTrue(assetOneAmountA == 84_000);
+        assertTrue(assetOneAmountB == 56_000);
+        assertTrue(assetTwoAmountA == 45_000);
+        assertTrue(assetTwoAmountB == 15_000);
         assertTrue(totalDistributed == 200_000);
 
-        VM.expectRevert();
-        registry.getTeachingRewardLedgerBuckets(assetOne, assetOneLayerTwo);
-        VM.expectRevert();
-        registry.getTeachingRewardLedgerBuckets(assetTwo, assetTwoLayerTwo);
+        assertTrue(_claimableAmount(teachingNftId, assetOne, assetOneLayerTwo) == 0);
+        assertTrue(_claimableAmount(teachingNftId, assetTwo, assetTwoLayerTwo) == 0);
     }
 
     function testPastDeadlineResearchBackedTeachingNeedsCoordinatorAndKeepsSnapshot() public {
@@ -1616,15 +1924,9 @@ contract TeachingRegistryTest {
         assertTrue(settlementLayers.length == 1);
         assertTrue(settlementLayers[0] == 1);
 
-        (, uint256[] memory amountsA) =
-            registry.getTeachingRewardLedgerBuckets(assetId, layerOnePositionA);
-        (, uint256[] memory amountsB) =
-            registry.getTeachingRewardLedgerBuckets(assetId, layerOnePositionB);
-        assertTrue(amountsA[0] == 120_000);
-        assertTrue(amountsB[0] == 80_000);
-
-        VM.expectRevert();
-        registry.getTeachingRewardLedgerBuckets(assetId, layerTwoPosition);
+        assertTrue(_claimableAmount(teachingNftId, assetId, layerOnePositionA) == 120_000);
+        assertTrue(_claimableAmount(teachingNftId, assetId, layerOnePositionB) == 80_000);
+        assertTrue(_claimableAmount(teachingNftId, assetId, layerTwoPosition) == 0);
     }
 
     function testTeacherFaultUsesHalfPriceToFundTwoResearchShares() public {
@@ -1697,8 +1999,7 @@ contract TeachingRegistryTest {
         assertTrue(afterRefund == beforeRefund + 400_000);
         assertTrue(afterTeacher == beforeTeacher + 800_000);
 
-        (, uint256[] memory amounts) = registry.getTeachingRewardLedgerBuckets(assetId, positionId);
-        assertTrue(amounts[0] == 400_000);
+        assertTrue(_claimableAmount(teachingNftId, assetId, positionId) == 400_000);
 
         (
             uint8 remedialLessonCount,
@@ -1831,20 +2132,14 @@ contract TeachingRegistryTest {
         assertTrue(settlementLayers[0] == 1);
         assertTrue(settlementLayers[1] == 1);
 
-        (, uint256[] memory assetOneAmounts) =
-            registry.getTeachingRewardLedgerBuckets(assetOne, assetOneLayerOne);
-        (, uint256[] memory assetTwoAmounts) =
-            registry.getTeachingRewardLedgerBuckets(assetTwo, assetTwoLayerOne);
-        assertTrue(assetOneAmounts[0] == 140_000);
-        assertTrue(assetTwoAmounts[0] == 60_000);
+        assertTrue(_claimableAmount(teachingNftId, assetOne, assetOneLayerOne) == 140_000);
+        assertTrue(_claimableAmount(teachingNftId, assetTwo, assetTwoLayerOne) == 60_000);
 
-        VM.expectRevert();
-        registry.getTeachingRewardLedgerBuckets(assetOne, assetOneLayerTwo);
-        VM.expectRevert();
-        registry.getTeachingRewardLedgerBuckets(assetTwo, assetTwoLayerTwo);
+        assertTrue(_claimableAmount(teachingNftId, assetOne, assetOneLayerTwo) == 0);
+        assertTrue(_claimableAmount(teachingNftId, assetTwo, assetTwoLayerTwo) == 0);
     }
 
-    function testTeachingRewardLedgerSupportsStagedClaims() public {
+    function testTeachingRewardClaimPullSupportsStagedClaims() public {
         VM.startPrank(coordinator);
         uint64 assetId = registry.createResearchAsset("Bucket Research", "ipfs://bucket-research");
         uint64 positionId = registry.createPatchPosition(
@@ -1904,37 +2199,39 @@ contract TeachingRegistryTest {
         VM.prank(teacher);
         registry.confirmTeachingCompletion(teachingTwo, true);
 
-        (uint64[] memory unlocks, uint256[] memory amounts) =
-            registry.getTeachingRewardLedgerBuckets(assetId, positionId);
-        assertTrue(unlocks.length == 2);
-        assertTrue(amounts[0] == 200_000);
-        assertTrue(amounts[1] == 200_000);
-        assertTrue(unlocks[1] > unlocks[0]);
+        (uint256 amountOne, uint64 unlockOne,) =
+            rewardDistributor.getTeachingRewardClaimable(teachingOne, assetId, positionId);
+        (uint256 amountTwo, uint64 unlockTwo,) =
+            rewardDistributor.getTeachingRewardClaimable(teachingTwo, assetId, positionId);
+        assertTrue(amountOne == 200_000);
+        assertTrue(amountTwo == 200_000);
+        assertTrue(unlockTwo > unlockOne);
 
         uint256 beforeFirstClaim = stable.balanceOf(contributorOne);
-        VM.warp(unlocks[0]);
+        VM.warp(unlockOne);
         VM.prank(contributorOne);
-        registry.claimTeachingReward(assetId, positionId);
+        rewardDistributor.claimTeachingReward(teachingOne, assetId, positionId);
         uint256 afterFirstClaim = stable.balanceOf(contributorOne);
         assertTrue(afterFirstClaim == beforeFirstClaim + 200_000);
 
-        (, uint256[] memory remainingAmounts) =
-            registry.getTeachingRewardLedgerBuckets(assetId, positionId);
-        assertTrue(remainingAmounts.length == 1);
-        assertTrue(remainingAmounts[0] == 200_000);
+        (,, bool firstClaimed) =
+            rewardDistributor.getTeachingRewardClaimable(teachingOne, assetId, positionId);
+        assertTrue(firstClaimed);
+        assertTrue(_claimableAmount(teachingTwo, assetId, positionId) == 200_000);
 
         uint256 beforeSecondClaim = stable.balanceOf(contributorOne);
-        VM.warp(unlocks[1]);
+        VM.warp(unlockTwo);
         VM.prank(contributorOne);
-        registry.claimTeachingReward(assetId, positionId);
+        rewardDistributor.claimTeachingReward(teachingTwo, assetId, positionId);
         uint256 afterSecondClaim = stable.balanceOf(contributorOne);
         assertTrue(afterSecondClaim == beforeSecondClaim + 200_000);
 
         VM.expectRevert();
-        registry.getTeachingRewardLedgerBuckets(assetId, positionId);
+        VM.prank(contributorOne);
+        rewardDistributor.claimTeachingReward(teachingTwo, assetId, positionId);
     }
 
-    function testBatchTeachingRewardClaimRevertsWhenOneLedgerIsLocked() public {
+    function testBatchTeachingRewardClaimRevertsWhenOnePoolIsLocked() public {
         VM.startPrank(coordinator);
         uint64 assetOne = registry.createResearchAsset("Atomic One", "ipfs://atomic-one");
         uint64 positionOne = registry.createPatchPosition(
@@ -2011,12 +2308,15 @@ contract TeachingRegistryTest {
         VM.prank(customer);
         registry.confirmTeachingCompletion(teachingTwo, false);
 
-        (uint64[] memory unlocksOne,) =
-            registry.getTeachingRewardLedgerBuckets(assetOne, positionOne);
-        (uint64[] memory unlocksTwo,) =
-            registry.getTeachingRewardLedgerBuckets(assetTwo, positionTwo);
-        assertTrue(unlocksTwo[0] > unlocksOne[0]);
+        (, uint64 unlockOne,) =
+            rewardDistributor.getTeachingRewardClaimable(teachingOne, assetOne, positionOne);
+        (, uint64 unlockTwo,) =
+            rewardDistributor.getTeachingRewardClaimable(teachingTwo, assetTwo, positionTwo);
+        assertTrue(unlockTwo > unlockOne);
 
+        uint64[] memory teachingNftIds = new uint64[](2);
+        teachingNftIds[0] = teachingOne;
+        teachingNftIds[1] = teachingTwo;
         uint64[] memory assetIds = new uint64[](2);
         assetIds[0] = assetOne;
         assetIds[1] = assetTwo;
@@ -2025,25 +2325,25 @@ contract TeachingRegistryTest {
         positionIds[1] = positionTwo;
 
         uint256 beforeBatch = stable.balanceOf(contributorOne);
-        VM.warp(unlocksOne[0]);
+        VM.warp(unlockOne);
         VM.expectRevert();
         VM.prank(contributorOne);
-        registry.claimTeachingRewardBatch(assetIds, positionIds);
+        rewardDistributor.claimTeachingRewardBatch(teachingNftIds, assetIds, positionIds);
         uint256 afterFailedBatch = stable.balanceOf(contributorOne);
         assertTrue(afterFailedBatch == beforeBatch);
 
         VM.prank(contributorOne);
-        registry.claimTeachingReward(assetOne, positionOne);
+        rewardDistributor.claimTeachingReward(teachingOne, assetOne, positionOne);
         uint256 afterSingleClaim = stable.balanceOf(contributorOne);
         assertTrue(afterSingleClaim == beforeBatch + 200_000);
 
         VM.expectRevert();
         VM.prank(contributorOne);
-        registry.claimTeachingReward(assetTwo, positionTwo);
+        rewardDistributor.claimTeachingReward(teachingTwo, assetTwo, positionTwo);
 
-        VM.warp(unlocksTwo[0]);
+        VM.warp(unlockTwo);
         VM.prank(contributorOne);
-        registry.claimTeachingReward(assetTwo, positionTwo);
+        rewardDistributor.claimTeachingReward(teachingTwo, assetTwo, positionTwo);
         uint256 afterSecondClaim = stable.balanceOf(contributorOne);
         assertTrue(afterSecondClaim == beforeBatch + 400_000);
     }
@@ -2085,8 +2385,8 @@ contract TeachingRegistryTest {
 
         _prepareTeachingSession(teachingNftId);
 
-        SparkDaoTypes.DaoState memory daoAfterCollateral = registry.getDaoState();
-        assertTrue(daoAfterCollateral.vaultReservedUnits == 1_600_000);
+        uint256 reservedAfterCollateral = registry.getVaultReservedUnits(address(stable));
+        assertTrue(reservedAfterCollateral == 1_600_000);
         assertTrue(stable.balanceOf(address(registry)) == 1_600_000);
 
         VM.warp(block.timestamp + 8 days);
@@ -2095,59 +2395,332 @@ contract TeachingRegistryTest {
         VM.prank(customer);
         registry.confirmTeachingCompletion(teachingNftId, false);
 
-        SparkDaoTypes.DaoState memory daoAfterSettlement = registry.getDaoState();
-        assertTrue(daoAfterSettlement.vaultReservedUnits == 600_000);
+        uint256 reservedAfterSettlement = registry.getVaultReservedUnits(address(stable));
+        assertTrue(reservedAfterSettlement == 600_000);
         assertTrue(stable.balanceOf(address(registry)) == 800_000);
-        assertTrue(
-            stable.balanceOf(address(registry)) - daoAfterSettlement.vaultReservedUnits == 200_000
-        );
+        assertTrue(stable.balanceOf(address(registry)) - reservedAfterSettlement == 200_000);
 
         VM.warp(block.timestamp + 31 days);
         VM.prank(teacher);
         registry.redeemTeachingPayout(teachingNftId);
 
-        SparkDaoTypes.DaoState memory daoAfterRedeem = registry.getDaoState();
-        assertTrue(daoAfterRedeem.vaultReservedUnits == 200_000);
+        uint256 reservedAfterRedeem = registry.getVaultReservedUnits(address(stable));
+        assertTrue(reservedAfterRedeem == 200_000);
         assertTrue(stable.balanceOf(address(registry)) == 400_000);
-        assertTrue(
-            stable.balanceOf(address(registry)) - daoAfterRedeem.vaultReservedUnits == 200_000
+        assertTrue(stable.balanceOf(address(registry)) - reservedAfterRedeem == 200_000);
+
+        (, uint64 unlockAt,) =
+            rewardDistributor.getTeachingRewardClaimable(teachingNftId, assetId, positionId);
+        VM.warp(unlockAt);
+        uint256 contributorBeforeClaim = stable.balanceOf(contributorOne);
+        VM.prank(contributorOne);
+        rewardDistributor.claimTeachingReward(teachingNftId, assetId, positionId);
+
+        assertTrue(registry.getVaultReservedUnits(address(stable)) == 0);
+        assertTrue(stable.balanceOf(address(registry)) == 200_000);
+        assertTrue(stable.balanceOf(contributorOne) == contributorBeforeClaim + 200_000);
+        SparkDaoTypes.ResearchPosition memory position =
+            registry.getResearchPosition(assetId, positionId);
+        assertTrue(position.totalClaimedUnits == 200_000);
+    }
+
+    function testSettlementGasDoesNotScaleLinearlyWithResearchPositionCount() public {
+        uint64 singleAsset = _createResearchAssetWithPositions(
+            "Single settlement asset", 1, SparkDaoTypes.BASIS_POINTS_DENOMINATOR
+        );
+        uint64 manyAsset = _createResearchAssetWithPositions("Many settlement asset", 20, 500);
+
+        uint64 singleTeaching =
+            _createResearchBackedTeachingSession(singleAsset, "Single settlement gas");
+        uint64 manyTeaching = _createResearchBackedTeachingSession(manyAsset, "Many settlement gas");
+
+        uint256 singleSettlementGas = _settleTeachingAndMeasureSecondCompletion(singleTeaching);
+        uint256 manySettlementGas = _settleTeachingAndMeasureSecondCompletion(manyTeaching);
+
+        assertTrue(manySettlementGas < singleSettlementGas + 100_000);
+    }
+
+    function testStableAssetDefaultSwitchOnlyAffectsFutureTeachingSessions() public {
+        VM.prank(coordinator);
+        uint64 usdcCourse = registry.createTeachingCourseType("USDC Course", 1_000_000, 400_000, 0);
+        VM.prank(coordinator);
+        uint64 usdcTeaching = registry.createTeachingSession(
+            SparkDaoTypes.CreateTeachingSessionParams({
+                courseTypeId: usdcCourse,
+                teacher: teacher,
+                customer: customer,
+                scheduledAt: uint64(block.timestamp + 7 days),
+                customerDiscountBps: 8_000,
+                linkedResearchAssetIds: new uint64[](0),
+                linkedResearchWeightBps: new uint16[](0)
+            })
         );
 
-        (uint64[] memory unlocks,) = registry.getTeachingRewardLedgerBuckets(assetId, positionId);
-        VM.warp(unlocks[0]);
-        VM.prank(contributorOne);
-        registry.claimTeachingReward(assetId, positionId);
+        VM.prank(authority);
+        registry.updateStableAsset(address(eurc));
 
-        SparkDaoTypes.DaoState memory daoAfterRewardClaim = registry.getDaoState();
-        assertTrue(daoAfterRewardClaim.vaultReservedUnits == 0);
-        assertTrue(stable.balanceOf(address(registry)) == 200_000);
+        VM.prank(coordinator);
+        uint64 eurcCourse = registry.createTeachingCourseType("EURC Course", 1_000_000, 400_000, 0);
+        VM.prank(coordinator);
+        uint64 eurcTeaching = registry.createTeachingSession(
+            SparkDaoTypes.CreateTeachingSessionParams({
+                courseTypeId: eurcCourse,
+                teacher: teacher,
+                customer: customer,
+                scheduledAt: uint64(block.timestamp + 7 days),
+                customerDiscountBps: 8_000,
+                linkedResearchAssetIds: new uint64[](0),
+                linkedResearchWeightBps: new uint16[](0)
+            })
+        );
+
+        _prepareTeachingSessionWithStable(usdcTeaching, stable);
+        _prepareTeachingSessionWithStable(eurcTeaching, eurc);
+
+        assertTrue(registry.getVaultReservedUnits(address(stable)) == 1_600_000);
+        assertTrue(registry.getVaultReservedUnits(address(eurc)) == 1_600_000);
+
+        _settlePreparedTeaching(usdcTeaching);
+        _settlePreparedTeaching(eurcTeaching);
+
+        assertTrue(registry.getVaultReservedUnits(address(stable)) == 400_000);
+        assertTrue(registry.getVaultReservedUnits(address(eurc)) == 400_000);
+
+        VM.warp(block.timestamp + 31 days);
+        uint256 teacherUsdcBefore = stable.balanceOf(teacher);
+        VM.prank(teacher);
+        registry.redeemTeachingPayout(usdcTeaching);
+        assertTrue(stable.balanceOf(teacher) == teacherUsdcBefore + 400_000);
+
+        uint256 teacherEurcBefore = eurc.balanceOf(teacher);
+        VM.prank(teacher);
+        registry.redeemTeachingPayout(eurcTeaching);
+        assertTrue(eurc.balanceOf(teacher) == teacherEurcBefore + 400_000);
+
+        assertTrue(registry.getVaultReservedUnits(address(stable)) == 0);
+        assertTrue(registry.getVaultReservedUnits(address(eurc)) == 0);
+    }
+
+    function testTeachingRewardPoolUsesFrozenSessionStableAsset() public {
+        VM.startPrank(coordinator);
+        uint64 assetId = registry.createResearchAsset("EURC Reward Asset", "ipfs://eurc-reward");
+        uint64 positionId = registry.createPatchPosition(
+            SparkDaoTypes.CreatePatchPositionParams({
+                assetId: assetId,
+                layerIndex: 1,
+                layerShareBps: 10_000,
+                buybackFloor: 250_000,
+                decayWaitSeconds: 365 days,
+                decayPeriodSeconds: 365 days,
+                decayRateBps: 5_000,
+                beneficiary: contributorOne
+            })
+        );
+        registry.sealLayer(assetId, 1);
+        VM.stopPrank();
+
+        VM.prank(authority);
+        registry.updateStableAsset(address(eurc));
+
+        uint64 teachingNftId = _createResearchBackedTeachingSession(assetId, "EURC reward seminar");
+        _prepareTeachingSessionWithStable(teachingNftId, eurc);
+        _settlePreparedTeaching(teachingNftId);
+
+        (, uint64 unlockAt,) =
+            rewardDistributor.getTeachingRewardClaimable(teachingNftId, assetId, positionId);
+        VM.warp(unlockAt);
+
+        uint256 stableBefore = stable.balanceOf(contributorOne);
+        uint256 eurcBefore = eurc.balanceOf(contributorOne);
+        VM.prank(contributorOne);
+        rewardDistributor.claimTeachingReward(teachingNftId, assetId, positionId);
+
+        assertTrue(stable.balanceOf(contributorOne) == stableBefore);
+        assertTrue(eurc.balanceOf(contributorOne) == eurcBefore + 200_000);
+    }
+
+    function testLockedTokenMintersBlockRotationButRegistryStillMints() public {
+        VM.prank(authority);
+        researchToken.lockMinter();
+        VM.prank(authority);
+        teachingToken.lockMinter();
+
+        VM.expectRevert();
+        VM.prank(authority);
+        researchToken.setMinter(address(0xBEEF));
+        VM.expectRevert();
+        VM.prank(authority);
+        teachingToken.setMinter(address(0xBEEF));
+
+        VM.startPrank(coordinator);
+        uint64 assetId = registry.createResearchAsset("Locked Minter Research", "ipfs://locked");
+        uint64 positionId = registry.createPatchPosition(
+            SparkDaoTypes.CreatePatchPositionParams({
+                assetId: assetId,
+                layerIndex: 1,
+                layerShareBps: 10_000,
+                buybackFloor: 250_000,
+                decayWaitSeconds: 365 days,
+                decayPeriodSeconds: 365 days,
+                decayRateBps: 5_000,
+                beneficiary: contributorOne
+            })
+        );
+        uint64 courseTypeId =
+            registry.createTeachingCourseType("Locked Minter Teaching", 1_000_000, 400_000, 0);
+        uint64 teachingNftId = registry.createTeachingSession(
+            SparkDaoTypes.CreateTeachingSessionParams({
+                courseTypeId: courseTypeId,
+                teacher: teacher,
+                customer: customer,
+                scheduledAt: uint64(block.timestamp + 7 days),
+                customerDiscountBps: 8_000,
+                linkedResearchAssetIds: new uint64[](0),
+                linkedResearchWeightBps: new uint16[](0)
+            })
+        );
+        VM.stopPrank();
+
+        assertTrue(researchToken.ownerOf(_researchTokenId(assetId, positionId)) == contributorOne);
+        assertTrue(teachingToken.ownerOf(teachingNftId) == teacher);
+
+        address newAuthority = address(0xA22CE);
+        VM.prank(authority);
+        registry.updateAuthority(newAuthority);
+        VM.prank(newAuthority);
+        registry.updateCoordinator(address(0xC002));
     }
 
     function _prepareTeachingSession(uint64 teachingNftId) internal {
+        _prepareTeachingSessionWithStable(teachingNftId, stable);
+    }
+
+    function _prepareTeachingSessionWithStable(uint64 teachingNftId, MockERC20 stableAsset)
+        internal
+    {
         VM.prank(teacher);
         registry.confirmTeachingSchedule(teachingNftId, true);
         VM.prank(customer);
         registry.confirmTeachingSchedule(teachingNftId, false);
 
         VM.startPrank(teacher);
-        stable.approve(address(registry), 800_000);
+        stableAsset.approve(address(registry), 800_000);
         registry.lockTeachingCollateral(teachingNftId, true);
         VM.stopPrank();
 
         VM.startPrank(customer);
-        stable.approve(address(registry), 800_000);
+        stableAsset.approve(address(registry), 800_000);
         registry.lockTeachingCollateral(teachingNftId, false);
         VM.stopPrank();
     }
 
     function _completeTeachingLifecycle(uint64 teachingNftId) internal {
         _prepareTeachingSession(teachingNftId);
+        _settlePreparedTeaching(teachingNftId);
+    }
+
+    function _settlePreparedTeaching(uint64 teachingNftId) internal {
         VM.warp(block.timestamp + 8 days);
 
         VM.prank(teacher);
         registry.confirmTeachingCompletion(teachingNftId, true);
         VM.prank(customer);
         registry.confirmTeachingCompletion(teachingNftId, false);
+    }
+
+    function _settleTeachingAndMeasureSecondCompletion(uint64 teachingNftId)
+        internal
+        returns (uint256 gasUsed)
+    {
+        _prepareTeachingSession(teachingNftId);
+        VM.warp(block.timestamp + 8 days);
+
+        VM.prank(teacher);
+        registry.confirmTeachingCompletion(teachingNftId, true);
+        VM.prank(customer);
+        uint256 gasBefore = gasleft();
+        registry.confirmTeachingCompletion(teachingNftId, false);
+        gasUsed = gasBefore - gasleft();
+    }
+
+    function _createResearchAssetWithPositions(
+        string memory title,
+        uint64 positionCount,
+        uint16 shareBps
+    ) internal returns (uint64 assetId) {
+        VM.startPrank(coordinator);
+        assetId = registry.createResearchAsset(title, "ipfs://scalable-asset");
+        for (uint64 i = 0; i < positionCount;) {
+            registry.createPatchPosition(
+                SparkDaoTypes.CreatePatchPositionParams({
+                    assetId: assetId,
+                    layerIndex: 1,
+                    layerShareBps: shareBps,
+                    buybackFloor: 250_000,
+                    decayWaitSeconds: 365 days,
+                    decayPeriodSeconds: 365 days,
+                    decayRateBps: 5_000,
+                    beneficiary: address(uint160(0x9000 + i))
+                })
+            );
+            unchecked {
+                ++i;
+            }
+        }
+        registry.sealLayer(assetId, 1);
+        VM.stopPrank();
+    }
+
+    function _createResearchBackedTeachingSession(uint64 assetId, string memory courseTitle)
+        internal
+        returns (uint64 teachingNftId)
+    {
+        VM.prank(coordinator);
+        uint64 courseTypeId =
+            registry.createTeachingCourseType(courseTitle, 1_000_000, 400_000, 2_500);
+        uint64[] memory linkedAssetIds = new uint64[](1);
+        linkedAssetIds[0] = assetId;
+        VM.prank(coordinator);
+        teachingNftId = registry.createTeachingSession(
+            SparkDaoTypes.CreateTeachingSessionParams({
+                courseTypeId: courseTypeId,
+                teacher: teacher,
+                customer: customer,
+                scheduledAt: uint64(block.timestamp + 7 days),
+                customerDiscountBps: 8_000,
+                linkedResearchAssetIds: linkedAssetIds,
+                linkedResearchWeightBps: new uint16[](0)
+            })
+        );
+    }
+
+    function _claimableAmount(uint64 teachingNftId, uint64 assetId, uint64 positionId)
+        internal
+        view
+        returns (uint256 amount)
+    {
+        (amount,,) =
+            rewardDistributor.getTeachingRewardClaimable(teachingNftId, assetId, positionId);
+    }
+
+    function _deployUnwiredRegistry() internal returns (TeachingRegistry unwired) {
+        unwired = new TeachingRegistry(
+            authority,
+            coordinator,
+            treasury,
+            address(stable),
+            90 days,
+            30 days,
+            address(researchToken),
+            address(teachingToken)
+        );
+    }
+
+    function _wireTokensTo(TeachingRegistry target) internal {
+        VM.prank(authority);
+        researchToken.setMinter(address(target));
+        VM.prank(authority);
+        teachingToken.setMinter(address(target));
     }
 
     function assertTrue(bool ok) internal pure {

@@ -8,6 +8,7 @@ contract TeachingNftToken {
     error TokenAlreadyMinted();
     error TokenNotFound();
     error NonTransferable();
+    error MinterLocked();
 
     event Transfer(address indexed from, address indexed to, uint256 indexed tokenId);
     event MinterUpdated(address indexed previousMinter, address indexed newMinter);
@@ -18,6 +19,7 @@ contract TeachingNftToken {
 
     address public immutable AUTHORITY;
     address public minter;
+    bool public minterLocked;
     string public name;
     string public symbol;
     string public baseTokenURI;
@@ -49,10 +51,16 @@ contract TeachingNftToken {
     }
 
     function setMinter(address newMinter) external onlyAuthority {
+        if (minterLocked) revert MinterLocked();
         if (newMinter == address(0)) revert ZeroAddress();
         address previousMinter = minter;
         minter = newMinter;
         emit MinterUpdated(previousMinter, newMinter);
+    }
+
+    function lockMinter() external onlyAuthority {
+        if (minter == address(0)) revert ZeroAddress();
+        minterLocked = true;
     }
 
     function supportsInterface(bytes4 interfaceId) external pure returns (bool) {

@@ -4,6 +4,7 @@ import { base, baseSepolia } from "viem/chains";
 export type SparkDaoAddresses = {
   researchRegistry: Address;
   teachingRegistry: Address;
+  teachingRewardDistributor?: Address;
   researchPositionToken?: Address;
   teachingNftToken?: Address;
 };
@@ -30,7 +31,8 @@ function optionalAddress(name: string): Address | undefined {
 export function resolveBaseChain(): Chain {
   const chainName = process.env.BASE_CHAIN?.toLowerCase();
   if (chainName === "base") return base;
-  return baseSepolia;
+  if (chainName === "base-sepolia") return baseSepolia;
+  throw new Error("BASE_CHAIN must be base or base-sepolia");
 }
 
 export function loadClientConfigFromEnv(): SparkDaoClientConfig {
@@ -40,6 +42,7 @@ export function loadClientConfigFromEnv(): SparkDaoClientConfig {
     addresses: {
       researchRegistry: requireEnv("RESEARCH_REGISTRY") as Address,
       teachingRegistry: requireEnv("TEACHING_REGISTRY") as Address,
+      teachingRewardDistributor: optionalAddress("TEACHING_REWARD_DISTRIBUTOR"),
       researchPositionToken: optionalAddress("RESEARCH_POSITION_TOKEN"),
       teachingNftToken: optionalAddress("TEACHING_NFT_TOKEN"),
     },

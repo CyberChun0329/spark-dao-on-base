@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.26;
 
-import {SparkDaoErrors} from "./SparkDaoErrors.sol";
-import {SparkDaoTypes} from "./SparkDaoTypes.sol";
+import { SparkDaoErrors } from "./SparkDaoErrors.sol";
+import { SparkDaoTypes } from "./SparkDaoTypes.sol";
 
 library SparkMath {
-    function computeDecaySplit(
-        uint16 layerShareBps,
-        uint16 decayRateBps,
-        uint64 decaySteps
-    ) internal pure returns (uint16 retainedShareBps, uint16 releasedShareBps) {
+    function computeDecaySplit(uint16 layerShareBps, uint16 decayRateBps, uint64 decaySteps)
+        internal
+        pure
+        returns (uint16 retainedShareBps, uint16 releasedShareBps)
+    {
         if (decayRateBps == 0 || decayRateBps > SparkDaoTypes.BASIS_POINTS_DENOMINATOR) {
             revert SparkDaoErrors.InvalidDecayRate();
         }
@@ -38,6 +38,8 @@ library SparkMath {
             revert SparkDaoErrors.DecayNotStarted();
         }
 
-        return ((nowTs - decayStartAt) / decayPeriodSeconds) + 1;
+        uint64 steps = ((nowTs - decayStartAt) / decayPeriodSeconds) + 1;
+        if (steps > SparkDaoTypes.MAX_DECAY_STEPS) return SparkDaoTypes.MAX_DECAY_STEPS;
+        return steps;
     }
 }

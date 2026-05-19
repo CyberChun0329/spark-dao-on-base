@@ -1,0 +1,6 @@
+{
+  "referenceUsdPerGas": 1.4960545778707655e-8,
+  "source": "trailing-twelve-month Base fee translation coefficient",
+  "measurementWindow": "trailing twelve months at calibration time",
+  "unit": "dollars per gas unit"
+}

@@ -50,22 +50,37 @@ export async function getTeachingFaultSettlement(
   });
 }
 
-export async function getTeachingRewardBuckets(
+export async function getTeachingRewardClaimable(
   config: SparkDaoClientConfig,
+  teachingNftId: bigint,
+  assetId: bigint,
+  positionId: bigint,
+) {
+  return getTeachingRewardPreview(config, teachingNftId, assetId, positionId);
+}
+
+export async function getTeachingRewardPreview(
+  config: SparkDaoClientConfig,
+  teachingNftId: bigint,
   assetId: bigint,
   positionId: bigint,
 ) {
   const client = createTeachingClient(config);
+  const rewardContract = client.contracts.teachingRewardDistributor;
+  if (!rewardContract) {
+    throw new Error("Teaching reward distributor address is not configured");
+  }
   return client.publicClient.readContract({
-    ...client.contracts.teachingRegistry,
-    functionName: "getTeachingRewardLedgerBuckets",
-    args: [assetId, positionId],
+    ...rewardContract,
+    functionName: "getTeachingRewardClaimable",
+    args: [teachingNftId, assetId, positionId],
   });
 }
 
 export async function claimTeachingReward(
   config: SparkDaoClientConfig,
   privateKey: Hex,
+  teachingNftId: bigint,
   assetId: bigint,
   positionId: bigint,
 ) {
@@ -73,18 +88,23 @@ export async function claimTeachingReward(
   if (!client.walletClient || !client.account) {
     throw new Error("Wallet client not configured");
   }
+  const rewardContract = client.contracts.teachingRewardDistributor;
+  if (!rewardContract) {
+    throw new Error("Teaching reward distributor address is not configured");
+  }
   return client.walletClient.writeContract({
-    ...client.contracts.teachingRegistry,
+    ...rewardContract,
     account: client.account,
     chain: config.chain,
     functionName: "claimTeachingReward",
-    args: [assetId, positionId],
+    args: [teachingNftId, assetId, positionId],
   });
 }
 
 export async function claimTeachingRewardBatch(
   config: SparkDaoClientConfig,
   privateKey: Hex,
+  teachingNftIds: bigint[],
   assetIds: bigint[],
   positionIds: bigint[],
 ) {
@@ -92,12 +112,16 @@ export async function claimTeachingRewardBatch(
   if (!client.walletClient || !client.account) {
     throw new Error("Wallet client not configured");
   }
+  const rewardContract = client.contracts.teachingRewardDistributor;
+  if (!rewardContract) {
+    throw new Error("Teaching reward distributor address is not configured");
+  }
   return client.walletClient.writeContract({
-    ...client.contracts.teachingRegistry,
+    ...rewardContract,
     account: client.account,
     chain: config.chain,
     functionName: "claimTeachingRewardBatch",
-    args: [assetIds, positionIds],
+    args: [teachingNftIds, assetIds, positionIds],
   });
 }
 

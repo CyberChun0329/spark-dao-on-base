@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.26;
 
-import {ResearchRegistry} from "../src/ResearchRegistry.sol";
-import {ResearchPositionToken} from "../src/ResearchPositionToken.sol";
-import {SparkDaoTypes} from "../src/SparkDaoTypes.sol";
-import {MockERC20} from "../test/mocks/MockERC20.sol";
+import { ResearchRegistry } from "../src/ResearchRegistry.sol";
+import { ResearchPositionToken } from "../src/ResearchPositionToken.sol";
+import { SparkDaoTypes } from "../src/SparkDaoTypes.sol";
+import { MockERC20 } from "../test/mocks/MockERC20.sol";
 
 interface Vm {
     function envUint(string calldata name) external returns (uint256);
@@ -41,14 +41,17 @@ contract DemoResearch {
         ResearchPositionToken researchToken = new ResearchPositionToken(
             authority, "Spark Research Position", "SRP", "ipfs://demo-research/"
         );
-        ResearchRegistry registry =
-            new ResearchRegistry(authority, coordinator, address(stable), 0, 0, address(researchToken));
+        ResearchRegistry registry = new ResearchRegistry(
+            authority, coordinator, authority, address(stable), 0, 0, address(researchToken)
+        );
         researchToken.setMinter(address(registry));
+        researchToken.lockMinter();
         stable.mint(authority, 5_000_000_000);
         VM.stopBroadcast();
 
         VM.startBroadcast(coordinatorPk);
-        uint64 assetId = registry.createResearchAsset("Demo Research Asset", "ipfs://demo-research-asset");
+        uint64 assetId =
+            registry.createResearchAsset("Demo Research Asset", "ipfs://demo-research-asset");
         uint64 positionOneId = registry.createPatchPosition(
             SparkDaoTypes.CreatePatchPositionParams({
                 assetId: assetId,

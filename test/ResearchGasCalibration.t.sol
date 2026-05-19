@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.26;
 
-import {ResearchRegistry} from "../src/ResearchRegistry.sol";
-import {ResearchPositionToken} from "../src/ResearchPositionToken.sol";
-import {SparkDaoTypes} from "../src/SparkDaoTypes.sol";
-import {MockERC20} from "./mocks/MockERC20.sol";
+import { ResearchRegistry } from "../src/ResearchRegistry.sol";
+import { ResearchPositionToken } from "../src/ResearchPositionToken.sol";
+import { SparkDaoTypes } from "../src/SparkDaoTypes.sol";
+import { MockERC20 } from "./mocks/MockERC20.sol";
 
 interface ResearchGasCalibrationVm {
     function prank(address) external;
@@ -26,6 +26,7 @@ contract ResearchGasCalibrationTest {
 
     address internal authority = address(0xA11CE);
     address internal coordinator = address(0xC001);
+    address internal treasury = address(0xDA01);
     address internal contributorOne = address(0x1001);
     address internal contributorTwo = address(0x1002);
 
@@ -37,6 +38,7 @@ contract ResearchGasCalibrationTest {
         registry = new ResearchRegistry(
             authority,
             coordinator,
+            treasury,
             address(stable),
             90 days,
             30 days,
@@ -125,6 +127,7 @@ contract ResearchGasCalibrationTest {
         bytes memory buffer = new bytes(digits);
         while (value != 0) {
             digits -= 1;
+            // forge-lint: disable-next-line(unsafe-typecast)
             buffer[digits] = bytes1(uint8(48 + uint256(value % 10)));
             value /= 10;
         }

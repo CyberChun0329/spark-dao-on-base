@@ -8,7 +8,10 @@ solc_version = "0.8.26"
 optimizer = true
 optimizer_runs = 1
 via_ir = true
-fs_permissions = [{ access = "read-write", path = "./" }]
+fs_permissions = [
+  { access = "read-write", path = "./teaching_gas_calibration.csv" },
+  { access = "read-write", path = "./research_gas_calibration.csv" }
+]
 
 [fmt]
 line_length = 100

@@ -14,6 +14,7 @@ import {
   researchPositionTokenArtifact,
   researchRegistryArtifact,
   teachingNftTokenArtifact,
+  teachingRewardDistributorArtifact,
   teachingRegistryArtifact,
 } from "./artifacts.js";
 import type { SparkDaoAddresses } from "./config.js";
@@ -26,6 +27,7 @@ export type SparkDaoContractDescriptor = {
 export type SparkDaoContracts = {
   researchRegistry: SparkDaoContractDescriptor;
   teachingRegistry: SparkDaoContractDescriptor;
+  teachingRewardDistributor?: SparkDaoContractDescriptor;
   researchPositionToken?: SparkDaoContractDescriptor;
   teachingNftToken?: SparkDaoContractDescriptor;
 };
@@ -74,6 +76,13 @@ export function createSparkDaoClient(
     abi: teachingRegistryArtifact.abi,
   };
 
+  const teachingRewardDistributor = params.addresses.teachingRewardDistributor
+    ? ({
+        address: params.addresses.teachingRewardDistributor,
+        abi: teachingRewardDistributorArtifact.abi,
+      } satisfies SparkDaoContractDescriptor)
+    : undefined;
+
   const researchPositionToken = params.addresses.researchPositionToken
     ? ({
         address: params.addresses.researchPositionToken,
@@ -95,6 +104,7 @@ export function createSparkDaoClient(
     contracts: {
       researchRegistry,
       teachingRegistry,
+      teachingRewardDistributor,
       researchPositionToken,
       teachingNftToken,
     },

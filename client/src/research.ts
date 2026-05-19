@@ -19,6 +19,18 @@ export async function getDaoState(config: SparkDaoClientConfig) {
   });
 }
 
+export async function getVaultReservedUnits(
+  config: SparkDaoClientConfig,
+  stableAsset: Address,
+) {
+  const client = createResearchClient(config);
+  return client.publicClient.readContract({
+    ...client.contracts.researchRegistry,
+    functionName: "getVaultReservedUnits",
+    args: [stableAsset],
+  });
+}
+
 export async function getResearchAsset(
   config: SparkDaoClientConfig,
   assetId: bigint,
@@ -100,5 +112,43 @@ export async function claimRevenue(
     chain: config.chain,
     functionName: "claimRevenue",
     args: [assetId, positionId, revenueId],
+  });
+}
+
+export async function fundDaoVaultFor(
+  config: SparkDaoClientConfig,
+  privateKey: Hex,
+  stableAsset: Address,
+  amount: bigint,
+) {
+  const client = createResearchClient(config, privateKey);
+  if (!client.walletClient || !client.account) {
+    throw new Error("Wallet client not configured");
+  }
+  return client.walletClient.writeContract({
+    ...client.contracts.researchRegistry,
+    account: client.account,
+    chain: config.chain,
+    functionName: "fundDaoVaultFor",
+    args: [stableAsset, amount],
+  });
+}
+
+export async function withdrawDaoVaultFor(
+  config: SparkDaoClientConfig,
+  privateKey: Hex,
+  stableAsset: Address,
+  amount: bigint,
+) {
+  const client = createResearchClient(config, privateKey);
+  if (!client.walletClient || !client.account) {
+    throw new Error("Wallet client not configured");
+  }
+  return client.walletClient.writeContract({
+    ...client.contracts.researchRegistry,
+    account: client.account,
+    chain: config.chain,
+    functionName: "withdrawDaoVaultFor",
+    args: [stableAsset, amount],
   });
 }

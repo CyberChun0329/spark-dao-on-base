@@ -2,6 +2,7 @@
 pragma solidity ^0.8.26;
 
 import { TeachingRegistry } from "../src/TeachingRegistry.sol";
+import { TeachingRewardDistributor } from "../src/TeachingRewardDistributor.sol";
 import { TeachingNftToken } from "../src/TeachingNftToken.sol";
 import { ResearchPositionToken } from "../src/ResearchPositionToken.sol";
 import { SparkDaoTypes } from "../src/SparkDaoTypes.sol";
@@ -12,6 +13,7 @@ interface Vm {
     function addr(uint256 privateKey) external returns (address);
     function startBroadcast(uint256 privateKey) external;
     function stopBroadcast() external;
+    function warp(uint256) external;
 }
 
 contract DemoTeaching {
@@ -22,6 +24,7 @@ contract DemoTeaching {
         address researchPositionToken;
         address teachingNftToken;
         address registry;
+        address rewardDistributor;
         uint64 assetId;
         uint64 teachingNftId;
         uint64 contributorOnePositionId;
@@ -53,14 +56,20 @@ contract DemoTeaching {
         TeachingRegistry registry = new TeachingRegistry(
             authority,
             coordinator,
+            authority,
             address(stable),
             0,
             0,
             address(researchToken),
             address(teachingToken)
         );
+        TeachingRewardDistributor rewardDistributor =
+            new TeachingRewardDistributor(address(registry));
+        registry.setTeachingRewardDistributor(address(rewardDistributor));
         researchToken.setMinter(address(registry));
         teachingToken.setMinter(address(registry));
+        researchToken.lockMinter();
+        teachingToken.lockMinter();
         stable.mint(authority, 5_000_000_000);
         stable.mint(teacher, 5_000_000_000);
         stable.mint(customer, 5_000_000_000);
@@ -106,7 +115,7 @@ contract DemoTeaching {
                 courseTypeId: courseTypeId,
                 teacher: teacher,
                 customer: customer,
-                scheduledAt: uint64(block.timestamp),
+                scheduledAt: uint64(block.timestamp + 1),
                 customerDiscountBps: 8_000,
                 linkedResearchAssetIds: assetIds,
                 linkedResearchWeightBps: weights
@@ -131,15 +140,16 @@ contract DemoTeaching {
 
         VM.startBroadcast(customerPk);
         registry.lockTeachingCollateral(teachingNftId, false);
+        VM.warp(block.timestamp + 2);
         registry.confirmTeachingCompletion(teachingNftId, false);
         VM.stopBroadcast();
 
         VM.startBroadcast(contributorOnePk);
-        registry.claimTeachingReward(assetId, positionOneId);
+        rewardDistributor.claimTeachingReward(teachingNftId, assetId, positionOneId);
         VM.stopBroadcast();
 
         VM.startBroadcast(contributorTwoPk);
-        registry.claimTeachingReward(assetId, positionTwoId);
+        rewardDistributor.claimTeachingReward(teachingNftId, assetId, positionTwoId);
         VM.stopBroadcast();
 
         deployment = DemoDeployment({
@@ -147,6 +157,7 @@ contract DemoTeaching {
             researchPositionToken: address(researchToken),
             teachingNftToken: address(teachingToken),
             registry: address(registry),
+            rewardDistributor: address(rewardDistributor),
             assetId: assetId,
             teachingNftId: teachingNftId,
             contributorOnePositionId: positionOneId,

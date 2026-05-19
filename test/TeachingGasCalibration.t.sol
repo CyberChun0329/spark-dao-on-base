@@ -2,6 +2,7 @@
 pragma solidity ^0.8.26;
 
 import { TeachingRegistry } from "../src/TeachingRegistry.sol";
+import { TeachingRewardDistributor } from "../src/TeachingRewardDistributor.sol";
 import { TeachingNftToken } from "../src/TeachingNftToken.sol";
 import { ResearchPositionToken } from "../src/ResearchPositionToken.sol";
 import { SparkDaoTypes } from "../src/SparkDaoTypes.sol";
@@ -23,12 +24,14 @@ contract TeachingGasCalibrationTest {
     string internal constant OUT = "teaching_gas_calibration.csv";
 
     TeachingRegistry internal registry;
+    TeachingRewardDistributor internal rewardDistributor;
     TeachingNftToken internal teachingToken;
     ResearchPositionToken internal researchToken;
     MockERC20 internal stable;
 
     address internal authority = address(0xA11CE);
     address internal coordinator = address(0xC001);
+    address internal treasury = address(0xDA01);
     address internal teacher = address(0x7001);
     address internal customer = address(0x7002);
     address internal contributorOne = address(0x1001);
@@ -72,12 +75,16 @@ contract TeachingGasCalibrationTest {
         registry = new TeachingRegistry(
             authority,
             coordinator,
+            treasury,
             address(stable),
             90 days,
             30 days,
             address(researchToken),
             address(teachingToken)
         );
+        rewardDistributor = new TeachingRewardDistributor(address(registry));
+        VM.prank(authority);
+        registry.setTeachingRewardDistributor(address(rewardDistributor));
         VM.prank(authority);
         researchToken.setMinter(address(registry));
         VM.prank(authority);
@@ -150,7 +157,7 @@ contract TeachingGasCalibrationTest {
             input.path, 1_000_000, 400_000, input.researchShareBps
         );
         gasUsed = gasBefore - gasleft();
-        lessonGas += gasUsed;
+        setupGas += gasUsed;
 
         uint64 scheduledAt = uint64(block.timestamp + 7 days);
         SparkDaoTypes.CreateTeachingSessionParams memory params =
@@ -614,6 +621,7 @@ contract TeachingGasCalibrationTest {
         bytes memory buffer = new bytes(digits);
         while (value != 0) {
             digits -= 1;
+            // forge-lint: disable-next-line(unsafe-typecast)
             buffer[digits] = bytes1(uint8(48 + uint256(value % 10)));
             value /= 10;
         }

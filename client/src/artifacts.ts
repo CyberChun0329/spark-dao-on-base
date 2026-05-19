@@ -20,6 +20,9 @@ export const researchRegistryArtifact = readArtifact(
 export const teachingRegistryArtifact = readArtifact(
   "out/TeachingRegistry.sol/TeachingRegistry.json",
 );
+export const teachingRewardDistributorArtifact = readArtifact(
+  "out/TeachingRewardDistributor.sol/TeachingRewardDistributor.json",
+);
 export const researchPositionTokenArtifact = readArtifact(
   "out/ResearchPositionToken.sol/ResearchPositionToken.json",
 );

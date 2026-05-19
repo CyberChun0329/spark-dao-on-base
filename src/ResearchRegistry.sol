@@ -1,29 +1,31 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.26;
 
-import {SparkDaoConfig} from "./SparkDaoConfig.sol";
-import {SparkDaoErrors} from "./SparkDaoErrors.sol";
-import {SparkDaoTypes} from "./SparkDaoTypes.sol";
-import {SparkMath} from "./SparkMath.sol";
-import {IERC20} from "./interfaces/IERC20.sol";
-import {IResearchPositionToken} from "./interfaces/IResearchPositionToken.sol";
+import { SparkDaoConfig } from "./SparkDaoConfig.sol";
+import { SparkDaoErrors } from "./SparkDaoErrors.sol";
+import { SparkDaoTypes } from "./SparkDaoTypes.sol";
+import { SparkMath } from "./SparkMath.sol";
+import { IResearchPositionToken } from "./interfaces/IResearchPositionToken.sol";
 
 contract ResearchRegistry is SparkDaoConfig {
     using SparkMath for uint16;
 
     address public immutable RESEARCH_POSITION_TOKEN;
     mapping(uint64 assetId => SparkDaoTypes.ResearchAsset) internal researchAssets;
-    mapping(uint64 assetId => mapping(uint64 positionId => SparkDaoTypes.ResearchPosition))
-        internal researchPositions;
+    mapping(uint64 assetId => mapping(uint64 positionId => SparkDaoTypes.ResearchPosition)) internal
+        researchPositions;
     mapping(uint64 assetId => uint64[] positionIds) internal researchAssetPositionIds;
-    mapping(uint64 assetId => mapping(uint64 positionId => mapping(uint64 revenueId => SparkDaoTypes.RevenueEscrow)))
-        internal revenueEscrows;
+    mapping(uint64 assetId => SparkDaoTypes.LayerCheckpoint[]) internal researchLayerCheckpoints;
+    mapping(uint64 assetId => SparkDaoTypes.ShareCheckpoint[]) internal researchShareCheckpoints;
+    mapping(
+        uint64 assetId
+            => mapping(
+            uint64 positionId => mapping(uint64 revenueId => SparkDaoTypes.RevenueEscrow)
+        )
+    ) internal revenueEscrows;
 
     event ResearchAssetCreated(
-        uint64 indexed assetId,
-        address indexed createdBy,
-        string title,
-        string metadataUri
+        uint64 indexed assetId, address indexed createdBy, string title, string metadataUri
     );
     event ResearchPositionCreated(
         uint64 indexed assetId,
@@ -60,12 +62,14 @@ contract ResearchRegistry is SparkDaoConfig {
         uint64 indexed assetId,
         uint64 indexed positionId,
         address indexed previousHolder,
+        address treasuryHolder,
         uint256 price
     );
 
     constructor(
         address authority_,
         address coordinator_,
+        address treasury_,
         address stableAsset_,
         uint64 rewardUnlockSeconds_,
         uint64 buybackWaitSeconds_,
@@ -74,12 +78,15 @@ contract ResearchRegistry is SparkDaoConfig {
         SparkDaoConfig(
             authority_,
             coordinator_,
+            treasury_,
             stableAsset_,
             rewardUnlockSeconds_,
             buybackWaitSeconds_
         )
     {
-        if (researchPositionToken_ == address(0)) revert SparkDaoErrors.ZeroAddress();
+        if (researchPositionToken_ == address(0)) {
+            revert SparkDaoErrors.ZeroAddress();
+        }
         RESEARCH_POSITION_TOKEN = researchPositionToken_;
     }
 
@@ -127,6 +134,8 @@ contract ResearchRegistry is SparkDaoConfig {
         asset.currentActiveLayer = 1;
         asset.currentLayerCapacityBps = SparkDaoTypes.BASIS_POINTS_DENOMINATOR;
         asset.createdAt = uint64(block.timestamp);
+        _pushLayerCheckpoint(assetId, asset.createdAt, 1);
+        _pushShareCheckpoint(assetId, asset.createdAt, 0);
 
         emit ResearchAssetCreated(assetId, msg.sender, title, metadataUri);
     }
@@ -143,10 +152,11 @@ contract ResearchRegistry is SparkDaoConfig {
         ) {
             revert SparkDaoErrors.InvalidShareBps();
         }
-        if (params.decayPeriodSeconds == 0) revert SparkDaoErrors.InvalidDecayPeriod();
+        if (params.decayPeriodSeconds < SparkDaoTypes.MIN_DECAY_PERIOD_SECONDS) {
+            revert SparkDaoErrors.InvalidDecayPeriod();
+        }
         if (
-            params.decayRateBps == 0
-                || params.decayRateBps > SparkDaoTypes.BASIS_POINTS_DENOMINATOR
+            params.decayRateBps == 0 || params.decayRateBps > SparkDaoTypes.BASIS_POINTS_DENOMINATOR
         ) {
             revert SparkDaoErrors.InvalidDecayRate();
         }
@@ -170,6 +180,7 @@ contract ResearchRegistry is SparkDaoConfig {
         position.positionId = positionId;
         position.beneficiary = params.beneficiary;
         position.currentHolder = params.beneficiary;
+        position.stableAsset = daoState.stableAsset;
         position.layerIndex = params.layerIndex;
         position.layerShareBps = params.layerShareBps;
         position.buybackFloor = params.buybackFloor;
@@ -184,7 +195,7 @@ contract ResearchRegistry is SparkDaoConfig {
         bool activatedImmediately = params.layerIndex == asset.currentActiveLayer;
         if (activatedImmediately) {
             _activateCurrentLayerPosition(
-                asset, position, params.layerShareBps, firstStepReleaseBps, nowTs
+                params.assetId, asset, position, params.layerShareBps, firstStepReleaseBps, nowTs
             );
         } else {
             _prepareNextLayerPosition(asset, params.layerShareBps, firstStepReleaseBps);
@@ -198,19 +209,21 @@ contract ResearchRegistry is SparkDaoConfig {
             params.layerShareBps,
             activatedImmediately
         );
-        IResearchPositionToken(RESEARCH_POSITION_TOKEN).mint(
-            params.beneficiary, _researchPositionTokenId(params.assetId, positionId)
-        );
+        IResearchPositionToken(RESEARCH_POSITION_TOKEN)
+            .mint(params.beneficiary, _researchPositionTokenId(params.assetId, positionId));
     }
 
     function _activateCurrentLayerPosition(
+        uint64 assetId,
         SparkDaoTypes.ResearchAsset storage asset,
         SparkDaoTypes.ResearchPosition storage position,
         uint16 layerShareBps,
         uint16 firstStepReleaseBps,
         uint64 nowTs
     ) internal {
-        if (asset.currentLayerSealed) revert SparkDaoErrors.LayerAlreadySealed();
+        if (asset.currentLayerSealed) {
+            revert SparkDaoErrors.LayerAlreadySealed();
+        }
 
         uint16 updatedShareTotal = asset.currentLayerShareBpsTotal + layerShareBps;
         if (updatedShareTotal > asset.currentLayerCapacityBps) {
@@ -225,6 +238,8 @@ contract ResearchRegistry is SparkDaoConfig {
         asset.currentLayerPositionCount += 1;
         asset.currentLayerShareBpsTotal = updatedShareTotal;
         asset.currentLayerPreparableCapacityBps += firstStepReleaseBps;
+        asset.teachingEffectiveShareBps += layerShareBps;
+        _pushShareCheckpoint(assetId, nowTs, asset.teachingEffectiveShareBps);
     }
 
     function _prepareNextLayerPosition(
@@ -232,7 +247,9 @@ contract ResearchRegistry is SparkDaoConfig {
         uint16 layerShareBps,
         uint16 firstStepReleaseBps
     ) internal {
-        if (!asset.currentLayerSealed) revert SparkDaoErrors.LayerNotSealed();
+        if (!asset.currentLayerSealed) {
+            revert SparkDaoErrors.LayerNotSealed();
+        }
         if (asset.preparedNextLayerSealed) revert SparkDaoErrors.LayerAlreadySealed();
 
         uint16 updatedPreparedTotal = asset.preparedNextLayerShareBpsTotal + layerShareBps;
@@ -271,7 +288,9 @@ contract ResearchRegistry is SparkDaoConfig {
         SparkDaoTypes.ResearchPosition storage position = _requirePosition(assetId, positionId);
 
         if (position.currentHolder != msg.sender) revert SparkDaoErrors.UnauthorizedHolder();
-        if (position.layerIndex != asset.currentActiveLayer) revert SparkDaoErrors.LayerNotActivated();
+        if (position.layerIndex != asset.currentActiveLayer) {
+            revert SparkDaoErrors.LayerNotActivated();
+        }
         if (!asset.currentLayerSealed) revert SparkDaoErrors.LayerNotSealed();
         if (!position.isActivated) revert SparkDaoErrors.LayerNotActivated();
         if (position.rolloverReady) revert SparkDaoErrors.PositionAlreadyReady();
@@ -286,6 +305,8 @@ contract ResearchRegistry is SparkDaoConfig {
 
         asset.currentLayerReadyCount += 1;
         asset.nextLayerCapacityBps += releasedShareBps;
+        asset.teachingEffectiveShareBps -= releasedShareBps;
+        _pushShareCheckpoint(assetId, uint64(block.timestamp), asset.teachingEffectiveShareBps);
 
         emit PositionReady(assetId, positionId, releasedShareBps);
     }
@@ -294,7 +315,9 @@ contract ResearchRegistry is SparkDaoConfig {
         SparkDaoTypes.ResearchAsset storage asset = _requireAsset(assetId);
         SparkDaoTypes.ResearchPosition storage position = _requirePosition(assetId, positionId);
 
-        if (position.layerIndex != asset.currentActiveLayer) revert SparkDaoErrors.LayerNotActivated();
+        if (position.layerIndex != asset.currentActiveLayer) {
+            revert SparkDaoErrors.LayerNotActivated();
+        }
         if (!asset.currentLayerSealed) revert SparkDaoErrors.LayerNotSealed();
         if (!position.isActivated) revert SparkDaoErrors.LayerNotActivated();
         if (position.rolloverReady) revert SparkDaoErrors.PositionAlreadyReady();
@@ -313,6 +336,8 @@ contract ResearchRegistry is SparkDaoConfig {
 
         asset.currentLayerReadyCount += 1;
         asset.nextLayerCapacityBps += releasedShareBps;
+        asset.teachingEffectiveShareBps -= releasedShareBps;
+        _pushShareCheckpoint(assetId, uint64(block.timestamp), asset.teachingEffectiveShareBps);
 
         emit PositionReady(assetId, positionId, releasedShareBps);
     }
@@ -325,7 +350,9 @@ contract ResearchRegistry is SparkDaoConfig {
         if (asset.currentLayerReadyCount != asset.currentLayerPositionCount) {
             revert SparkDaoErrors.LayerNotReadyToAdvance();
         }
-        if (asset.preparedNextLayerPositionCount == 0) revert SparkDaoErrors.NextLayerNotPrepared();
+        if (asset.preparedNextLayerPositionCount == 0) {
+            revert SparkDaoErrors.NextLayerNotPrepared();
+        }
         if (!asset.preparedNextLayerSealed) revert SparkDaoErrors.LayerNotSealed();
         if (preparedPositionIds.length != asset.preparedNextLayerPositionCount) {
             revert SparkDaoErrors.InvalidPreparedLayerAccounts();
@@ -356,6 +383,7 @@ contract ResearchRegistry is SparkDaoConfig {
         }
 
         uint16 previousLayer = asset.currentActiveLayer;
+        uint16 preparedShareTotal = asset.preparedNextLayerShareBpsTotal;
         asset.currentActiveLayer = nextLayerIndex;
         asset.currentLayerCapacityBps = asset.nextLayerCapacityBps;
         asset.currentLayerPositionCount = asset.preparedNextLayerPositionCount;
@@ -368,11 +396,16 @@ contract ResearchRegistry is SparkDaoConfig {
         asset.preparedNextLayerShareBpsTotal = 0;
         asset.preparedNextLayerSealed = false;
         asset.preparedNextLayerPreparableCapacityBps = 0;
+        asset.teachingEffectiveShareBps += preparedShareTotal;
+        _pushLayerCheckpoint(assetId, nowTs, nextLayerIndex);
+        _pushShareCheckpoint(assetId, nowTs, asset.teachingEffectiveShareBps);
 
         emit LayerAdvanced(assetId, previousLayer, nextLayerIndex);
     }
 
-    function transferResearchPosition(uint64 assetId, uint64 positionId, address newHolder) external {
+    function transferResearchPosition(uint64 assetId, uint64 positionId, address newHolder)
+        external
+    {
         if (newHolder == address(0)) revert SparkDaoErrors.ZeroAddress();
 
         SparkDaoTypes.ResearchPosition storage position = _requirePosition(assetId, positionId);
@@ -380,9 +413,10 @@ contract ResearchRegistry is SparkDaoConfig {
 
         address previousHolder = position.currentHolder;
         position.currentHolder = newHolder;
-        IResearchPositionToken(RESEARCH_POSITION_TOKEN).protocolTransfer(
-            previousHolder, newHolder, _researchPositionTokenId(assetId, positionId)
-        );
+        IResearchPositionToken(RESEARCH_POSITION_TOKEN)
+            .protocolTransfer(
+                previousHolder, newHolder, _researchPositionTokenId(assetId, positionId)
+            );
 
         emit ResearchPositionTransferred(assetId, positionId, previousHolder, newHolder);
     }
@@ -397,24 +431,27 @@ contract ResearchRegistry is SparkDaoConfig {
         SparkDaoTypes.ResearchAsset storage asset = _requireAsset(assetId);
         SparkDaoTypes.ResearchPosition storage position = _requirePosition(assetId, positionId);
 
-        if (position.layerIndex != asset.currentActiveLayer) {
+        if (!position.isActivated) revert SparkDaoErrors.LayerNotActivated();
+        if (position.layerIndex == asset.currentActiveLayer) {
+            if (!asset.currentLayerSealed) revert SparkDaoErrors.LayerNotSealed();
+        } else if (position.layerIndex > asset.currentActiveLayer || position.retainedShareBps == 0)
+        {
             revert SparkDaoErrors.LayerNotActivated();
         }
-        if (!asset.currentLayerSealed) revert SparkDaoErrors.LayerNotSealed();
 
         revenueId = position.nextRevenueId;
         position.nextRevenueId += 1;
 
-        if (!IERC20(daoState.stableAsset).transferFrom(msg.sender, address(this), amount)) {
-            revert SparkDaoErrors.TokenTransferFailed();
-        }
+        address stableAsset = daoState.stableAsset;
+        _safeTransferFrom(stableAsset, msg.sender, address(this), amount);
 
         uint64 unlockAt = uint64(block.timestamp) + daoState.rewardUnlockSeconds;
         SparkDaoTypes.RevenueEscrow storage escrow = revenueEscrows[assetId][positionId][revenueId];
+        escrow.stableAsset = stableAsset;
         escrow.amount = amount;
         escrow.unlockAt = unlockAt;
 
-        daoState.vaultReservedUnits += amount;
+        _reserveVaultUnits(stableAsset, amount);
 
         emit RevenueEscrowCreated(assetId, positionId, revenueId, amount, unlockAt);
     }
@@ -430,30 +467,33 @@ contract ResearchRegistry is SparkDaoConfig {
 
         escrow.claimed = true;
         position.totalClaimedUnits += escrow.amount;
-        daoState.vaultReservedUnits -= escrow.amount;
+        _releaseVaultUnits(escrow.stableAsset, escrow.amount);
 
-        if (!IERC20(daoState.stableAsset).transfer(msg.sender, escrow.amount)) {
-            revert SparkDaoErrors.TokenTransferFailed();
-        }
+        _safeTransfer(escrow.stableAsset, msg.sender, escrow.amount);
 
         emit RevenueClaimed(assetId, positionId, revenueId, msg.sender, escrow.amount);
     }
 
     function fundDaoVault(uint256 amount) external onlyAuthority {
+        fundDaoVaultFor(daoState.stableAsset, amount);
+    }
+
+    function fundDaoVaultFor(address stableAsset, uint256 amount) public onlyAuthority {
+        if (stableAsset == address(0)) revert SparkDaoErrors.ZeroAddress();
         if (amount == 0) revert SparkDaoErrors.InvalidAmount();
-        if (!IERC20(daoState.stableAsset).transferFrom(msg.sender, address(this), amount)) {
-            revert SparkDaoErrors.TokenTransferFailed();
-        }
+        _safeTransferFrom(stableAsset, msg.sender, address(this), amount);
     }
 
     function withdrawDaoVault(uint256 amount) external onlyAuthority {
+        withdrawDaoVaultFor(daoState.stableAsset, amount);
+    }
+
+    function withdrawDaoVaultFor(address stableAsset, uint256 amount) public onlyAuthority {
+        if (stableAsset == address(0)) revert SparkDaoErrors.ZeroAddress();
         if (amount == 0) revert SparkDaoErrors.InvalidAmount();
-        uint256 idleVaultUnits =
-            IERC20(daoState.stableAsset).balanceOf(address(this)) - daoState.vaultReservedUnits;
+        uint256 idleVaultUnits = _idleVaultUnits(stableAsset);
         if (amount > idleVaultUnits) revert SparkDaoErrors.VaultFundsReserved();
-        if (!IERC20(daoState.stableAsset).transfer(msg.sender, amount)) {
-            revert SparkDaoErrors.TokenTransferFailed();
-        }
+        _safeTransfer(stableAsset, msg.sender, amount);
     }
 
     function sellPositionBackToDao(uint64 assetId, uint64 positionId) external {
@@ -462,27 +502,30 @@ contract ResearchRegistry is SparkDaoConfig {
         if (position.currentHolder != msg.sender) revert SparkDaoErrors.UnauthorizedHolder();
         if (!position.isActivated) revert SparkDaoErrors.LayerNotActivated();
         if (position.boughtBack) revert SparkDaoErrors.PositionAlreadyBoughtBack();
-        if (block.timestamp < position.buybackUnlockAt) revert SparkDaoErrors.BuybackNotYetAvailable();
+        if (block.timestamp < position.buybackUnlockAt) {
+            revert SparkDaoErrors.BuybackNotYetAvailable();
+        }
 
-        uint256 availableVaultUnits =
-            IERC20(daoState.stableAsset).balanceOf(address(this)) - daoState.vaultReservedUnits;
+        uint256 availableVaultUnits = _idleVaultUnits(position.stableAsset);
         if (availableVaultUnits < position.buybackFloor) {
             revert SparkDaoErrors.VaultFundsReserved();
         }
 
-        position.currentHolder = daoState.authority;
+        address treasuryHolder = daoState.treasury;
+        position.currentHolder = treasuryHolder;
         position.boughtBack = true;
         position.boughtBackAt = uint64(block.timestamp);
         position.boughtBackPrice = position.buybackFloor;
-        IResearchPositionToken(RESEARCH_POSITION_TOKEN).protocolTransfer(
-            msg.sender, daoState.authority, _researchPositionTokenId(assetId, positionId)
+        IResearchPositionToken(RESEARCH_POSITION_TOKEN)
+            .protocolTransfer(
+                msg.sender, treasuryHolder, _researchPositionTokenId(assetId, positionId)
+            );
+
+        _safeTransfer(position.stableAsset, msg.sender, position.buybackFloor);
+
+        emit PositionBoughtBack(
+            assetId, positionId, msg.sender, treasuryHolder, position.buybackFloor
         );
-
-        if (!IERC20(daoState.stableAsset).transfer(msg.sender, position.buybackFloor)) {
-            revert SparkDaoErrors.TokenTransferFailed();
-        }
-
-        emit PositionBoughtBack(assetId, positionId, msg.sender, position.buybackFloor);
     }
 
     function _requireAsset(uint64 assetId)
@@ -518,5 +561,65 @@ contract ResearchRegistry is SparkDaoConfig {
         returns (uint256)
     {
         return (uint256(assetId) << 64) | uint256(positionId);
+    }
+
+    function _snapshotActiveLayerFromCheckpoints(uint64 assetId, uint64 snapshotAt)
+        internal
+        view
+        returns (uint16)
+    {
+        SparkDaoTypes.LayerCheckpoint[] storage checkpoints = researchLayerCheckpoints[assetId];
+        uint256 checkpointCount = checkpoints.length;
+        if (checkpointCount == 0 || snapshotAt < checkpoints[0].timestamp) return 0;
+
+        uint256 low = 0;
+        uint256 high = checkpointCount;
+        while (low < high) {
+            uint256 mid = (low + high) / 2;
+            if (checkpoints[mid].timestamp <= snapshotAt) {
+                low = mid + 1;
+            } else {
+                high = mid;
+            }
+        }
+        return checkpoints[low - 1].activeLayer;
+    }
+
+    function _snapshotEffectiveShareBps(uint64 assetId, uint64 snapshotAt)
+        internal
+        view
+        returns (uint16)
+    {
+        SparkDaoTypes.ShareCheckpoint[] storage checkpoints = researchShareCheckpoints[assetId];
+        uint256 checkpointCount = checkpoints.length;
+        if (checkpointCount == 0 || snapshotAt < checkpoints[0].timestamp) return 0;
+
+        uint256 low = 0;
+        uint256 high = checkpointCount;
+        while (low < high) {
+            uint256 mid = (low + high) / 2;
+            if (checkpoints[mid].timestamp <= snapshotAt) {
+                low = mid + 1;
+            } else {
+                high = mid;
+            }
+        }
+        return checkpoints[low - 1].effectiveShareBps;
+    }
+
+    function _pushLayerCheckpoint(uint64 assetId, uint64 timestamp, uint16 activeLayer) internal {
+        researchLayerCheckpoints[assetId].push(
+            SparkDaoTypes.LayerCheckpoint({ timestamp: timestamp, activeLayer: activeLayer })
+        );
+    }
+
+    function _pushShareCheckpoint(uint64 assetId, uint64 timestamp, uint16 effectiveShareBps)
+        internal
+    {
+        researchShareCheckpoints[assetId].push(
+            SparkDaoTypes.ShareCheckpoint({
+                timestamp: timestamp, effectiveShareBps: effectiveShareBps
+            })
+        );
     }
 }
