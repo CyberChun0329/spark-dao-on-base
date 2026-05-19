@@ -22,6 +22,7 @@ contract TeachingGasCalibrationTest {
         GasCalibrationVm(address(uint160(uint256(keccak256("hevm cheat code")))));
 
     string internal constant OUT = "teaching_gas_calibration.csv";
+    string internal constant CLAIM_OUT = "teaching_claim_gas_calibration.csv";
 
     TeachingRegistry internal registry;
     TeachingRewardDistributor internal rewardDistributor;
@@ -40,8 +41,10 @@ contract TeachingGasCalibrationTest {
     address internal contributorFour = address(0x1004);
 
     struct AssetBundle {
-        uint64 firstAsset;
-        uint64 secondAsset;
+        uint64 assetId;
+        uint64 layerOnePositionA;
+        uint64 layerOnePositionB;
+        uint64 layerTwoPosition;
         uint256 setupGas;
     }
 
@@ -61,7 +64,12 @@ contract TeachingGasCalibrationTest {
         uint64 firstAssetLayerOneB;
         uint64 firstAssetLayerTwo;
         uint64 secondAssetLayerOneA;
+        uint64 secondAssetLayerOneB;
         uint64 secondAssetLayerTwo;
+        address firstAssetLayerOneAHolder;
+        address firstAssetLayerOneBHolder;
+        address secondAssetLayerOneAHolder;
+        address secondAssetLayerOneBHolder;
         uint256 setupGas;
     }
 
@@ -97,8 +105,10 @@ contract TeachingGasCalibrationTest {
 
     function testWriteTeachingGasCalibrationCsv() public {
         VM.writeFile(
-            OUT, "path,category,total_gas,setup_gas,lesson_gas,valid_lesson,revenue_weight_bps\n"
+            OUT,
+            "path,category,total_gas,setup_gas,lesson_gas,claim_gas,valid_lesson,revenue_weight_bps\n"
         );
+        VM.writeFile(CLAIM_OUT, "path,category,claim_gas,claim_count,dust_release\n");
 
         _recordPath(_noResearch("ORD_NR", "ordinary", false, false, false));
         _recordPath(_zeroShare("ORD_ZS", "ordinary", false, false, false));
@@ -123,6 +133,12 @@ contract TeachingGasCalibrationTest {
         _recordPath(_researchBacked("TF_RB", "teacher_fault", false, false, true));
         _recordPath(_weightedMultiAsset("TF_WM", "teacher_fault", false, false, true));
         _recordPath(_multiLayer("TF_ML", "teacher_fault", false, false, true));
+
+        _recordClaimPrimitive(
+            "CLAIM_SINGLE_FULL", "single_claim", _claimSingleFullShare(), 1, false
+        );
+        _recordClaimPrimitive("CLAIM_BATCH_TWO", "batch_claim", _claimBatchTwoPools(), 2, false);
+        _recordClaimPrimitive("CLAIM_DUST_RELEASE", "dust_release", _claimDustRelease(), 1, true);
     }
 
     function _recordPath(PathInput memory input) internal {
@@ -131,10 +147,11 @@ contract TeachingGasCalibrationTest {
             string memory category,
             uint256 setupGas,
             uint256 lessonGas,
+            uint256 claimGas,
             bool validLesson,
             uint16 revenueWeightBps
         ) = _runPath(input);
-        _record(path, category, setupGas, lessonGas, validLesson, revenueWeightBps);
+        _record(path, category, setupGas, lessonGas, claimGas, validLesson, revenueWeightBps);
     }
 
     function _runPath(PathInput memory input)
@@ -144,6 +161,7 @@ contract TeachingGasCalibrationTest {
             string memory category,
             uint256 setupGas,
             uint256 lessonGas,
+            uint256 claimGas,
             bool validLesson,
             uint16 revenueWeightBps
         )
@@ -226,6 +244,8 @@ contract TeachingGasCalibrationTest {
             revenueWeightBps = 10_000;
         }
 
+        claimGas = _claimRewards(input, teachingNftId);
+
         (uint8 status,,,,,) = registry.getTeachingSessionState(teachingNftId);
         if (input.teacherFault) {
             assert(status == 4);
@@ -293,16 +313,20 @@ contract TeachingGasCalibrationTest {
         input.category = category;
         input.researchShareBps = 2_500;
         input.linkedAssetIds = new uint64[](2);
-        input.linkedAssetIds[0] = bundleOne.firstAsset;
-        input.linkedAssetIds[1] = bundleTwo.firstAsset;
+        input.linkedAssetIds[0] = bundleOne.assetId;
+        input.linkedAssetIds[1] = bundleTwo.assetId;
         input.weights = new uint16[](2);
         input.weights[0] = 7_000;
         input.weights[1] = 3_000;
         input.forceValid = forceValid;
         input.customerFault = customerFault;
         input.teacherFault = teacherFault;
-        input.firstAsset = bundleOne.firstAsset;
-        input.secondAsset = bundleTwo.firstAsset;
+        input.firstAsset = bundleOne.assetId;
+        input.secondAsset = bundleTwo.assetId;
+        input.firstAssetLayerOneA = bundleOne.layerOnePositionA;
+        input.secondAssetLayerOneA = bundleTwo.layerOnePositionA;
+        input.firstAssetLayerOneAHolder = contributorOne;
+        input.secondAssetLayerOneAHolder = contributorOne;
         input.setupGas = bundleOne.setupGas + bundleTwo.setupGas;
     }
 
@@ -325,18 +349,20 @@ contract TeachingGasCalibrationTest {
         AssetBundle memory second = _twoLayerAsset(path, "_B", contributorTwo, contributorFour);
 
         input.linkedAssetIds = new uint64[](2);
-        input.linkedAssetIds[0] = first.firstAsset;
-        input.linkedAssetIds[1] = second.firstAsset;
+        input.linkedAssetIds[0] = first.assetId;
+        input.linkedAssetIds[1] = second.assetId;
         input.weights = new uint16[](2);
         input.weights[0] = 7_000;
         input.weights[1] = 3_000;
-        input.firstAsset = first.firstAsset;
-        input.secondAsset = second.firstAsset;
-        input.firstAssetLayerOneA = uint64(uint256(first.secondAsset));
-        input.firstAssetLayerTwo = uint64(first.setupGas >> 128);
-        input.secondAssetLayerOneA = uint64(uint256(second.secondAsset));
-        input.secondAssetLayerTwo = uint64(second.setupGas >> 128);
-        input.setupGas = uint128(first.setupGas) + uint128(second.setupGas);
+        input.firstAsset = first.assetId;
+        input.secondAsset = second.assetId;
+        input.firstAssetLayerOneA = first.layerOnePositionA;
+        input.firstAssetLayerTwo = first.layerTwoPosition;
+        input.secondAssetLayerOneA = second.layerOnePositionA;
+        input.secondAssetLayerTwo = second.layerTwoPosition;
+        input.firstAssetLayerOneAHolder = contributorOne;
+        input.secondAssetLayerOneAHolder = contributorTwo;
+        input.setupGas = first.setupGas + second.setupGas;
     }
 
     function _oneAssetInput(
@@ -347,17 +373,21 @@ contract TeachingGasCalibrationTest {
         bool forceValid,
         bool customerFault,
         bool teacherFault
-    ) internal pure returns (PathInput memory input) {
+    ) internal view returns (PathInput memory input) {
         input.path = path;
         input.category = category;
         input.researchShareBps = researchShareBps;
         input.linkedAssetIds = new uint64[](1);
-        input.linkedAssetIds[0] = bundle.firstAsset;
+        input.linkedAssetIds[0] = bundle.assetId;
         input.weights = new uint16[](0);
         input.forceValid = forceValid;
         input.customerFault = customerFault;
         input.teacherFault = teacherFault;
-        input.firstAsset = bundle.firstAsset;
+        input.firstAsset = bundle.assetId;
+        input.firstAssetLayerOneA = bundle.layerOnePositionA;
+        input.firstAssetLayerOneB = bundle.layerOnePositionB;
+        input.firstAssetLayerOneAHolder = contributorOne;
+        input.firstAssetLayerOneBHolder = contributorTwo;
         input.setupGas = bundle.setupGas;
     }
 
@@ -391,8 +421,8 @@ contract TeachingGasCalibrationTest {
         registry.sealLayer(assetId, 1);
         setupGas += gasBefore - gasleft();
 
-        bundle.firstAsset = assetId;
-        bundle.secondAsset = positionId;
+        bundle.assetId = assetId;
+        bundle.layerOnePositionA = positionId;
         bundle.setupGas = setupGas;
     }
 
@@ -410,7 +440,7 @@ contract TeachingGasCalibrationTest {
 
         VM.prank(coordinator);
         gasBefore = gasleft();
-        registry.createPatchPosition(
+        uint64 positionA = registry.createPatchPosition(
             SparkDaoTypes.CreatePatchPositionParams({
                 assetId: assetId,
                 layerIndex: 1,
@@ -426,7 +456,7 @@ contract TeachingGasCalibrationTest {
 
         VM.prank(coordinator);
         gasBefore = gasleft();
-        registry.createPatchPosition(
+        uint64 positionB = registry.createPatchPosition(
             SparkDaoTypes.CreatePatchPositionParams({
                 assetId: assetId,
                 layerIndex: 1,
@@ -445,7 +475,9 @@ contract TeachingGasCalibrationTest {
         registry.sealLayer(assetId, 1);
         setupGas += gasBefore - gasleft();
 
-        bundle.firstAsset = assetId;
+        bundle.assetId = assetId;
+        bundle.layerOnePositionA = positionA;
+        bundle.layerOnePositionB = positionB;
         bundle.setupGas = setupGas;
     }
 
@@ -505,9 +537,10 @@ contract TeachingGasCalibrationTest {
         registry.sealLayer(assetId, 2);
         setupGas += gasBefore - gasleft();
 
-        bundle.firstAsset = assetId;
-        bundle.secondAsset = layerOnePosition;
-        bundle.setupGas = (uint256(layerTwoPosition) << 128) | setupGas;
+        bundle.assetId = assetId;
+        bundle.layerOnePositionA = layerOnePosition;
+        bundle.layerTwoPosition = layerTwoPosition;
+        bundle.setupGas = setupGas;
     }
 
     function _advancePreparedLayers(PathInput memory input) internal returns (uint256 gasUsed) {
@@ -582,11 +615,238 @@ contract TeachingGasCalibrationTest {
         gasUsed = gasBefore - gasleft();
     }
 
+    function _claimRewards(PathInput memory input, uint64 teachingNftId)
+        internal
+        returns (uint256 gasUsed)
+    {
+        if (input.customerFault || input.researchShareBps == 0 || input.linkedAssetIds.length == 0)
+        {
+            return 0;
+        }
+
+        if (
+            input.firstAssetLayerOneAHolder != address(0)
+                && input.secondAssetLayerOneAHolder != address(0) && input.firstAssetLayerOneB == 0
+                && input.secondAssetLayerOneB == 0
+                && input.firstAssetLayerOneAHolder == input.secondAssetLayerOneAHolder
+        ) {
+            _warpToRewardUnlock(teachingNftId, input.firstAsset, input.firstAssetLayerOneA);
+            uint64[] memory teachingNftIds = new uint64[](2);
+            teachingNftIds[0] = teachingNftId;
+            teachingNftIds[1] = teachingNftId;
+            uint64[] memory assetIds = new uint64[](2);
+            assetIds[0] = input.firstAsset;
+            assetIds[1] = input.secondAsset;
+            uint64[] memory positionIds = new uint64[](2);
+            positionIds[0] = input.firstAssetLayerOneA;
+            positionIds[1] = input.secondAssetLayerOneA;
+
+            VM.prank(input.firstAssetLayerOneAHolder);
+            uint256 gasBefore = gasleft();
+            rewardDistributor.claimTeachingRewardBatch(teachingNftIds, assetIds, positionIds);
+            return gasBefore - gasleft();
+        }
+
+        _warpToRewardUnlock(teachingNftId, input.firstAsset, input.firstAssetLayerOneA);
+        gasUsed += _claimOne(
+            input.firstAsset,
+            input.firstAssetLayerOneA,
+            input.firstAssetLayerOneAHolder,
+            teachingNftId
+        );
+        if (input.firstAssetLayerOneB != 0) {
+            gasUsed += _claimOne(
+                input.firstAsset,
+                input.firstAssetLayerOneB,
+                input.firstAssetLayerOneBHolder,
+                teachingNftId
+            );
+        }
+        if (input.secondAsset != 0) {
+            gasUsed += _claimOne(
+                input.secondAsset,
+                input.secondAssetLayerOneA,
+                input.secondAssetLayerOneAHolder,
+                teachingNftId
+            );
+            if (input.secondAssetLayerOneB != 0) {
+                gasUsed += _claimOne(
+                    input.secondAsset,
+                    input.secondAssetLayerOneB,
+                    input.secondAssetLayerOneBHolder,
+                    teachingNftId
+                );
+            }
+        }
+    }
+
+    function _claimOne(uint64 assetId, uint64 positionId, address holder, uint64 teachingNftId)
+        internal
+        returns (uint256 gasUsed)
+    {
+        if (holder == address(0)) return 0;
+        VM.prank(holder);
+        uint256 gasBefore = gasleft();
+        rewardDistributor.claimTeachingReward(teachingNftId, assetId, positionId);
+        gasUsed = gasBefore - gasleft();
+    }
+
+    function _warpToRewardUnlock(uint64 teachingNftId, uint64 assetId, uint64 positionId) internal {
+        (, uint64 unlockAt,) =
+            rewardDistributor.getTeachingRewardClaimable(teachingNftId, assetId, positionId);
+        VM.warp(unlockAt);
+    }
+
+    function _claimSingleFullShare() internal returns (uint256 gasUsed) {
+        AssetBundle memory bundle = _oneLayerOnePosition("CLAIM_SINGLE_FULL");
+        PathInput memory input =
+            _oneAssetInput("CLAIM_SINGLE_FULL", "claim", bundle, 2_500, false, false, false);
+        uint64 teachingNftId = _createSettledClaimFixture(input);
+        _warpToRewardUnlock(teachingNftId, input.firstAsset, input.firstAssetLayerOneA);
+        gasUsed =
+            _claimOne(input.firstAsset, input.firstAssetLayerOneA, contributorOne, teachingNftId);
+    }
+
+    function _claimBatchTwoPools() internal returns (uint256 gasUsed) {
+        PathInput memory input =
+            _weightedMultiAsset("CLAIM_BATCH_TWO", "claim", false, false, false);
+        uint64 teachingNftId = _createSettledClaimFixture(input);
+        _warpToRewardUnlock(teachingNftId, input.firstAsset, input.firstAssetLayerOneA);
+
+        uint64[] memory teachingNftIds = new uint64[](2);
+        teachingNftIds[0] = teachingNftId;
+        teachingNftIds[1] = teachingNftId;
+        uint64[] memory assetIds = new uint64[](2);
+        assetIds[0] = input.firstAsset;
+        assetIds[1] = input.secondAsset;
+        uint64[] memory positionIds = new uint64[](2);
+        positionIds[0] = input.firstAssetLayerOneA;
+        positionIds[1] = input.secondAssetLayerOneA;
+
+        VM.prank(contributorOne);
+        uint256 gasBefore = gasleft();
+        rewardDistributor.claimTeachingRewardBatch(teachingNftIds, assetIds, positionIds);
+        gasUsed = gasBefore - gasleft();
+    }
+
+    function _claimDustRelease() internal returns (uint256 gasUsed) {
+        VM.startPrank(coordinator);
+        uint64 assetId = registry.createResearchAsset("Claim Dust Asset", "ipfs://claim-dust");
+        uint64 positionA = registry.createPatchPosition(
+            SparkDaoTypes.CreatePatchPositionParams({
+                assetId: assetId,
+                layerIndex: 1,
+                layerShareBps: 9_000,
+                buybackFloor: 10,
+                decayWaitSeconds: 365 days,
+                decayPeriodSeconds: 365 days,
+                decayRateBps: 5_000,
+                beneficiary: contributorOne
+            })
+        );
+        uint64 positionB = registry.createPatchPosition(
+            SparkDaoTypes.CreatePatchPositionParams({
+                assetId: assetId,
+                layerIndex: 1,
+                layerShareBps: 1_000,
+                buybackFloor: 10,
+                decayWaitSeconds: 365 days,
+                decayPeriodSeconds: 365 days,
+                decayRateBps: 5_000,
+                beneficiary: contributorTwo
+            })
+        );
+        registry.sealLayer(assetId, 1);
+
+        uint64 courseTypeId = registry.createTeachingCourseType("Claim Dust Seminar", 12, 1, 2_500);
+        uint64[] memory linkedAssetIds = new uint64[](1);
+        linkedAssetIds[0] = assetId;
+        uint64 teachingNftId = registry.createTeachingSession(
+            SparkDaoTypes.CreateTeachingSessionParams({
+                courseTypeId: courseTypeId,
+                teacher: teacher,
+                customer: customer,
+                scheduledAt: uint64(block.timestamp + 7 days),
+                customerDiscountBps: 10_000,
+                linkedResearchAssetIds: linkedAssetIds,
+                linkedResearchWeightBps: new uint16[](0)
+            })
+        );
+        VM.stopPrank();
+
+        _prepareTeachingSession(teachingNftId);
+        VM.warp(block.timestamp + 8 days);
+        VM.prank(teacher);
+        registry.confirmTeachingCompletion(teachingNftId, true);
+        VM.prank(customer);
+        registry.confirmTeachingCompletion(teachingNftId, false);
+
+        (, uint64 unlockAt,) =
+            rewardDistributor.getTeachingRewardClaimable(teachingNftId, assetId, positionA);
+        VM.warp(unlockAt);
+        _claimOne(assetId, positionA, contributorOne, teachingNftId);
+
+        VM.prank(contributorTwo);
+        uint256 gasBefore = gasleft();
+        rewardDistributor.claimTeachingReward(teachingNftId, assetId, positionB);
+        gasUsed = gasBefore - gasleft();
+    }
+
+    function _createSettledClaimFixture(PathInput memory input)
+        internal
+        returns (uint64 teachingNftId)
+    {
+        uint64 courseTypeId;
+        VM.prank(coordinator);
+        courseTypeId = registry.createTeachingCourseType(
+            input.path, 1_000_000, 400_000, input.researchShareBps
+        );
+
+        uint64 scheduledAt = uint64(block.timestamp + 7 days);
+        SparkDaoTypes.CreateTeachingSessionParams memory params =
+            SparkDaoTypes.CreateTeachingSessionParams({
+                courseTypeId: courseTypeId,
+                teacher: teacher,
+                customer: customer,
+                scheduledAt: scheduledAt,
+                customerDiscountBps: 8_000,
+                linkedResearchAssetIds: input.linkedAssetIds,
+                linkedResearchWeightBps: input.weights
+            });
+
+        VM.prank(coordinator);
+        teachingNftId = registry.createTeachingSession(params);
+        _prepareTeachingSession(teachingNftId);
+        VM.warp(uint256(scheduledAt) + 8 days);
+        VM.prank(teacher);
+        registry.confirmTeachingCompletion(teachingNftId, true);
+        VM.prank(customer);
+        registry.confirmTeachingCompletion(teachingNftId, false);
+    }
+
+    function _prepareTeachingSession(uint64 teachingNftId) internal {
+        VM.prank(teacher);
+        registry.confirmTeachingSchedule(teachingNftId, true);
+        VM.prank(customer);
+        registry.confirmTeachingSchedule(teachingNftId, false);
+
+        VM.startPrank(teacher);
+        stable.approve(address(registry), 800_000);
+        registry.lockTeachingCollateral(teachingNftId, true);
+        VM.stopPrank();
+
+        VM.startPrank(customer);
+        stable.approve(address(registry), 800_000);
+        registry.lockTeachingCollateral(teachingNftId, false);
+        VM.stopPrank();
+    }
+
     function _record(
         string memory path,
         string memory category,
         uint256 setupGas,
         uint256 lessonGas,
+        uint256 claimGas,
         bool validLesson,
         uint16 revenueWeightBps
     ) internal {
@@ -597,15 +857,32 @@ contract TeachingGasCalibrationTest {
                 ",",
                 category,
                 ",",
-                _u(setupGas + lessonGas),
+                _u(setupGas + lessonGas + claimGas),
                 ",",
                 _u(setupGas),
                 ",",
                 _u(lessonGas),
                 ",",
+                _u(claimGas),
+                ",",
                 _b(validLesson),
                 ",",
                 _u(revenueWeightBps)
+            )
+        );
+    }
+
+    function _recordClaimPrimitive(
+        string memory path,
+        string memory category,
+        uint256 claimGas,
+        uint256 claimCount,
+        bool dustRelease
+    ) internal {
+        VM.writeLine(
+            CLAIM_OUT,
+            string.concat(
+                path, ",", category, ",", _u(claimGas), ",", _u(claimCount), ",", _b(dustRelease)
             )
         );
     }

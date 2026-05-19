@@ -7,8 +7,17 @@ type GasRow = {
   total_gas: number;
   setup_gas: number;
   lesson_gas: number;
+  claim_gas: number;
   valid_lesson: boolean;
   revenue_weight_bps: number;
+};
+
+type ClaimGasRow = {
+  path: string;
+  category: string;
+  claim_gas: number;
+  claim_count: number;
+  dust_release: boolean;
 };
 
 type ResearchGasRow = {
@@ -30,6 +39,7 @@ type CoordinatorCase = {
 
 const root = process.cwd();
 const gasCsvPath = join(root, "teaching_gas_calibration.csv");
+const claimGasCsvPath = join(root, "teaching_claim_gas_calibration.csv");
 const researchGasCsvPath = join(root, "research_gas_calibration.csv");
 const feeAssumptionsPath = join(root, "simulation_inputs", "fee_assumptions.json");
 const outDir = join(root, "simulation_outputs");
@@ -78,8 +88,25 @@ function parseCsv(path: string): GasRow[] {
       total_gas: Number(row.total_gas),
       setup_gas: Number(row.setup_gas),
       lesson_gas: Number(row.lesson_gas),
+      claim_gas: Number(row.claim_gas ?? 0),
       valid_lesson: row.valid_lesson === "true",
       revenue_weight_bps: Number(row.revenue_weight_bps),
+    };
+  });
+}
+
+function parseClaimCsv(path: string): ClaimGasRow[] {
+  const [headerLine, ...lines] = readFileSync(path, "utf8").trim().split(/\r?\n/);
+  const headers = headerLine.split(",");
+  return lines.map((line) => {
+    const cells = line.split(",");
+    const row = Object.fromEntries(headers.map((header, index) => [header, cells[index]]));
+    return {
+      path: row.path,
+      category: row.category,
+      claim_gas: Number(row.claim_gas),
+      claim_count: Number(row.claim_count),
+      dust_release: row.dust_release === "true",
     };
   });
 }
@@ -115,12 +142,15 @@ function weightedGas(
   gasByPath: Map<string, GasRow>,
   prefix: "ORD" | "FV" | "CF" | "TF",
   mix: Scenario["ordinaryMix"],
+  metric: "lesson_gas" | "claim_gas" | "management_gas",
 ): number {
   let total = 0;
   for (const [kind, weight] of Object.entries(mix)) {
     const row = gasByPath.get(`${prefix}_${kind}`);
     if (!row) throw new Error(`Missing gas row for ${prefix}_${kind}`);
-    total += weight * row.lesson_gas;
+    const gas =
+      metric === "management_gas" ? row.lesson_gas + row.claim_gas : row[metric];
+    total += weight * gas;
   }
   return total;
 }
@@ -147,6 +177,7 @@ function fmtGas(value: number): string {
 
 const gasRows = parseCsv(gasCsvPath);
 const gasByPath = new Map(gasRows.map((row) => [row.path, row]));
+const claimGasRows = parseClaimCsv(claimGasCsvPath);
 const researchGasRows = parseResearchCsv(researchGasCsvPath);
 const researchGasByPath = new Map(researchGasRows.map((row) => [row.path, row.gas]));
 const feeAssumptions = parseFeeAssumptions(feeAssumptionsPath);
@@ -161,12 +192,20 @@ const simulationRows: string[] = [
     "p_customer_fault",
     "p_teacher_fault",
     "ordinary_expected_lesson_gas",
+    "ordinary_expected_claim_gas",
     "forced_valid_expected_lesson_gas",
+    "forced_valid_expected_claim_gas",
     "customer_fault_expected_lesson_gas",
+    "customer_fault_expected_claim_gas",
     "teacher_fault_expected_lesson_gas",
-    "expected_gas_per_attempted_lesson",
+    "teacher_fault_expected_claim_gas",
+    "expected_lesson_gas_per_attempted_lesson",
+    "expected_claim_gas_per_attempted_lesson",
+    "expected_management_gas_per_attempted_lesson",
     "revenue_weight",
-    "cost_per_attempted_lesson",
+    "lesson_settlement_cost_per_attempted_lesson",
+    "claim_cost_per_attempted_lesson",
+    "claim_inclusive_cost_per_attempted_lesson",
     "cost_share_at_50",
     "cost_share_at_100",
     "cost_share_at_150",
@@ -180,12 +219,20 @@ type SummaryRow = {
   pFV: number;
   pCF: number;
   pTF: number;
-  ordinaryGas: number;
-  forcedValidGas: number;
-  customerFaultGas: number;
-  teacherFaultGas: number;
-  expectedGas: number;
+  ordinaryLessonGas: number;
+  ordinaryClaimGas: number;
+  forcedValidLessonGas: number;
+  forcedValidClaimGas: number;
+  customerFaultLessonGas: number;
+  customerFaultClaimGas: number;
+  teacherFaultLessonGas: number;
+  teacherFaultClaimGas: number;
+  expectedLessonGas: number;
+  expectedClaimGas: number;
+  expectedManagementGas: number;
   revenueWeight: number;
+  lessonSettlementCostPerAttemptedLesson: number;
+  claimCostPerAttemptedLesson: number;
   costPerAttemptedLesson: number;
   shares: number[];
 };
@@ -193,24 +240,38 @@ type SummaryRow = {
 const summaries: SummaryRow[] = [];
 
 for (const scenario of scenarios) {
-  const ordinaryGas = weightedGas(gasByPath, "ORD", scenario.ordinaryMix);
-  const forcedValidGas = weightedGas(gasByPath, "FV", scenario.ordinaryMix);
-  const customerFaultGas = weightedGas(gasByPath, "CF", scenario.ordinaryMix);
-  const teacherFaultGas = weightedGas(gasByPath, "TF", scenario.ordinaryMix);
+  const ordinaryLessonGas = weightedGas(gasByPath, "ORD", scenario.ordinaryMix, "lesson_gas");
+  const forcedValidLessonGas = weightedGas(gasByPath, "FV", scenario.ordinaryMix, "lesson_gas");
+  const customerFaultLessonGas = weightedGas(gasByPath, "CF", scenario.ordinaryMix, "lesson_gas");
+  const teacherFaultLessonGas = weightedGas(gasByPath, "TF", scenario.ordinaryMix, "lesson_gas");
+  const ordinaryClaimGas = weightedGas(gasByPath, "ORD", scenario.ordinaryMix, "claim_gas");
+  const forcedValidClaimGas = weightedGas(gasByPath, "FV", scenario.ordinaryMix, "claim_gas");
+  const customerFaultClaimGas = weightedGas(gasByPath, "CF", scenario.ordinaryMix, "claim_gas");
+  const teacherFaultClaimGas = weightedGas(gasByPath, "TF", scenario.ordinaryMix, "claim_gas");
 
   for (const coordinatorCase of coordinatorCases) {
     if (coordinatorCase.pFV + coordinatorCase.pCF + coordinatorCase.pTF >= 1) {
       throw new Error(`Invalid coordinator probabilities for ${coordinatorCase.name}`);
     }
-    const expectedGas =
-      (1 - coordinatorCase.pFV - coordinatorCase.pCF - coordinatorCase.pTF) * ordinaryGas
-      + coordinatorCase.pFV * forcedValidGas
-      + coordinatorCase.pCF * customerFaultGas
-      + coordinatorCase.pTF * teacherFaultGas;
+    const expectedLessonGas =
+      (1 - coordinatorCase.pFV - coordinatorCase.pCF - coordinatorCase.pTF) * ordinaryLessonGas
+      + coordinatorCase.pFV * forcedValidLessonGas
+      + coordinatorCase.pCF * customerFaultLessonGas
+      + coordinatorCase.pTF * teacherFaultLessonGas;
+    const expectedClaimGas =
+      (1 - coordinatorCase.pFV - coordinatorCase.pCF - coordinatorCase.pTF) * ordinaryClaimGas
+      + coordinatorCase.pFV * forcedValidClaimGas
+      + coordinatorCase.pCF * customerFaultClaimGas
+      + coordinatorCase.pTF * teacherFaultClaimGas;
+    const expectedManagementGas = expectedLessonGas + expectedClaimGas;
     const revenueWeight = 1 - 0.5 * (coordinatorCase.pCF + coordinatorCase.pTF);
 
     for (const feeMultiplier of feeMultipliers) {
-      const costPerAttemptedLesson = expectedGas * referenceUsdPerGas * feeMultiplier;
+      const lessonSettlementCostPerAttemptedLesson =
+        expectedLessonGas * referenceUsdPerGas * feeMultiplier;
+      const claimCostPerAttemptedLesson =
+        expectedClaimGas * referenceUsdPerGas * feeMultiplier;
+      const costPerAttemptedLesson = expectedManagementGas * referenceUsdPerGas * feeMultiplier;
       const shares = revenues.map(
         (revenue) => (100 * costPerAttemptedLesson) / (revenue * revenueWeight),
       );
@@ -222,12 +283,20 @@ for (const scenario of scenarios) {
         pFV: coordinatorCase.pFV,
         pCF: coordinatorCase.pCF,
         pTF: coordinatorCase.pTF,
-        ordinaryGas,
-        forcedValidGas,
-        customerFaultGas,
-        teacherFaultGas,
-        expectedGas,
+        ordinaryLessonGas,
+        ordinaryClaimGas,
+        forcedValidLessonGas,
+        forcedValidClaimGas,
+        customerFaultLessonGas,
+        customerFaultClaimGas,
+        teacherFaultLessonGas,
+        teacherFaultClaimGas,
+        expectedLessonGas,
+        expectedClaimGas,
+        expectedManagementGas,
         revenueWeight,
+        lessonSettlementCostPerAttemptedLesson,
+        claimCostPerAttemptedLesson,
         costPerAttemptedLesson,
         shares,
       });
@@ -240,12 +309,20 @@ for (const scenario of scenarios) {
           coordinatorCase.pFV,
           coordinatorCase.pCF,
           coordinatorCase.pTF,
-          Math.round(ordinaryGas),
-          Math.round(forcedValidGas),
-          Math.round(customerFaultGas),
-          Math.round(teacherFaultGas),
-          Math.round(expectedGas),
+          Math.round(ordinaryLessonGas),
+          Math.round(ordinaryClaimGas),
+          Math.round(forcedValidLessonGas),
+          Math.round(forcedValidClaimGas),
+          Math.round(customerFaultLessonGas),
+          Math.round(customerFaultClaimGas),
+          Math.round(teacherFaultLessonGas),
+          Math.round(teacherFaultClaimGas),
+          Math.round(expectedLessonGas),
+          Math.round(expectedClaimGas),
+          Math.round(expectedManagementGas),
           revenueWeight.toFixed(3),
+          lessonSettlementCostPerAttemptedLesson.toFixed(8),
+          claimCostPerAttemptedLesson.toFixed(8),
           costPerAttemptedLesson.toFixed(8),
           shares[0].toFixed(6),
           shares[1].toFixed(6),
@@ -257,24 +334,40 @@ for (const scenario of scenarios) {
 }
 
 const pathTable = [
-  "| Path | Category | Setup gas | Lesson gas | Total gas | Revenue weight |",
-  "|---|---|---:|---:|---:|---|",
+  "| Path | Category | Setup gas | Lesson settlement gas | Distributor claim gas | Claim-inclusive management gas | Total gas | Revenue weight |",
+  "|---|---|---:|---:|---:|---:|---:|---|",
   ...gasRows.map((row) =>
     [
       row.path,
       row.category,
       fmtGas(row.setup_gas),
       fmtGas(row.lesson_gas),
+      fmtGas(row.claim_gas),
+      fmtGas(row.lesson_gas + row.claim_gas),
       fmtGas(row.total_gas),
       fmtPct(row.revenue_weight_bps / 100),
     ].join(" | "),
   ).map((line) => `| ${line} |`),
 ];
 
+const claimPrimitiveTable = [
+  "| Claim path | Category | Claim gas | Claim count | Dust release |",
+  "|---|---|---:|---:|---|",
+  ...claimGasRows.map((row) =>
+    [
+      row.path,
+      row.category,
+      fmtGas(row.claim_gas),
+      row.claim_count,
+      row.dust_release ? "yes" : "no",
+    ].join(" | "),
+  ).map((line) => `| ${line} |`),
+];
+
 const k1Rows = summaries.filter((row) => row.feeMultiplier === 1);
 const scenarioTable = [
-  "| Window | Coordinator case | p(FV) | p(CF) | p(TF) | Expected gas / attempted lesson | Revenue weight | Cost / attempted lesson | Share at $50 | Share at $100 | Share at $150 |",
-  "|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
+  "| Window | Coordinator case | p(FV) | p(CF) | p(TF) | Lesson gas | Claim gas | Claim-inclusive gas | Revenue weight | Claim-inclusive cost / attempted lesson | Claim gas share | Share at $50 | Share at $100 | Share at $150 |",
+  "|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
   ...k1Rows.map((row) =>
     [
       row.window,
@@ -282,9 +375,12 @@ const scenarioTable = [
       fmtPct(100 * row.pFV),
       fmtPct(100 * row.pCF),
       fmtPct(100 * row.pTF),
-      fmtGas(row.expectedGas),
+      fmtGas(row.expectedLessonGas),
+      fmtGas(row.expectedClaimGas),
+      fmtGas(row.expectedManagementGas),
       fmtPct(100 * row.revenueWeight),
       fmtMoney(row.costPerAttemptedLesson),
+      fmtPct((100 * row.expectedClaimGas) / row.expectedManagementGas),
       fmtPct(row.shares[0]),
       fmtPct(row.shares[1]),
       fmtPct(row.shares[2]),
@@ -296,13 +392,15 @@ const stressRows = summaries.filter(
   (row) => row.coordinatorCase === "Coordinator stress" && [1, 10].includes(row.feeMultiplier),
 );
 const stressTable = [
-  "| Window | Fee multiplier | Expected gas / attempted lesson | Cost / attempted lesson | Share at $50 | Share at $100 | Share at $150 |",
-  "|---|---:|---:|---:|---:|---:|---:|",
+  "| Window | Fee multiplier | Lesson gas | Claim gas | Claim-inclusive gas | Claim-inclusive cost / attempted lesson | Share at $50 | Share at $100 | Share at $150 |",
+  "|---|---:|---:|---:|---:|---:|---:|---:|---:|",
   ...stressRows.map((row) =>
     [
       row.window,
       `${row.feeMultiplier}x`,
-      fmtGas(row.expectedGas),
+      fmtGas(row.expectedLessonGas),
+      fmtGas(row.expectedClaimGas),
+      fmtGas(row.expectedManagementGas),
       fmtMoney(row.costPerAttemptedLesson),
       fmtPct(row.shares[0]),
       fmtPct(row.shares[1]),
@@ -408,8 +506,8 @@ const chapterScaleSummaries: ChapterScaleSummary[] = chapterScaleRows.map((row) 
 function makeScaleTable(window: string, includeMainResearchNfts: boolean): string[] {
   const rows = chapterScaleSummaries.filter((row) => row.window === window);
   const header = includeMainResearchNfts
-    ? "| Teachers | Active students | Main research NFTs | Realised lessons / month | Throughput bottleneck | Estimated lesson-driven cost / month |"
-    : "| Teachers | Active students | Realised lessons / month | Throughput bottleneck | Estimated lesson-driven cost / month |";
+    ? "| Teachers | Active students | Main research NFTs | Realised lessons / month | Throughput bottleneck | Estimated claim-inclusive management cost / month |"
+    : "| Teachers | Active students | Realised lessons / month | Throughput bottleneck | Estimated claim-inclusive management cost / month |";
   const divider = includeMainResearchNfts
     ? "|---:|---:|---:|---:|---|---:|"
     : "|---:|---:|---:|---|---:|";
@@ -565,13 +663,27 @@ const researchMaintenanceTable = [
 const ordinaryNoCoordinatorRows = summaries.filter(
   (row) => row.coordinatorCase === "No coordinator" && row.feeMultiplier === 1,
 );
+const ordinaryMinLessonCost = Math.min(
+  ...ordinaryNoCoordinatorRows.map((row) => row.lessonSettlementCostPerAttemptedLesson),
+);
+const ordinaryMaxLessonCost = Math.max(
+  ...ordinaryNoCoordinatorRows.map((row) => row.lessonSettlementCostPerAttemptedLesson),
+);
+const ordinaryMinClaimCost = Math.min(
+  ...ordinaryNoCoordinatorRows.map((row) => row.claimCostPerAttemptedLesson),
+);
+const ordinaryMaxClaimCost = Math.max(
+  ...ordinaryNoCoordinatorRows.map((row) => row.claimCostPerAttemptedLesson),
+);
 const ordinaryMinCost = Math.min(...ordinaryNoCoordinatorRows.map((row) => row.costPerAttemptedLesson));
 const ordinaryMaxCost = Math.max(...ordinaryNoCoordinatorRows.map((row) => row.costPerAttemptedLesson));
 const costShareTable = [
-  "| Revenue / lesson | Window-specific on-chain cost / lesson | Lesson-driven cost share of revenue |",
-  "|---:|---:|---:|",
+  "| Revenue / lesson | Lesson settlement cost / lesson | Distributor claim cost / lesson | Claim-inclusive on-chain cost / lesson | Claim-inclusive cost share of revenue |",
+  "|---:|---:|---:|---:|---:|",
   ...revenues.map((revenue) =>
-    `| $${revenue} | ${fmtMoney(ordinaryMinCost)}-${fmtMoney(ordinaryMaxCost)} | ${
+    `| $${revenue} | ${fmtMoney(ordinaryMinLessonCost)}-${fmtMoney(ordinaryMaxLessonCost)} | ${
+      fmtMoney(ordinaryMinClaimCost)
+    }-${fmtMoney(ordinaryMaxClaimCost)} | ${fmtMoney(ordinaryMinCost)}-${fmtMoney(ordinaryMaxCost)} | ${
       fmtSharePct((100 * ordinaryMinCost) / revenue)
     }-${fmtSharePct((100 * ordinaryMaxCost) / revenue)} |`,
   ),
@@ -579,7 +691,7 @@ const costShareTable = [
 
 const markdown = `# Teaching Cost Simulation
 
-Generated from \`teaching_gas_calibration.csv\`.
+Generated from \`teaching_gas_calibration.csv\`, \`teaching_claim_gas_calibration.csv\`, and \`research_gas_calibration.csv\`.
 
 Reference translation coefficient:
 
@@ -590,11 +702,15 @@ measurementWindow = ${feeAssumptions.measurementWindow}
 unit = ${feeAssumptions.unit}
 \`\`\`
 
-The simulation uses \`lesson_gas\` for lesson-driven cost. \`setup_gas\` is reported separately because research setup and catalogue maintenance are low-frequency components in the model. Research maintenance rows are generated from \`research_gas_calibration.csv\`.
+The simulation uses \`lesson_gas + claim_gas\` for the recurring teaching-management coefficient. \`lesson_gas\` measures settlement through \`TeachingRegistry\`; \`claim_gas\` measures reward withdrawal through \`TeachingRewardDistributor\`. \`setup_gas\` is reported separately because research setup and catalogue maintenance are low-frequency components in the model. Claim primitives below record single-claim, batch-claim, and dust-release paths, while the path table reports the deterministic claim policy used by the calibration test.
 
 ## Measured Contract Paths
 
 ${pathTable.join("\n")}
+
+## Measured Reward-Claim Primitives
+
+${claimPrimitiveTable.join("\n")}
 
 ## Coordinator-Extended Scenario Simulation
 
@@ -644,11 +760,20 @@ writeFileSync(
   JSON.stringify(
     {
       gasRows,
+      claimGasRows,
       researchGasRows,
       feeAssumptions,
       summaries,
       chapterScaleSummaries,
       researchMaintenanceSummaries,
+      ordinaryLessonCostRange: {
+        min: ordinaryMinLessonCost,
+        max: ordinaryMaxLessonCost,
+      },
+      ordinaryClaimCostRange: {
+        min: ordinaryMinClaimCost,
+        max: ordinaryMaxClaimCost,
+      },
       ordinaryCostRange: {
         min: ordinaryMinCost,
         max: ordinaryMaxCost,

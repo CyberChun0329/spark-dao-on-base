@@ -10,6 +10,7 @@ optimizer_runs = 1
 via_ir = true
 fs_permissions = [
   { access = "read-write", path = "./teaching_gas_calibration.csv" },
+  { access = "read-write", path = "./teaching_claim_gas_calibration.csv" },
   { access = "read-write", path = "./research_gas_calibration.csv" }
 ]
 
