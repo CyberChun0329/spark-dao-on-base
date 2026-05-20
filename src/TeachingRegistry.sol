@@ -1,13 +1,16 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.26;
 
-import { ResearchRegistry } from "./ResearchRegistry.sol";
+import { SparkDaoConfig } from "./SparkDaoConfig.sol";
 import { SparkDaoErrors } from "./SparkDaoErrors.sol";
 import { SparkDaoTypes } from "./SparkDaoTypes.sol";
+import { IResearchRegistryForTeaching } from "./interfaces/IResearchRegistryForTeaching.sol";
+import { ITeachingEconomicsPolicyGuard } from "./interfaces/ITeachingEconomicsPolicyGuard.sol";
+import { ITeachingFaultPolicyGuard } from "./interfaces/ITeachingFaultPolicyGuard.sol";
 import { ITeachingRewardDistributor } from "./interfaces/ITeachingRewardDistributor.sol";
 import { ITeachingNftToken } from "./interfaces/ITeachingNftToken.sol";
 
-contract TeachingRegistry is ResearchRegistry {
+contract TeachingRegistry is SparkDaoConfig {
     uint8 internal constant TEACHING_STATUS_SCHEDULED = 0;
     uint8 internal constant TEACHING_STATUS_CONFIRMED = 1;
     uint8 internal constant TEACHING_STATUS_COMPLETED = 2;
@@ -24,10 +27,17 @@ contract TeachingRegistry is ResearchRegistry {
     uint8 internal constant TEACHING_RESOLUTION_MUTUAL_DISPUTE = 5;
     uint8 internal constant TEACHING_RESOLUTION_EXTERNAL_EXCEPTION = 6;
 
+    address public immutable RESEARCH_REGISTRY;
     address internal immutable TEACHING_NFT_TOKEN;
+    address internal immutable TEACHING_POLICY_GUARD;
+    address internal defaultTeachingEconomicsPolicy;
+    address internal defaultTeachingFaultPolicy;
+    uint8 internal defaultTeachingFaultPolicyVersion;
     address internal teachingRewardDistributor;
     mapping(uint64 courseTypeId => SparkDaoTypes.TeachingCourseType) internal teachingCourseTypes;
     mapping(uint64 teachingNftId => SparkDaoTypes.TeachingSession) internal teachingSessions;
+    mapping(uint64 teachingNftId => SparkDaoTypes.FrozenTeachingFaultQuotes) internal
+        frozenTeachingFaultQuotes;
 
     event TeachingCourseTypeCreated(
         uint64 indexed courseTypeId,
@@ -54,12 +64,21 @@ contract TeachingRegistry is ResearchRegistry {
         uint8 indexed resolutionReasonCode,
         uint256 customerChargeUnits,
         uint256 customerRefundUnits,
-        uint256 teacherPayoutUnits,
+        uint256 teacherImmediatePayoutUnits,
+        uint256 remedialTeacherPayoutUnits,
         uint256 researchRewardUnits,
         uint256 serviceReserveUnits,
         uint8 remedialLessonCount
     );
     event TeachingRedeemed(uint64 indexed teachingNftId, address indexed teacher, uint256 amount);
+    event TeachingRemedialWageSettled(
+        uint64 indexed teachingNftId, address indexed teacher, uint256 amount
+    );
+    event TeachingRewardDistributorSet(address indexed distributor);
+    event TeachingEconomicsPolicyUpdated(address indexed previousPolicy, address indexed newPolicy);
+    event TeachingFaultPolicyUpdated(
+        address indexed previousPolicy, address indexed newPolicy, uint8 version
+    );
 
     constructor(
         address authority_,
@@ -68,33 +87,71 @@ contract TeachingRegistry is ResearchRegistry {
         address stableAsset_,
         uint64 rewardUnlockSeconds_,
         uint64 buybackWaitSeconds_,
-        address researchPositionToken_,
-        address teachingNftToken_
+        address researchRegistry_,
+        address teachingNftToken_,
+        address teachingPolicyGuard_,
+        address teachingEconomicsPolicy_,
+        address teachingFaultPolicy_
     )
-        ResearchRegistry(
+        SparkDaoConfig(
             authority_,
             coordinator_,
             treasury_,
             stableAsset_,
             rewardUnlockSeconds_,
-            buybackWaitSeconds_,
-            researchPositionToken_
+            buybackWaitSeconds_
         )
     {
-        if (teachingNftToken_ == address(0)) {
+        if (researchRegistry_ == address(0) || researchRegistry_.code.length == 0) {
+            revert SparkDaoErrors.InvalidResearchRegistry();
+        }
+        if (teachingNftToken_ == address(0) || teachingPolicyGuard_ == address(0)) {
             revert SparkDaoErrors.ZeroAddress();
         }
+        _assertContract(teachingNftToken_);
+        _assertContract(teachingPolicyGuard_);
+        RESEARCH_REGISTRY = researchRegistry_;
         TEACHING_NFT_TOKEN = teachingNftToken_;
+        TEACHING_POLICY_GUARD = teachingPolicyGuard_;
+        _setDefaultTeachingEconomicsPolicy(teachingEconomicsPolicy_);
+        _setDefaultTeachingFaultPolicy(teachingFaultPolicy_);
+    }
+
+    function updateDefaultTeachingEconomicsPolicy(address newPolicy) external onlyAuthority {
+        _setDefaultTeachingEconomicsPolicy(newPolicy);
+    }
+
+    function updateDefaultTeachingFaultPolicy(address newPolicy) external onlyAuthority {
+        _setDefaultTeachingFaultPolicy(newPolicy);
     }
 
     function setTeachingRewardDistributor(address distributor) external onlyAuthority {
         if (teachingRewardDistributor != address(0)) {
             revert SparkDaoErrors.TeachingRewardDistributorAlreadySet();
         }
-        if (ITeachingRewardDistributor(distributor).TEACHING_REGISTRY() != address(this)) {
+        if (distributor == address(0) || distributor.code.length == 0) {
+            revert SparkDaoErrors.UnauthorizedTeachingRewardDistributor();
+        }
+        address configuredTeachingRegistry;
+        address configuredResearchRegistry;
+        try ITeachingRewardDistributor(distributor).TEACHING_REGISTRY() returns (address value) {
+            configuredTeachingRegistry = value;
+        } catch {
+            revert SparkDaoErrors.UnauthorizedTeachingRewardDistributor();
+        }
+        try ITeachingRewardDistributor(distributor).RESEARCH_REGISTRY() returns (address value) {
+            configuredResearchRegistry = value;
+        } catch {
+            revert SparkDaoErrors.UnauthorizedTeachingRewardDistributor();
+        }
+        if (
+            configuredTeachingRegistry != address(this)
+                || configuredResearchRegistry != RESEARCH_REGISTRY
+        ) {
             revert SparkDaoErrors.UnauthorizedTeachingRewardDistributor();
         }
         teachingRewardDistributor = distributor;
+        emit TeachingRewardDistributorSet(distributor);
     }
 
     function settleTeachingRewardClaim(
@@ -109,10 +166,8 @@ contract TeachingRegistry is ResearchRegistry {
             revert SparkDaoErrors.UnauthorizedTeachingRewardDistributor();
         }
 
-        SparkDaoTypes.ResearchPosition storage position = _requirePosition(assetId, positionId);
-        if (claimAmount != 0) {
-            position.totalClaimedUnits += claimAmount;
-        }
+        IResearchRegistryForTeaching(RESEARCH_REGISTRY)
+            .recordTeachingRewardClaim(assetId, positionId, claimAmount);
         uint256 releasedUnits = claimAmount + dustUnits;
         if (releasedUnits != 0) {
             _releaseVaultUnits(stableAsset, releasedUnits);
@@ -156,7 +211,8 @@ contract TeachingRegistry is ResearchRegistry {
             uint8 remedialLessonCount,
             uint256 customerChargeUnits,
             uint256 customerRefundUnits,
-            uint256 teacherPayoutUnits,
+            uint256 teacherImmediatePayoutUnits,
+            uint256 remedialTeacherPayoutUnits,
             uint256 researchRewardUnits,
             uint256 serviceReserveUnits
         )
@@ -167,6 +223,7 @@ contract TeachingRegistry is ResearchRegistry {
             session.faultCustomerChargeUnits,
             session.faultCustomerRefundUnits,
             session.faultTeacherPayoutUnits,
+            session.faultRemedialTeacherPayoutUnits,
             session.faultResearchRewardUnits,
             session.faultServiceReserveUnits
         );
@@ -191,6 +248,39 @@ contract TeachingRegistry is ResearchRegistry {
         return layers;
     }
 
+    function getTeachingRemedialWageSettlement(uint64 teachingNftId)
+        external
+        view
+        returns (uint256 remedialTeacherPayoutUnits, uint64 remedialWageSettledAt)
+    {
+        SparkDaoTypes.TeachingSession storage session = _requireTeachingSession(teachingNftId);
+        return (session.faultRemedialTeacherPayoutUnits, session.remedialWageSettledAt);
+    }
+
+    function getTeachingModuleState()
+        external
+        view
+        returns (
+            address researchRegistry,
+            address teachingNftToken,
+            address policyGuard,
+            address economicsPolicy,
+            address faultPolicy,
+            uint8 faultPolicyVersion,
+            address rewardDistributor
+        )
+    {
+        return (
+            RESEARCH_REGISTRY,
+            TEACHING_NFT_TOKEN,
+            TEACHING_POLICY_GUARD,
+            defaultTeachingEconomicsPolicy,
+            defaultTeachingFaultPolicy,
+            defaultTeachingFaultPolicyVersion,
+            teachingRewardDistributor
+        );
+    }
+
     function createTeachingCourseType(
         string calldata name,
         uint256 listPriceUnits,
@@ -201,12 +291,20 @@ contract TeachingRegistry is ResearchRegistry {
         {
             revert SparkDaoErrors.InvalidCourseTypeName();
         }
-        if (listPriceUnits == 0 || teacherSalaryUnits == 0) {
-            revert SparkDaoErrors.InvalidAmount();
-        }
-        if (researchShareBps > SparkDaoTypes.MAX_TEACHING_RESEARCH_SHARE_BPS) {
-            revert SparkDaoErrors.InvalidResearchShareBps();
-        }
+        address economicsPolicy = defaultTeachingEconomicsPolicy;
+        SparkDaoTypes.TeachingEconomicsQuote memory economics = _quoteCourseEconomics(
+            economicsPolicy, listPriceUnits, teacherSalaryUnits, researchShareBps
+        );
+
+        address faultPolicy = defaultTeachingFaultPolicy;
+        uint8 faultPolicyVersion = defaultTeachingFaultPolicyVersion;
+        _quoteCustomerFault(faultPolicy, economics.lessonPriceUnits, economics.teacherSalaryUnits);
+        _quoteTeacherFault(
+            faultPolicy,
+            economics.lessonPriceUnits,
+            economics.teacherSalaryUnits,
+            economics.teacherFaultResearchRewardUnits
+        );
 
         courseTypeId = daoState.nextCourseTypeId;
         daoState.nextCourseTypeId += 1;
@@ -214,14 +312,21 @@ contract TeachingRegistry is ResearchRegistry {
         SparkDaoTypes.TeachingCourseType storage courseType = teachingCourseTypes[courseTypeId];
         courseType.exists = true;
         courseType.courseTypeId = courseTypeId;
+        courseType.economicsPolicy = economicsPolicy;
+        courseType.faultPolicy = faultPolicy;
+        courseType.faultPolicyVersion = faultPolicyVersion;
         courseType.name = name;
         courseType.stableAsset = daoState.stableAsset;
-        courseType.listPriceUnits = listPriceUnits;
-        courseType.teacherSalaryUnits = teacherSalaryUnits;
+        courseType.listPriceUnits = economics.lessonPriceUnits;
+        courseType.teacherSalaryUnits = economics.teacherSalaryUnits;
         courseType.researchShareBps = researchShareBps;
 
         emit TeachingCourseTypeCreated(
-            courseTypeId, name, listPriceUnits, teacherSalaryUnits, researchShareBps
+            courseTypeId,
+            name,
+            economics.lessonPriceUnits,
+            economics.teacherSalaryUnits,
+            researchShareBps
         );
     }
 
@@ -233,12 +338,6 @@ contract TeachingRegistry is ResearchRegistry {
         if (params.teacher == address(0) || params.customer == address(0)) {
             revert SparkDaoErrors.ZeroAddress();
         }
-        if (
-            params.customerDiscountBps == 0
-                || params.customerDiscountBps > SparkDaoTypes.BASIS_POINTS_DENOMINATOR
-        ) {
-            revert SparkDaoErrors.InvalidDiscountBps();
-        }
         if (params.linkedResearchAssetIds.length > SparkDaoTypes.MAX_TEACHING_RESEARCH_LINKS) {
             revert SparkDaoErrors.TooManyResearchLinks();
         }
@@ -246,13 +345,17 @@ contract TeachingRegistry is ResearchRegistry {
 
         SparkDaoTypes.TeachingCourseType storage courseType =
             _requireTeachingCourseType(params.courseTypeId);
-        uint256 discountedPriceUnits = (courseType.listPriceUnits * params.customerDiscountBps)
-            / SparkDaoTypes.BASIS_POINTS_DENOMINATOR;
-        uint256 researchPoolUnits = (discountedPriceUnits * courseType.researchShareBps)
-            / SparkDaoTypes.BASIS_POINTS_DENOMINATOR;
-        if (discountedPriceUnits < courseType.teacherSalaryUnits + researchPoolUnits) {
-            revert SparkDaoErrors.InvalidAmount();
-        }
+        SparkDaoTypes.TeachingEconomicsQuote memory economics =
+            _quoteSessionEconomics(courseType, params.customerDiscountBps);
+        SparkDaoTypes.TeachingFaultQuote memory customerFaultQuote = _quoteCustomerFault(
+            courseType.faultPolicy, economics.lessonPriceUnits, economics.teacherSalaryUnits
+        );
+        SparkDaoTypes.TeachingFaultQuote memory teacherFaultQuote = _quoteTeacherFault(
+            courseType.faultPolicy,
+            economics.lessonPriceUnits,
+            economics.teacherSalaryUnits,
+            economics.teacherFaultResearchRewardUnits
+        );
         uint16[] memory normalizedWeights = _normalizeResearchWeights(
             params.linkedResearchAssetIds, params.linkedResearchWeightBps
         );
@@ -270,15 +373,26 @@ contract TeachingRegistry is ResearchRegistry {
         session.stableAsset = courseType.stableAsset;
         session.scheduledAt = params.scheduledAt;
         session.listPriceUnits = courseType.listPriceUnits;
-        session.teacherSalaryUnits = courseType.teacherSalaryUnits;
+        session.lessonPriceUnits = economics.lessonPriceUnits;
+        session.teacherSalaryUnits = economics.teacherSalaryUnits;
+        session.teacherBondUnits = economics.teacherBondUnits;
+        session.researchRewardUnits = economics.researchRewardUnits;
+        session.teacherFaultResearchRewardUnits = economics.teacherFaultResearchRewardUnits;
+        session.serviceReserveUnits = economics.serviceReserveUnits;
         session.customerDiscountBps = params.customerDiscountBps;
         session.researchShareBps = courseType.researchShareBps;
+        session.faultPolicy = courseType.faultPolicy;
+        session.faultPolicyVersion = courseType.faultPolicyVersion;
         session.linkedResearchLinks =
             _packResearchLinks(params.linkedResearchAssetIds, normalizedWeights);
         session.secondRoundDeadlineAt =
             params.scheduledAt + SparkDaoTypes.TEACHING_SECOND_ROUND_TIMEOUT_SECONDS;
         session.redeemableAt = params.scheduledAt + SparkDaoTypes.TEACHING_REDEEM_DELAY_SECONDS;
         session.status = TEACHING_STATUS_SCHEDULED;
+        SparkDaoTypes.FrozenTeachingFaultQuotes storage frozenQuotes =
+            frozenTeachingFaultQuotes[teachingNftId];
+        frozenQuotes.customerFaultQuote = customerFaultQuote;
+        frozenQuotes.teacherFaultQuote = teacherFaultQuote;
         ITeachingNftToken(TEACHING_NFT_TOKEN).mint(params.teacher, teachingNftId);
 
         emit TeachingSessionCreated(
@@ -362,6 +476,27 @@ contract TeachingRegistry is ResearchRegistry {
         emit TeachingRedeemed(teachingNftId, session.teacher, session.teacherSalaryUnits);
     }
 
+    function coordinatorSettleTeacherFaultRemedialWage(uint64 teachingNftId)
+        external
+        onlyCoordinator
+    {
+        SparkDaoTypes.TeachingSession storage session = _requireTeachingSession(teachingNftId);
+        if (
+            session.status != TEACHING_STATUS_TEACHER_FAULT_REMEDIATION
+                || session.faultRemedialTeacherPayoutUnits == 0
+                || session.remedialWageSettledAt != 0
+        ) {
+            revert SparkDaoErrors.InvalidTeachingStatus();
+        }
+
+        uint256 amount = session.faultRemedialTeacherPayoutUnits;
+        session.remedialWageSettledAt = uint64(block.timestamp);
+        _releaseVaultUnits(session.stableAsset, amount);
+        _safeTransfer(session.stableAsset, session.teacher, amount);
+
+        emit TeachingRemedialWageSettled(teachingNftId, session.teacher, amount);
+    }
+
     function _freezeFirstRoundIfReady(SparkDaoTypes.TeachingSession storage session) internal {
         if (session.teacherConfirmedSchedule && session.customerConfirmedSchedule) {
             session.firstRoundFrozen = true;
@@ -402,14 +537,14 @@ contract TeachingRegistry is ResearchRegistry {
             if (session.teacher != msg.sender) revert SparkDaoErrors.UnauthorizedTeacher();
             if (session.teacherBondLocked) revert SparkDaoErrors.TeachingCollateralAlreadyLocked();
             session.teacherBondLocked = true;
-            amount = _teacherBondUnits(session);
+            amount = session.teacherBondUnits;
         } else {
             if (session.customer != msg.sender) revert SparkDaoErrors.UnauthorizedCustomer();
             if (session.customerPaymentLocked) {
                 revert SparkDaoErrors.TeachingCollateralAlreadyLocked();
             }
             session.customerPaymentLocked = true;
-            amount = _discountedPriceUnits(session);
+            amount = session.lessonPriceUnits;
         }
 
         if (!session.firstRoundFrozen || session.status != TEACHING_STATUS_CONFIRMED) {
@@ -481,11 +616,11 @@ contract TeachingRegistry is ResearchRegistry {
         }
 
         uint256 distributedResearchUnits = _recordSettlementRewards(session);
-        uint256 teacherBondUnits = _teacherBondUnits(session);
-        uint256 daoResidualUnits = _daoResidualUnits(session);
-        uint256 undistributedResearchUnits = _researchPoolUnits(session) - distributedResearchUnits;
+        uint256 teacherBondUnits = session.teacherBondUnits;
+        uint256 undistributedResearchUnits = session.researchRewardUnits - distributedResearchUnits;
         _releaseVaultUnits(
-            session.stableAsset, teacherBondUnits + daoResidualUnits + undistributedResearchUnits
+            session.stableAsset,
+            teacherBondUnits + session.serviceReserveUnits + undistributedResearchUnits
         );
 
         session.teacherBondReleasedAt = uint64(block.timestamp);
@@ -506,30 +641,22 @@ contract TeachingRegistry is ResearchRegistry {
             revert SparkDaoErrors.InvalidTeachingStatus();
         }
 
-        uint256 customerPaymentUnits = _discountedPriceUnits(session);
-        uint256 customerChargeUnits = _halfPriceUnits(customerPaymentUnits);
-        uint256 customerRefundUnits = customerPaymentUnits - customerChargeUnits;
-        uint256 teacherPayoutUnits = _min(session.teacherSalaryUnits, customerChargeUnits);
-        uint256 serviceReserveUnits = customerChargeUnits - teacherPayoutUnits;
-        uint256 teacherBondUnits = _teacherBondUnits(session);
+        uint256 customerPaymentUnits = session.lessonPriceUnits;
+        SparkDaoTypes.TeachingFaultQuote memory quote =
+        frozenTeachingFaultQuotes[session.teachingNftId].customerFaultQuote;
+        uint256 teacherBondUnits = session.teacherBondUnits;
 
         _releaseVaultUnits(session.stableAsset, teacherBondUnits + customerPaymentUnits);
         session.teacherBondReleasedAt = uint64(block.timestamp);
-        _recordFaultSettlement(
-            session,
-            TEACHING_STATUS_CUSTOMER_FAULT_SETTLED,
-            reasonCode,
-            0,
-            customerChargeUnits,
-            customerRefundUnits,
-            teacherPayoutUnits,
-            0,
-            serviceReserveUnits
-        );
+        _recordFaultSettlement(session, TEACHING_STATUS_CUSTOMER_FAULT_SETTLED, reasonCode, quote);
 
-        _safeTransfer(session.stableAsset, session.teacher, teacherBondUnits + teacherPayoutUnits);
-        if (customerRefundUnits != 0) {
-            _safeTransfer(session.stableAsset, session.customer, customerRefundUnits);
+        _safeTransfer(
+            session.stableAsset,
+            session.teacher,
+            teacherBondUnits + quote.teacherImmediatePayoutUnits
+        );
+        if (quote.customerRefundUnits != 0) {
+            _safeTransfer(session.stableAsset, session.customer, quote.customerRefundUnits);
         }
 
         emit TeachingResolved(session.teachingNftId, session.status, reasonCode, resolver);
@@ -544,37 +671,28 @@ contract TeachingRegistry is ResearchRegistry {
             revert SparkDaoErrors.InvalidTeachingStatus();
         }
 
-        uint256 customerPaymentUnits = _discountedPriceUnits(session);
-        uint256 customerChargeUnits = _halfPriceUnits(customerPaymentUnits);
-        uint256 customerRefundUnits = customerPaymentUnits - customerChargeUnits;
-        uint256 teacherBondUnits = _teacherBondUnits(session);
-        uint256 targetResearchUnits = _teacherFaultResearchPoolUnits(session);
-        if (targetResearchUnits > customerChargeUnits) {
-            revert SparkDaoErrors.FaultSettlementInsolvent();
-        }
+        uint256 customerPaymentUnits = session.lessonPriceUnits;
+        uint256 teacherBondUnits = session.teacherBondUnits;
+        SparkDaoTypes.TeachingFaultQuote memory quote =
+        frozenTeachingFaultQuotes[session.teachingNftId].teacherFaultQuote;
 
         uint256 distributedResearchUnits =
-            _recordSettlementRewardsWithPool(session, targetResearchUnits);
-        uint256 serviceReserveUnits = customerChargeUnits - distributedResearchUnits;
+            _recordSettlementRewardsWithPool(session, quote.researchRewardUnits);
+        quote.serviceReserveUnits += quote.researchRewardUnits - distributedResearchUnits;
+        quote.researchRewardUnits = distributedResearchUnits;
         _releaseVaultUnits(
-            session.stableAsset, teacherBondUnits + customerPaymentUnits - distributedResearchUnits
+            session.stableAsset,
+            teacherBondUnits + customerPaymentUnits - distributedResearchUnits
+                - quote.remedialTeacherPayoutUnits
         );
         session.teacherBondReleasedAt = uint64(block.timestamp);
         _recordFaultSettlement(
-            session,
-            TEACHING_STATUS_TEACHER_FAULT_REMEDIATION,
-            reasonCode,
-            1,
-            customerChargeUnits,
-            customerRefundUnits,
-            0,
-            distributedResearchUnits,
-            serviceReserveUnits
+            session, TEACHING_STATUS_TEACHER_FAULT_REMEDIATION, reasonCode, quote
         );
 
         _safeTransfer(session.stableAsset, session.teacher, teacherBondUnits);
-        if (customerRefundUnits != 0) {
-            _safeTransfer(session.stableAsset, session.customer, customerRefundUnits);
+        if (quote.customerRefundUnits != 0) {
+            _safeTransfer(session.stableAsset, session.customer, quote.customerRefundUnits);
         }
 
         emit TeachingResolved(session.teachingNftId, session.status, reasonCode, resolver);
@@ -584,46 +702,111 @@ contract TeachingRegistry is ResearchRegistry {
         SparkDaoTypes.TeachingSession storage session,
         uint8 status,
         uint8 reasonCode,
-        uint8 remedialLessonCount,
-        uint256 customerChargeUnits,
-        uint256 customerRefundUnits,
-        uint256 teacherPayoutUnits,
-        uint256 researchRewardUnits,
-        uint256 serviceReserveUnits
+        SparkDaoTypes.TeachingFaultQuote memory quote
     ) internal {
         session.resolvedAt = uint64(block.timestamp);
         session.status = status;
-        session.remedialLessonCount = remedialLessonCount;
-        session.faultCustomerChargeUnits = customerChargeUnits;
-        session.faultCustomerRefundUnits = customerRefundUnits;
-        session.faultTeacherPayoutUnits = teacherPayoutUnits;
-        session.faultResearchRewardUnits = researchRewardUnits;
-        session.faultServiceReserveUnits = serviceReserveUnits;
+        session.remedialLessonCount = quote.remedialLessonCount;
+        session.faultCustomerChargeUnits = quote.customerChargeUnits;
+        session.faultCustomerRefundUnits = quote.customerRefundUnits;
+        session.faultTeacherPayoutUnits = quote.teacherImmediatePayoutUnits;
+        session.faultRemedialTeacherPayoutUnits = quote.remedialTeacherPayoutUnits;
+        session.faultResearchRewardUnits = quote.researchRewardUnits;
+        session.faultServiceReserveUnits = quote.serviceReserveUnits;
 
         emit TeachingFaultSettlement(
             session.teachingNftId,
             reasonCode,
-            customerChargeUnits,
-            customerRefundUnits,
-            teacherPayoutUnits,
-            researchRewardUnits,
-            serviceReserveUnits,
-            remedialLessonCount
+            quote.customerChargeUnits,
+            quote.customerRefundUnits,
+            quote.teacherImmediatePayoutUnits,
+            quote.remedialTeacherPayoutUnits,
+            quote.researchRewardUnits,
+            quote.serviceReserveUnits,
+            quote.remedialLessonCount
         );
+    }
+
+    function _setDefaultTeachingEconomicsPolicy(address newPolicy) internal {
+        _validateTeachingEconomicsPolicy(newPolicy);
+        address previousPolicy = defaultTeachingEconomicsPolicy;
+        defaultTeachingEconomicsPolicy = newPolicy;
+        emit TeachingEconomicsPolicyUpdated(previousPolicy, newPolicy);
+    }
+
+    function _validateTeachingEconomicsPolicy(address policy) internal view {
+        ITeachingEconomicsPolicyGuard(TEACHING_POLICY_GUARD).validateEconomicsPolicy(policy);
+    }
+
+    function _quoteCourseEconomics(
+        address economicsPolicy,
+        uint256 listPriceUnits,
+        uint256 teacherSalaryUnits,
+        uint16 researchShareBps
+    ) internal view returns (SparkDaoTypes.TeachingEconomicsQuote memory quote) {
+        quote = ITeachingEconomicsPolicyGuard(TEACHING_POLICY_GUARD)
+            .quoteCourseType(economicsPolicy, listPriceUnits, teacherSalaryUnits, researchShareBps);
+    }
+
+    function _quoteSessionEconomics(
+        SparkDaoTypes.TeachingCourseType storage courseType,
+        uint16 customerDiscountBps
+    ) internal view returns (SparkDaoTypes.TeachingEconomicsQuote memory quote) {
+        quote = ITeachingEconomicsPolicyGuard(TEACHING_POLICY_GUARD)
+            .quoteSession(
+                courseType.economicsPolicy,
+                courseType.listPriceUnits,
+                courseType.teacherSalaryUnits,
+                courseType.researchShareBps,
+                customerDiscountBps
+            );
+    }
+
+    function _setDefaultTeachingFaultPolicy(address newPolicy) internal {
+        uint8 version = _validateTeachingFaultPolicy(newPolicy);
+        address previousPolicy = defaultTeachingFaultPolicy;
+        defaultTeachingFaultPolicy = newPolicy;
+        defaultTeachingFaultPolicyVersion = version;
+        emit TeachingFaultPolicyUpdated(previousPolicy, newPolicy, version);
+    }
+
+    function _validateTeachingFaultPolicy(address policy) internal view returns (uint8 version) {
+        version = ITeachingFaultPolicyGuard(TEACHING_POLICY_GUARD).validatePolicy(policy);
+    }
+
+    function _quoteCustomerFault(
+        address faultPolicy,
+        uint256 customerPaymentUnits,
+        uint256 teacherSalaryUnits
+    ) internal view returns (SparkDaoTypes.TeachingFaultQuote memory quote) {
+        quote = ITeachingFaultPolicyGuard(TEACHING_POLICY_GUARD)
+            .quoteCustomerFault(faultPolicy, customerPaymentUnits, teacherSalaryUnits);
+    }
+
+    function _quoteTeacherFault(
+        address faultPolicy,
+        uint256 customerPaymentUnits,
+        uint256 teacherSalaryUnits,
+        uint256 requestedResearchRewardUnits
+    ) internal view returns (SparkDaoTypes.TeachingFaultQuote memory quote) {
+        quote = ITeachingFaultPolicyGuard(TEACHING_POLICY_GUARD)
+            .quoteTeacherFault(
+                faultPolicy, customerPaymentUnits, teacherSalaryUnits, requestedResearchRewardUnits
+            );
     }
 
     function _recordSettlementRewards(SparkDaoTypes.TeachingSession storage session)
         internal
         returns (uint256 distributedUnits)
     {
-        return _recordSettlementRewardsWithPool(session, _researchPoolUnits(session));
+        return _recordSettlementRewardsWithPool(session, session.researchRewardUnits);
     }
 
     function _recordSettlementRewardsWithPool(
         SparkDaoTypes.TeachingSession storage session,
         uint256 researchPoolUnits
     ) internal returns (uint256 distributedUnits) {
-        if (!_requiresResearchDistribution(session)) {
+        if (!_requiresResearchDistribution(session, researchPoolUnits)) {
             _clearSettlementResearchLayers(session);
             return 0;
         }
@@ -665,15 +848,16 @@ contract TeachingRegistry is ResearchRegistry {
         uint64 snapshotAt,
         uint64 unlockAt
     ) internal returns (uint16 snapshotActiveLayer, uint256 distributedUnits) {
-        _requireAsset(assetId);
-        snapshotActiveLayer = _snapshotActiveLayerFromCheckpoints(assetId, snapshotAt);
+        uint16 totalEffectiveShareBps;
+        (snapshotActiveLayer, totalEffectiveShareBps) = IResearchRegistryForTeaching(
+                RESEARCH_REGISTRY
+            ).getTeachingResearchSnapshot(assetId, snapshotAt);
 
         uint256 assetPoolUnits = _computeWeightedAmount(researchPoolUnits, assetWeightBps);
         if (assetPoolUnits == 0 || snapshotActiveLayer == 0) {
             return (snapshotActiveLayer, 0);
         }
 
-        uint16 totalEffectiveShareBps = _snapshotEffectiveShareBps(assetId, snapshotAt);
         distributedUnits = _computeWeightedAmount(assetPoolUnits, totalEffectiveShareBps);
         if (distributedUnits == 0) return (snapshotActiveLayer, 0);
 
@@ -862,11 +1046,8 @@ contract TeachingRegistry is ResearchRegistry {
     {
         uint256 assetCount = assetIds.length;
         for (uint256 i = 0; i < assetCount;) {
-            SparkDaoTypes.ResearchAsset storage asset = researchAssets[assetIds[i]];
-            if (!asset.exists) revert SparkDaoErrors.AssetNotFound();
-            if (researchShareBps > 0 && !asset.currentLayerSealed) {
-                revert SparkDaoErrors.LinkedResearchLayerNotSealed();
-            }
+            IResearchRegistryForTeaching(RESEARCH_REGISTRY)
+                .requireTeachingResearchAssetReady(assetIds[i], researchShareBps);
             unchecked {
                 ++i;
             }
@@ -888,64 +1069,12 @@ contract TeachingRegistry is ResearchRegistry {
         }
     }
 
-    function _discountedPriceUnits(SparkDaoTypes.TeachingSession storage session)
-        internal
-        view
-        returns (uint256)
-    {
-        return (session.listPriceUnits * session.customerDiscountBps)
-            / SparkDaoTypes.BASIS_POINTS_DENOMINATOR;
-    }
-
-    function _teacherBondUnits(SparkDaoTypes.TeachingSession storage session)
-        internal
-        view
-        returns (uint256)
-    {
-        return session.teacherSalaryUnits * 2;
-    }
-
-    function _halfPriceUnits(uint256 priceUnits) internal pure returns (uint256) {
-        return priceUnits / 2;
-    }
-
-    function _researchPoolUnits(SparkDaoTypes.TeachingSession storage session)
-        internal
-        view
-        returns (uint256)
-    {
-        return (_discountedPriceUnits(session) * session.researchShareBps)
-            / SparkDaoTypes.BASIS_POINTS_DENOMINATOR;
-    }
-
-    function _teacherFaultResearchPoolUnits(SparkDaoTypes.TeachingSession storage session)
-        internal
-        view
-        returns (uint256)
-    {
-        return _researchPoolUnits(session) * 2;
-    }
-
-    function _daoResidualUnits(SparkDaoTypes.TeachingSession storage session)
-        internal
-        view
-        returns (uint256)
-    {
-        return _discountedPriceUnits(session) - session.teacherSalaryUnits
-            - _researchPoolUnits(session);
-    }
-
-    function _requiresResearchDistribution(SparkDaoTypes.TeachingSession storage session)
-        internal
-        view
-        returns (bool)
-    {
+    function _requiresResearchDistribution(
+        SparkDaoTypes.TeachingSession storage session,
+        uint256 researchPoolUnits
+    ) internal view returns (bool) {
         return session.researchShareBps > 0 && session.linkedResearchLinks.length > 0
-            && _discountedPriceUnits(session) > 0;
-    }
-
-    function _min(uint256 a, uint256 b) internal pure returns (uint256) {
-        return a < b ? a : b;
+            && researchPoolUnits > 0;
     }
 
     function _requireTeachingCourseType(uint64 courseTypeId)

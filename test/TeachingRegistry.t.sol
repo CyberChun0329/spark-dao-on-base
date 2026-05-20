@@ -2,11 +2,21 @@
 pragma solidity ^0.8.26;
 
 import { TeachingRegistry } from "../src/TeachingRegistry.sol";
+import { ResearchRegistry } from "../src/ResearchRegistry.sol";
 import { TeachingRewardDistributor } from "../src/TeachingRewardDistributor.sol";
+import { TeachingEconomicsPolicyV1 } from "../src/TeachingEconomicsPolicyV1.sol";
+import { TeachingFaultPolicyV1 } from "../src/TeachingFaultPolicyV1.sol";
+import { TeachingPolicyGuard } from "../src/TeachingPolicyGuard.sol";
 import { TeachingNftToken } from "../src/TeachingNftToken.sol";
 import { ResearchPositionToken } from "../src/ResearchPositionToken.sol";
+import { SparkDaoErrors } from "../src/SparkDaoErrors.sol";
 import { SparkDaoTypes } from "../src/SparkDaoTypes.sol";
 import { MockERC20 } from "./mocks/MockERC20.sol";
+import { MockTeachingEconomicsPolicy } from "./mocks/MockTeachingEconomicsPolicy.sol";
+import {
+    MockTeachingFaultPolicy,
+    MutableTeachingFaultPolicy
+} from "./mocks/MockTeachingFaultPolicy.sol";
 
 interface Vm {
     function prank(address) external;
@@ -14,13 +24,19 @@ interface Vm {
     function stopPrank() external;
     function warp(uint256) external;
     function expectRevert() external;
+    function expectRevert(bytes4) external;
 }
 
 contract TeachingRegistryTest {
     Vm internal constant VM = Vm(address(uint160(uint256(keccak256("hevm cheat code")))));
 
     TeachingRegistry internal registry;
+    ResearchRegistry internal researchRegistry;
+    ResearchRegistry internal auxResearchRegistry;
     TeachingRewardDistributor internal rewardDistributor;
+    TeachingEconomicsPolicyV1 internal economicsPolicy;
+    TeachingFaultPolicyV1 internal faultPolicy;
+    TeachingPolicyGuard internal policyGuard;
     TeachingNftToken internal teachingToken;
     ResearchPositionToken internal researchToken;
     MockERC20 internal stable;
@@ -35,6 +51,7 @@ contract TeachingRegistryTest {
     address internal contributorTwo = address(0x1002);
     address internal contributorThree = address(0x1003);
     address internal contributorFour = address(0x1004);
+    uint16 internal constant SAFE_RESEARCH_SHARE_BPS = 1_000;
 
     function setUp() public {
         stable = new MockERC20("USD Coin", "USDC", 6);
@@ -44,6 +61,18 @@ contract TeachingRegistryTest {
         );
         teachingToken =
             new TeachingNftToken(authority, "Spark Teaching NFT", "STN", "ipfs://teaching/");
+        economicsPolicy = new TeachingEconomicsPolicyV1();
+        faultPolicy = new TeachingFaultPolicyV1();
+        policyGuard = new TeachingPolicyGuard();
+        researchRegistry = new ResearchRegistry(
+            authority,
+            coordinator,
+            treasury,
+            address(stable),
+            90 days,
+            30 days,
+            address(researchToken)
+        );
         registry = new TeachingRegistry(
             authority,
             coordinator,
@@ -51,14 +80,20 @@ contract TeachingRegistryTest {
             address(stable),
             90 days,
             30 days,
-            address(researchToken),
-            address(teachingToken)
+            address(researchRegistry),
+            address(teachingToken),
+            address(policyGuard),
+            address(economicsPolicy),
+            address(faultPolicy)
         );
-        rewardDistributor = new TeachingRewardDistributor(address(registry));
+        rewardDistributor =
+            new TeachingRewardDistributor(address(registry), address(researchRegistry));
+        VM.prank(authority);
+        researchRegistry.setTeachingRegistry(address(registry));
         VM.prank(authority);
         registry.setTeachingRewardDistributor(address(rewardDistributor));
         VM.prank(authority);
-        researchToken.setMinter(address(registry));
+        researchToken.setMinter(address(researchRegistry));
         VM.prank(authority);
         teachingToken.setMinter(address(registry));
 
@@ -73,13 +108,13 @@ contract TeachingRegistryTest {
     function testSetTeachingRewardDistributorRequiresAuthorityNonZeroAndOneTime() public {
         TeachingRegistry unwired = _deployUnwiredRegistry();
         TeachingRewardDistributor matchingDistributor =
-            new TeachingRewardDistributor(address(unwired));
+            new TeachingRewardDistributor(address(unwired), address(auxResearchRegistry));
 
-        VM.expectRevert();
+        VM.expectRevert(SparkDaoErrors.UnauthorizedAuthority.selector);
         VM.prank(coordinator);
         unwired.setTeachingRewardDistributor(address(matchingDistributor));
 
-        VM.expectRevert();
+        VM.expectRevert(SparkDaoErrors.UnauthorizedTeachingRewardDistributor.selector);
         VM.prank(authority);
         unwired.setTeachingRewardDistributor(address(0));
 
@@ -87,8 +122,8 @@ contract TeachingRegistryTest {
         unwired.setTeachingRewardDistributor(address(matchingDistributor));
 
         TeachingRewardDistributor secondMatchingDistributor =
-            new TeachingRewardDistributor(address(unwired));
-        VM.expectRevert();
+            new TeachingRewardDistributor(address(unwired), address(auxResearchRegistry));
+        VM.expectRevert(SparkDaoErrors.TeachingRewardDistributorAlreadySet.selector);
         VM.prank(authority);
         unwired.setTeachingRewardDistributor(address(secondMatchingDistributor));
     }
@@ -96,29 +131,73 @@ contract TeachingRegistryTest {
     function testSetTeachingRewardDistributorRejectsMismatchedOrNonContractDistributor() public {
         TeachingRegistry unwired = _deployUnwiredRegistry();
         TeachingRewardDistributor wrongDistributor =
-            new TeachingRewardDistributor(address(registry));
+            new TeachingRewardDistributor(address(registry), address(researchRegistry));
 
-        VM.expectRevert();
+        VM.expectRevert(SparkDaoErrors.UnauthorizedTeachingRewardDistributor.selector);
         VM.prank(authority);
         unwired.setTeachingRewardDistributor(address(wrongDistributor));
 
-        VM.expectRevert();
+        VM.expectRevert(SparkDaoErrors.UnauthorizedTeachingRewardDistributor.selector);
         VM.prank(authority);
         unwired.setTeachingRewardDistributor(address(0xBEEF));
     }
 
-    function testSettleTeachingRewardClaimRejectsNonDistributor() public {
-        VM.expectRevert();
-        registry.settleTeachingRewardClaim(address(stable), contributorOne, 0, 0, 0, 0);
+    function testSetTeachingRegistryRequiresAuthorityValidHandshakeAndOneTime() public {
+        ResearchRegistry linkedResearch = _deployAuxResearchRegistry();
+        TeachingRegistry matchingRegistry =
+            _deployRegistryWithPolicyOnly(address(faultPolicy), linkedResearch);
+
+        VM.expectRevert(SparkDaoErrors.UnauthorizedAuthority.selector);
+        VM.prank(coordinator);
+        linkedResearch.setTeachingRegistry(address(matchingRegistry));
+
+        VM.expectRevert(SparkDaoErrors.InvalidResearchRegistry.selector);
+        VM.prank(authority);
+        linkedResearch.setTeachingRegistry(address(0));
+
+        VM.expectRevert(SparkDaoErrors.InvalidResearchRegistry.selector);
+        VM.prank(authority);
+        linkedResearch.setTeachingRegistry(address(0xBEEF));
+
+        ResearchRegistry otherResearch = _deployAuxResearchRegistry();
+        TeachingRegistry mismatchedRegistry =
+            _deployRegistryWithPolicyOnly(address(faultPolicy), otherResearch);
+        VM.expectRevert(SparkDaoErrors.InvalidResearchRegistry.selector);
+        VM.prank(authority);
+        linkedResearch.setTeachingRegistry(address(mismatchedRegistry));
+
+        VM.prank(authority);
+        linkedResearch.setTeachingRegistry(address(matchingRegistry));
+
+        VM.expectRevert(SparkDaoErrors.TeachingRegistryAlreadySet.selector);
+        VM.prank(authority);
+        linkedResearch.setTeachingRegistry(address(matchingRegistry));
     }
 
-    function testResearchSettlementRevertsWhenRewardDistributorUnset() public {
-        TeachingRegistry unwired = _deployUnwiredRegistry();
-        _wireTokensTo(unwired);
+    function testTeachingModuleStateExposesWiringAndPolicies() public view {
+        (
+            address researchRegistryAddress,
+            address teachingTokenAddress,
+            address policyGuardAddress,
+            address economicsPolicyAddress,
+            address faultPolicyAddress,
+            uint8 faultPolicyVersion,
+            address rewardDistributorAddress
+        ) = registry.getTeachingModuleState();
 
+        assertTrue(researchRegistryAddress == address(researchRegistry));
+        assertTrue(teachingTokenAddress == address(teachingToken));
+        assertTrue(policyGuardAddress == address(policyGuard));
+        assertTrue(economicsPolicyAddress == address(economicsPolicy));
+        assertTrue(faultPolicyAddress == address(faultPolicy));
+        assertTrue(faultPolicyVersion == faultPolicy.FAULT_POLICY_VERSION());
+        assertTrue(rewardDistributorAddress == address(rewardDistributor));
+    }
+
+    function testResearchClaimAccountingIsTeachingRegistryOnly() public {
         VM.startPrank(coordinator);
-        uint64 assetId = unwired.createResearchAsset("Unwired Research", "ipfs://unwired");
-        unwired.createPatchPosition(
+        uint64 assetId = researchRegistry.createResearchAsset("Claim Source", "ipfs://claim-source");
+        uint64 positionId = researchRegistry.createPatchPosition(
             SparkDaoTypes.CreatePatchPositionParams({
                 assetId: assetId,
                 layerIndex: 1,
@@ -130,9 +209,342 @@ contract TeachingRegistryTest {
                 beneficiary: contributorOne
             })
         );
-        unwired.sealLayer(assetId, 1);
+        VM.stopPrank();
+
+        VM.expectRevert();
+        researchRegistry.recordTeachingRewardClaim(assetId, positionId, 123);
+
+        VM.prank(address(registry));
+        researchRegistry.recordTeachingRewardClaim(assetId, positionId, 123);
+
+        SparkDaoTypes.ResearchPosition memory position =
+            researchRegistry.getResearchPosition(assetId, positionId);
+        assertTrue(position.totalClaimedUnits == 123);
+    }
+
+    function testResearchAndTeachingRegistryInitialAdminStateMatches() public view {
+        SparkDaoTypes.DaoState memory researchState = researchRegistry.getDaoState();
+        SparkDaoTypes.DaoState memory teachingState = registry.getDaoState();
+
+        assertTrue(researchState.authority == teachingState.authority);
+        assertTrue(researchState.treasury == teachingState.treasury);
+        assertTrue(researchState.coordinator == teachingState.coordinator);
+        assertTrue(researchState.stableAsset == teachingState.stableAsset);
+        assertTrue(researchState.rewardUnlockSeconds == teachingState.rewardUnlockSeconds);
+        assertTrue(researchState.buybackWaitSeconds == teachingState.buybackWaitSeconds);
+    }
+
+    function testTeachingRegistryRejectsInvalidFaultPolicyAtDeployment() public {
+        ResearchRegistry linkedResearch = _deployAuxResearchRegistry();
+        VM.expectRevert();
+        _deployRegistryWithPolicyOnly(address(0), linkedResearch);
+
+        linkedResearch = _deployAuxResearchRegistry();
+        VM.expectRevert();
+        _deployRegistryWithPolicyOnly(address(0xBEEF), linkedResearch);
+
+        VM.expectRevert();
+        new TeachingRegistry(
+            authority,
+            coordinator,
+            treasury,
+            address(stable),
+            90 days,
+            30 days,
+            address(researchRegistry),
+            address(teachingToken),
+            address(0),
+            address(economicsPolicy),
+            address(faultPolicy)
+        );
+
+        MockTeachingFaultPolicy zeroVersionPolicy = new MockTeachingFaultPolicy(0, 0);
+        linkedResearch = _deployAuxResearchRegistry();
+        VM.expectRevert();
+        _deployRegistryWithPolicyOnly(address(zeroVersionPolicy), linkedResearch);
+    }
+
+    function testTeachingRegistryRejectsNonContractStableTokenOrPolicyGuardAtDeployment() public {
+        ResearchRegistry linkedResearch = _deployAuxResearchRegistry();
+
+        VM.expectRevert(SparkDaoErrors.InvalidContractAddress.selector);
+        new TeachingRegistry(
+            authority,
+            coordinator,
+            treasury,
+            address(0xBEEF),
+            90 days,
+            30 days,
+            address(linkedResearch),
+            address(teachingToken),
+            address(policyGuard),
+            address(economicsPolicy),
+            address(faultPolicy)
+        );
+
+        VM.expectRevert(SparkDaoErrors.InvalidContractAddress.selector);
+        new TeachingRegistry(
+            authority,
+            coordinator,
+            treasury,
+            address(stable),
+            90 days,
+            30 days,
+            address(linkedResearch),
+            address(0xBEEF),
+            address(policyGuard),
+            address(economicsPolicy),
+            address(faultPolicy)
+        );
+
+        VM.expectRevert(SparkDaoErrors.InvalidContractAddress.selector);
+        new TeachingRegistry(
+            authority,
+            coordinator,
+            treasury,
+            address(stable),
+            90 days,
+            30 days,
+            address(linkedResearch),
+            address(teachingToken),
+            address(0xBEEF),
+            address(economicsPolicy),
+            address(faultPolicy)
+        );
+    }
+
+    function testTeachingRegistryRejectsInvalidEconomicsPolicyAtDeploymentAndUse() public {
+        ResearchRegistry linkedResearch = _deployAuxResearchRegistry();
+        VM.expectRevert();
+        _deployRegistryWithEconomicsPolicyOnly(address(0), linkedResearch);
+
+        linkedResearch = _deployAuxResearchRegistry();
+        VM.expectRevert();
+        _deployRegistryWithEconomicsPolicyOnly(address(0xBEEF), linkedResearch);
+
+        MockTeachingEconomicsPolicy zeroVersionPolicy = new MockTeachingEconomicsPolicy(0, 0);
+        linkedResearch = _deployAuxResearchRegistry();
+        VM.expectRevert();
+        _deployRegistryWithEconomicsPolicyOnly(address(zeroVersionPolicy), linkedResearch);
+
+        _assertCourseCreationRejectedByEconomicsPolicy(new MockTeachingEconomicsPolicy(2, 1));
+        _assertCourseCreationRejectedByEconomicsPolicy(new MockTeachingEconomicsPolicy(2, 4));
+    }
+
+    function testDefaultTeachingEconomicsPolicyUpdateIsAuthorityOnlyAndFutureOnly() public {
+        uint64 oldCourseTypeId;
+        VM.prank(coordinator);
+        oldCourseTypeId =
+            registry.createTeachingCourseType("Original Economics Course", 1_000_000, 400_000, 0);
+
+        MockTeachingEconomicsPolicy alternatePolicy = new MockTeachingEconomicsPolicy(2, 3);
+
+        VM.expectRevert();
+        VM.prank(coordinator);
+        registry.updateDefaultTeachingEconomicsPolicy(address(alternatePolicy));
+
+        VM.prank(authority);
+        registry.updateDefaultTeachingEconomicsPolicy(address(alternatePolicy));
+
+        uint64 newCourseTypeId;
+        VM.prank(coordinator);
+        newCourseTypeId =
+            registry.createTeachingCourseType("Updated Economics Course", 1_000_000, 400_000, 0);
+
+        uint64 oldTeachingNftId = _createNoResearchTeachingSession(oldCourseTypeId);
+        uint64 newTeachingNftId = _createNoResearchTeachingSession(newCourseTypeId);
+
+        _confirmSchedule(oldTeachingNftId);
+        uint256 beforeOldBond = stable.balanceOf(teacher);
+        VM.startPrank(teacher);
+        stable.approve(address(registry), 800_000);
+        registry.lockTeachingCollateral(oldTeachingNftId, true);
+        VM.stopPrank();
+        assert(beforeOldBond - stable.balanceOf(teacher) == 800_000);
+
+        _confirmSchedule(newTeachingNftId);
+        uint256 beforeNewBond = stable.balanceOf(teacher);
+        VM.startPrank(teacher);
+        stable.approve(address(registry), 400_000);
+        registry.lockTeachingCollateral(newTeachingNftId, true);
+        VM.stopPrank();
+        assert(beforeNewBond - stable.balanceOf(teacher) == 400_000);
+    }
+
+    function testDefaultTeachingFaultPolicyUpdateIsAuthorityOnlyAndFutureOnly() public {
+        MockTeachingFaultPolicy alternatePolicy = new MockTeachingFaultPolicy(2, 0);
+
+        VM.expectRevert();
+        VM.prank(coordinator);
+        registry.updateDefaultTeachingFaultPolicy(address(alternatePolicy));
+
+        VM.expectRevert();
+        VM.prank(authority);
+        registry.updateDefaultTeachingFaultPolicy(address(0xBEEF));
+
+        VM.prank(coordinator);
+        uint64 oldCourseTypeId =
+            registry.createTeachingCourseType("Frozen Policy Course", 1_000_000, 400_000, 0);
+
+        VM.prank(authority);
+        registry.updateDefaultTeachingFaultPolicy(address(alternatePolicy));
+
+        VM.prank(coordinator);
+        uint64 newCourseTypeId =
+            registry.createTeachingCourseType("Updated Policy Course", 1_000_000, 400_000, 0);
+
+        VM.prank(coordinator);
+        registry.createTeachingSession(
+            SparkDaoTypes.CreateTeachingSessionParams({
+                courseTypeId: oldCourseTypeId,
+                teacher: teacher,
+                customer: customer,
+                scheduledAt: uint64(block.timestamp + 7 days),
+                customerDiscountBps: 8_000,
+                linkedResearchAssetIds: new uint64[](0),
+                linkedResearchWeightBps: new uint16[](0)
+            })
+        );
+
+        VM.prank(coordinator);
+        registry.createTeachingSession(
+            SparkDaoTypes.CreateTeachingSessionParams({
+                courseTypeId: newCourseTypeId,
+                teacher: teacher,
+                customer: customer,
+                scheduledAt: uint64(block.timestamp + 7 days),
+                customerDiscountBps: 8_000,
+                linkedResearchAssetIds: new uint64[](0),
+                linkedResearchWeightBps: new uint16[](0)
+            })
+        );
+    }
+
+    function testExistingSessionUsesFrozenFaultPolicyAfterDefaultPolicyUpdate() public {
+        VM.prank(coordinator);
         uint64 courseTypeId =
-            unwired.createTeachingCourseType("Unwired Course", 1_000_000, 400_000, 2_500);
+            registry.createTeachingCourseType("Frozen Session", 1_000_000, 400_000, 0);
+        VM.prank(coordinator);
+        uint64 teachingNftId = registry.createTeachingSession(
+            SparkDaoTypes.CreateTeachingSessionParams({
+                courseTypeId: courseTypeId,
+                teacher: teacher,
+                customer: customer,
+                scheduledAt: uint64(block.timestamp + 7 days),
+                customerDiscountBps: 8_000,
+                linkedResearchAssetIds: new uint64[](0),
+                linkedResearchWeightBps: new uint16[](0)
+            })
+        );
+
+        MockTeachingFaultPolicy alternatePolicy = new MockTeachingFaultPolicy(2, 0);
+        VM.prank(authority);
+        registry.updateDefaultTeachingFaultPolicy(address(alternatePolicy));
+
+        _prepareTeachingSession(teachingNftId);
+        VM.warp(block.timestamp + 38 days);
+        VM.prank(coordinator);
+        registry.coordinatorResolveCustomerFault(teachingNftId, 2);
+
+        (
+            uint8 remedialLessonCount,
+            uint256 customerChargeUnits,
+            uint256 customerRefundUnits,
+            uint256 teacherImmediatePayoutUnits,
+            uint256 remedialTeacherPayoutUnits,
+            uint256 researchRewardUnits,
+            uint256 serviceReserveUnits
+        ) = registry.getTeachingFaultSettlement(teachingNftId);
+        assertTrue(remedialLessonCount == 0);
+        assertTrue(customerChargeUnits == 400_000);
+        assertTrue(customerRefundUnits == 400_000);
+        assertTrue(teacherImmediatePayoutUnits == 200_000);
+        assertTrue(remedialTeacherPayoutUnits == 0);
+        assertTrue(researchRewardUnits == 0);
+        assertTrue(serviceReserveUnits == 200_000);
+    }
+
+    function testExistingSessionUsesFrozenFaultQuoteAfterPolicyBehaviourChanges() public {
+        MutableTeachingFaultPolicy mutablePolicy = new MutableTeachingFaultPolicy();
+        TeachingRegistry mutableRegistry = _deployRegistryWithPolicy(address(mutablePolicy));
+        ResearchRegistry linkedResearch = auxResearchRegistry;
+        TeachingRewardDistributor mutableDistributor =
+            new TeachingRewardDistributor(address(mutableRegistry), address(linkedResearch));
+        VM.prank(authority);
+        mutableRegistry.setTeachingRewardDistributor(address(mutableDistributor));
+        _wireTokensTo(mutableRegistry, linkedResearch);
+
+        VM.prank(coordinator);
+        uint64 courseTypeId =
+            mutableRegistry.createTeachingCourseType("Mutable Fault Course", 1_000_000, 400_000, 0);
+        VM.prank(coordinator);
+        uint64 teachingNftId = mutableRegistry.createTeachingSession(
+            SparkDaoTypes.CreateTeachingSessionParams({
+                courseTypeId: courseTypeId,
+                teacher: teacher,
+                customer: customer,
+                scheduledAt: uint64(block.timestamp + 7 days),
+                customerDiscountBps: 8_000,
+                linkedResearchAssetIds: new uint64[](0),
+                linkedResearchWeightBps: new uint16[](0)
+            })
+        );
+
+        mutablePolicy.setCustomerFaultTeacherPayoutDivisor(4);
+
+        _prepareTeachingSessionFor(mutableRegistry, teachingNftId);
+        VM.warp(block.timestamp + 38 days);
+        VM.prank(coordinator);
+        mutableRegistry.coordinatorResolveCustomerFault(teachingNftId, 2);
+
+        (
+            ,
+            uint256 customerChargeUnits,
+            uint256 customerRefundUnits,
+            uint256 teacherImmediatePayoutUnits,,,
+            uint256 serviceReserveUnits
+        ) = mutableRegistry.getTeachingFaultSettlement(teachingNftId);
+        assertTrue(customerChargeUnits == 400_000);
+        assertTrue(customerRefundUnits == 400_000);
+        assertTrue(teacherImmediatePayoutUnits == 200_000);
+        assertTrue(serviceReserveUnits == 200_000);
+    }
+
+    function testFaultPolicyQuoteSafetyValidationRejectsInvalidAdapters() public {
+        _assertCourseCreationRejectedByPolicy(new MockTeachingFaultPolicy(2, 1));
+        _assertCourseCreationRejectedByPolicy(new MockTeachingFaultPolicy(2, 2));
+        _assertCourseCreationRejectedByPolicy(new MockTeachingFaultPolicy(2, 3));
+        _assertCourseCreationRejectedByPolicy(new MockTeachingFaultPolicy(2, 4));
+    }
+
+    function testSettleTeachingRewardClaimRejectsNonDistributor() public {
+        VM.expectRevert();
+        registry.settleTeachingRewardClaim(address(stable), contributorOne, 0, 0, 0, 0);
+    }
+
+    function testResearchSettlementRevertsWhenRewardDistributorUnset() public {
+        TeachingRegistry unwired = _deployUnwiredRegistry();
+        ResearchRegistry unwiredResearch = auxResearchRegistry;
+        _wireTokensTo(unwired, unwiredResearch);
+
+        VM.startPrank(coordinator);
+        uint64 assetId = unwiredResearch.createResearchAsset("Unwired Research", "ipfs://unwired");
+        unwiredResearch.createPatchPosition(
+            SparkDaoTypes.CreatePatchPositionParams({
+                assetId: assetId,
+                layerIndex: 1,
+                layerShareBps: 10_000,
+                buybackFloor: 250_000,
+                decayWaitSeconds: 365 days,
+                decayPeriodSeconds: 365 days,
+                decayRateBps: 5_000,
+                beneficiary: contributorOne
+            })
+        );
+        unwiredResearch.sealLayer(assetId, 1);
+        uint64 courseTypeId = unwired.createTeachingCourseType(
+            "Unwired Course", 1_000_000, 400_000, SAFE_RESEARCH_SHARE_BPS
+        );
         uint64[] memory linkedAssetIds = new uint64[](1);
         linkedAssetIds[0] = assetId;
         uint64 teachingNftId = unwired.createTeachingSession(
@@ -307,8 +719,8 @@ contract TeachingRegistryTest {
 
     function testScheduledSnapshotCannotBeBackfilledAfterResearchUpdate() public {
         VM.startPrank(coordinator);
-        uint64 assetId = registry.createResearchAsset("No Backfill", "ipfs://no-backfill");
-        registry.createPatchPosition(
+        uint64 assetId = researchRegistry.createResearchAsset("No Backfill", "ipfs://no-backfill");
+        researchRegistry.createPatchPosition(
             SparkDaoTypes.CreatePatchPositionParams({
                 assetId: assetId,
                 layerIndex: 1,
@@ -320,9 +732,10 @@ contract TeachingRegistryTest {
                 beneficiary: contributorOne
             })
         );
-        registry.sealLayer(assetId, 1);
-        uint64 courseTypeId =
-            registry.createTeachingCourseType("No Backfill Course", 1_000_000, 400_000, 2_500);
+        researchRegistry.sealLayer(assetId, 1);
+        uint64 courseTypeId = registry.createTeachingCourseType(
+            "No Backfill Course", 1_000_000, 400_000, SAFE_RESEARCH_SHARE_BPS
+        );
         uint64[] memory linkedAssetIds = new uint64[](1);
         linkedAssetIds[0] = assetId;
         VM.stopPrank();
@@ -346,7 +759,26 @@ contract TeachingRegistryTest {
     function testTeachingResearchShareCannotExceedFaultSolvencyCap() public {
         VM.expectRevert();
         VM.prank(coordinator);
-        registry.createTeachingCourseType("Overlinked Course", 1_000_000, 400_000, 2_501);
+        registry.createTeachingCourseType("Overlinked Course", 1_000_000, 400_000, 1_501);
+
+        VM.prank(coordinator);
+        uint64 courseTypeId = registry.createTeachingCourseType(
+            "Discount-Sensitive Course", 1_000_000, 400_000, 1_500
+        );
+
+        VM.expectRevert();
+        VM.prank(coordinator);
+        registry.createTeachingSession(
+            SparkDaoTypes.CreateTeachingSessionParams({
+                courseTypeId: courseTypeId,
+                teacher: teacher,
+                customer: customer,
+                scheduledAt: uint64(block.timestamp + 7 days),
+                customerDiscountBps: 8_000,
+                linkedResearchAssetIds: new uint64[](0),
+                linkedResearchWeightBps: new uint16[](0)
+            })
+        );
     }
 
     function testNoResearchTeachingLifecycleCompletesAndRedeems() public {
@@ -511,8 +943,8 @@ contract TeachingRegistryTest {
 
     function testCustomerFirstAcknowledgeResearchBackedTeachingStillSnapshotsRewards() public {
         VM.startPrank(coordinator);
-        uint64 assetId = registry.createResearchAsset("Ack Research", "ipfs://ack-research");
-        uint64 layerOnePositionA = registry.createPatchPosition(
+        uint64 assetId = researchRegistry.createResearchAsset("Ack Research", "ipfs://ack-research");
+        uint64 layerOnePositionA = researchRegistry.createPatchPosition(
             SparkDaoTypes.CreatePatchPositionParams({
                 assetId: assetId,
                 layerIndex: 1,
@@ -524,7 +956,7 @@ contract TeachingRegistryTest {
                 beneficiary: contributorOne
             })
         );
-        uint64 layerOnePositionB = registry.createPatchPosition(
+        uint64 layerOnePositionB = researchRegistry.createPatchPosition(
             SparkDaoTypes.CreatePatchPositionParams({
                 assetId: assetId,
                 layerIndex: 1,
@@ -536,8 +968,8 @@ contract TeachingRegistryTest {
                 beneficiary: contributorTwo
             })
         );
-        registry.sealLayer(assetId, 1);
-        uint64 layerTwoPosition = registry.createPatchPosition(
+        researchRegistry.sealLayer(assetId, 1);
+        uint64 layerTwoPosition = researchRegistry.createPatchPosition(
             SparkDaoTypes.CreatePatchPositionParams({
                 assetId: assetId,
                 layerIndex: 2,
@@ -549,10 +981,11 @@ contract TeachingRegistryTest {
                 beneficiary: contributorThree
             })
         );
-        registry.sealLayer(assetId, 2);
+        researchRegistry.sealLayer(assetId, 2);
 
-        uint64 courseTypeId =
-            registry.createTeachingCourseType("Customer Ack Seminar", 1_000_000, 400_000, 2_500);
+        uint64 courseTypeId = registry.createTeachingCourseType(
+            "Customer Ack Seminar", 1_000_000, 400_000, SAFE_RESEARCH_SHARE_BPS
+        );
         uint64[] memory linkedAssetIds = new uint64[](1);
         linkedAssetIds[0] = assetId;
         uint64 teachingNftId = registry.createTeachingSession(
@@ -584,11 +1017,11 @@ contract TeachingRegistryTest {
         VM.stopPrank();
 
         VM.warp(block.timestamp + 8 days);
-        registry.markPositionReady(assetId, layerOnePositionA);
-        registry.markPositionReady(assetId, layerOnePositionB);
+        researchRegistry.markPositionReady(assetId, layerOnePositionA);
+        researchRegistry.markPositionReady(assetId, layerOnePositionB);
         uint64[] memory preparedPositionIds = new uint64[](1);
         preparedPositionIds[0] = layerTwoPosition;
-        registry.advanceLayer(assetId, preparedPositionIds);
+        researchRegistry.advanceLayer(assetId, preparedPositionIds);
 
         VM.prank(customer);
         registry.acknowledgeTeachingCompletion(teachingNftId, false);
@@ -612,15 +1045,16 @@ contract TeachingRegistryTest {
         assertTrue(settlementLayers.length == 1);
         assertTrue(settlementLayers[0] == 1);
 
-        assertTrue(_claimableAmount(teachingNftId, assetId, layerOnePositionA) == 120_000);
-        assertTrue(_claimableAmount(teachingNftId, assetId, layerOnePositionB) == 80_000);
+        assertTrue(_claimableAmount(teachingNftId, assetId, layerOnePositionA) == 48_000);
+        assertTrue(_claimableAmount(teachingNftId, assetId, layerOnePositionB) == 32_000);
         assertTrue(_claimableAmount(teachingNftId, assetId, layerTwoPosition) == 0);
     }
 
     function testLinkedResearchWithZeroShareSkipsDistributionCleanly() public {
         VM.startPrank(coordinator);
-        uint64 assetId = registry.createResearchAsset("Zero Share Asset", "ipfs://zero-share-asset");
-        uint64 positionId = registry.createPatchPosition(
+        uint64 assetId =
+            researchRegistry.createResearchAsset("Zero Share Asset", "ipfs://zero-share-asset");
+        uint64 positionId = researchRegistry.createPatchPosition(
             SparkDaoTypes.CreatePatchPositionParams({
                 assetId: assetId,
                 layerIndex: 1,
@@ -632,7 +1066,7 @@ contract TeachingRegistryTest {
                 beneficiary: contributorOne
             })
         );
-        registry.sealLayer(assetId, 1);
+        researchRegistry.sealLayer(assetId, 1);
 
         uint64 courseTypeId =
             registry.createTeachingCourseType("Zero Share Seminar", 1_000_000, 400_000, 0);
@@ -690,8 +1124,9 @@ contract TeachingRegistryTest {
         registry.updateRewardUnlockSeconds(0);
 
         VM.startPrank(coordinator);
-        uint64 assetId = registry.createResearchAsset("Immediate Reward", "ipfs://immediate-reward");
-        uint64 positionId = registry.createPatchPosition(
+        uint64 assetId =
+            researchRegistry.createResearchAsset("Immediate Reward", "ipfs://immediate-reward");
+        uint64 positionId = researchRegistry.createPatchPosition(
             SparkDaoTypes.CreatePatchPositionParams({
                 assetId: assetId,
                 layerIndex: 1,
@@ -703,10 +1138,11 @@ contract TeachingRegistryTest {
                 beneficiary: contributorOne
             })
         );
-        registry.sealLayer(assetId, 1);
+        researchRegistry.sealLayer(assetId, 1);
 
-        uint64 courseTypeId =
-            registry.createTeachingCourseType("Immediate Seminar", 1_000_000, 400_000, 2_500);
+        uint64 courseTypeId = registry.createTeachingCourseType(
+            "Immediate Seminar", 1_000_000, 400_000, SAFE_RESEARCH_SHARE_BPS
+        );
         uint64[] memory linkedAssetIds = new uint64[](1);
         linkedAssetIds[0] = assetId;
         uint64 teachingNftId = registry.createTeachingSession(
@@ -727,13 +1163,13 @@ contract TeachingRegistryTest {
         (uint256 amount, uint64 unlockAt,) =
             rewardDistributor.getTeachingRewardClaimable(teachingNftId, assetId, positionId);
         assertTrue(unlockAt == block.timestamp);
-        assertTrue(amount == 200_000);
+        assertTrue(amount == 80_000);
 
         uint256 beforeClaim = stable.balanceOf(contributorOne);
         VM.prank(contributorOne);
         rewardDistributor.claimTeachingReward(teachingNftId, assetId, positionId);
         uint256 afterClaim = stable.balanceOf(contributorOne);
-        assertTrue(afterClaim == beforeClaim + 200_000);
+        assertTrue(afterClaim == beforeClaim + 80_000);
     }
 
     function testCoordinatorTeacherFaultKeepsHalfPriceAndOwesRemedialLesson() public {
@@ -788,6 +1224,7 @@ contract TeachingRegistryTest {
             uint256 customerChargeUnits,
             uint256 customerRefundUnits,
             uint256 teacherPayoutUnits,
+            uint256 remedialTeacherPayoutUnits,
             uint256 researchRewardUnits,
             uint256 serviceReserveUnits
         ) = registry.getTeachingFaultSettlement(teachingNftId);
@@ -795,8 +1232,55 @@ contract TeachingRegistryTest {
         assertTrue(customerChargeUnits == 400_000);
         assertTrue(customerRefundUnits == 400_000);
         assertTrue(teacherPayoutUnits == 0);
+        assertTrue(remedialTeacherPayoutUnits == 200_000);
         assertTrue(researchRewardUnits == 0);
-        assertTrue(serviceReserveUnits == 400_000);
+        assertTrue(serviceReserveUnits == 200_000);
+        assertTrue(registry.getVaultReservedUnits(address(stable)) == 200_000);
+    }
+
+    function testCoordinatorCanSettleTeacherFaultRemedialWage() public {
+        VM.prank(coordinator);
+        uint64 courseTypeId = registry.createTeachingCourseType("Calculus", 1_000_000, 400_000, 0);
+
+        VM.prank(coordinator);
+        uint64 teachingNftId = registry.createTeachingSession(
+            SparkDaoTypes.CreateTeachingSessionParams({
+                courseTypeId: courseTypeId,
+                teacher: teacher,
+                customer: customer,
+                scheduledAt: uint64(block.timestamp + 2 days),
+                customerDiscountBps: 8_000,
+                linkedResearchAssetIds: new uint64[](0),
+                linkedResearchWeightBps: new uint16[](0)
+            })
+        );
+
+        _prepareTeachingSession(teachingNftId);
+        VM.warp(block.timestamp + 33 days);
+
+        VM.prank(coordinator);
+        registry.coordinatorResolveTeacherFault(teachingNftId, 4);
+        assertTrue(registry.getVaultReservedUnits(address(stable)) == 200_000);
+
+        VM.expectRevert(SparkDaoErrors.UnauthorizedCoordinator.selector);
+        VM.prank(customer);
+        registry.coordinatorSettleTeacherFaultRemedialWage(teachingNftId);
+
+        uint256 beforeTeacher = stable.balanceOf(teacher);
+        VM.prank(coordinator);
+        registry.coordinatorSettleTeacherFaultRemedialWage(teachingNftId);
+        uint256 afterTeacher = stable.balanceOf(teacher);
+
+        (uint256 remedialTeacherPayoutUnits, uint64 remedialWageSettledAt) =
+            registry.getTeachingRemedialWageSettlement(teachingNftId);
+        assertTrue(remedialTeacherPayoutUnits == 200_000);
+        assertTrue(remedialWageSettledAt == block.timestamp);
+        assertTrue(afterTeacher == beforeTeacher + 200_000);
+        assertTrue(registry.getVaultReservedUnits(address(stable)) == 0);
+
+        VM.expectRevert(SparkDaoErrors.InvalidTeachingStatus.selector);
+        VM.prank(coordinator);
+        registry.coordinatorSettleTeacherFaultRemedialWage(teachingNftId);
     }
 
     function testCoordinatorCustomerFaultKeepsHalfPriceAndPaysTeacherTime() public {
@@ -845,28 +1329,31 @@ contract TeachingRegistryTest {
         assertTrue(status == 5);
         assertTrue(resolvedAt != 0);
         assertTrue(afterRefund == beforeRefund + 400_000);
-        assertTrue(afterTeacher == beforeTeacher + 1_200_000);
+        assertTrue(afterTeacher == beforeTeacher + 1_000_000);
 
         (
             uint8 remedialLessonCount,
             uint256 customerChargeUnits,
             uint256 customerRefundUnits,
             uint256 teacherPayoutUnits,
+            uint256 remedialTeacherPayoutUnits,
             uint256 researchRewardUnits,
             uint256 serviceReserveUnits
         ) = registry.getTeachingFaultSettlement(teachingNftId);
         assertTrue(remedialLessonCount == 0);
         assertTrue(customerChargeUnits == 400_000);
         assertTrue(customerRefundUnits == 400_000);
-        assertTrue(teacherPayoutUnits == 400_000);
+        assertTrue(teacherPayoutUnits == 200_000);
+        assertTrue(remedialTeacherPayoutUnits == 0);
         assertTrue(researchRewardUnits == 0);
-        assertTrue(serviceReserveUnits == 0);
+        assertTrue(serviceReserveUnits == 200_000);
     }
 
     function testResearchBackedTeachingDistributesSnapshotRewards() public {
         VM.startPrank(coordinator);
-        uint64 assetId = registry.createResearchAsset("Research Core", "ipfs://research-core");
-        uint64 layerOnePositionA = registry.createPatchPosition(
+        uint64 assetId =
+            researchRegistry.createResearchAsset("Research Core", "ipfs://research-core");
+        uint64 layerOnePositionA = researchRegistry.createPatchPosition(
             SparkDaoTypes.CreatePatchPositionParams({
                 assetId: assetId,
                 layerIndex: 1,
@@ -878,7 +1365,7 @@ contract TeachingRegistryTest {
                 beneficiary: contributorOne
             })
         );
-        uint64 layerOnePositionB = registry.createPatchPosition(
+        uint64 layerOnePositionB = researchRegistry.createPatchPosition(
             SparkDaoTypes.CreatePatchPositionParams({
                 assetId: assetId,
                 layerIndex: 1,
@@ -890,8 +1377,8 @@ contract TeachingRegistryTest {
                 beneficiary: contributorTwo
             })
         );
-        registry.sealLayer(assetId, 1);
-        uint64 layerTwoPosition = registry.createPatchPosition(
+        researchRegistry.sealLayer(assetId, 1);
+        uint64 layerTwoPosition = researchRegistry.createPatchPosition(
             SparkDaoTypes.CreatePatchPositionParams({
                 assetId: assetId,
                 layerIndex: 2,
@@ -903,10 +1390,11 @@ contract TeachingRegistryTest {
                 beneficiary: contributorThree
             })
         );
-        registry.sealLayer(assetId, 2);
+        researchRegistry.sealLayer(assetId, 2);
 
-        uint64 courseTypeId =
-            registry.createTeachingCourseType("Research Seminar", 1_000_000, 400_000, 2_500);
+        uint64 courseTypeId = registry.createTeachingCourseType(
+            "Research Seminar", 1_000_000, 400_000, SAFE_RESEARCH_SHARE_BPS
+        );
         uint64[] memory linkedAssetIds = new uint64[](1);
         linkedAssetIds[0] = assetId;
         uint64 teachingNftId = registry.createTeachingSession(
@@ -938,11 +1426,11 @@ contract TeachingRegistryTest {
         VM.stopPrank();
 
         VM.warp(block.timestamp + 8 days);
-        registry.markPositionReady(assetId, layerOnePositionA);
-        registry.markPositionReady(assetId, layerOnePositionB);
+        researchRegistry.markPositionReady(assetId, layerOnePositionA);
+        researchRegistry.markPositionReady(assetId, layerOnePositionB);
         uint64[] memory preparedPositionIds = new uint64[](1);
         preparedPositionIds[0] = layerTwoPosition;
-        registry.advanceLayer(assetId, preparedPositionIds);
+        researchRegistry.advanceLayer(assetId, preparedPositionIds);
 
         VM.prank(teacher);
         registry.confirmTeachingCompletion(teachingNftId, true);
@@ -958,8 +1446,8 @@ contract TeachingRegistryTest {
         assertTrue(settlementLayers.length == 1);
         assertTrue(settlementLayers[0] == 1);
 
-        assertTrue(_claimableAmount(teachingNftId, assetId, layerOnePositionA) == 120_000);
-        assertTrue(_claimableAmount(teachingNftId, assetId, layerOnePositionB) == 80_000);
+        assertTrue(_claimableAmount(teachingNftId, assetId, layerOnePositionA) == 48_000);
+        assertTrue(_claimableAmount(teachingNftId, assetId, layerOnePositionB) == 32_000);
         assertTrue(_claimableAmount(teachingNftId, assetId, layerTwoPosition) == 0);
 
         VM.warp(block.timestamp + 91 days);
@@ -968,19 +1456,20 @@ contract TeachingRegistryTest {
         VM.prank(contributorOne);
         rewardDistributor.claimTeachingReward(teachingNftId, assetId, layerOnePositionA);
         uint256 contributorOneAfter = stable.balanceOf(contributorOne);
-        assertTrue(contributorOneAfter == contributorOneBefore + 120_000);
+        assertTrue(contributorOneAfter == contributorOneBefore + 48_000);
 
         uint256 contributorTwoBefore = stable.balanceOf(contributorTwo);
         VM.prank(contributorTwo);
         rewardDistributor.claimTeachingReward(teachingNftId, assetId, layerOnePositionB);
         uint256 contributorTwoAfter = stable.balanceOf(contributorTwo);
-        assertTrue(contributorTwoAfter == contributorTwoBefore + 80_000);
+        assertTrue(contributorTwoAfter == contributorTwoBefore + 32_000);
     }
 
     function testScheduledSnapshotIgnoresResearchUpdatesBeforeCompletion() public {
         VM.startPrank(coordinator);
-        uint64 assetId = registry.createResearchAsset("Layered Research", "ipfs://layered-research");
-        uint64 layerOnePositionA = registry.createPatchPosition(
+        uint64 assetId =
+            researchRegistry.createResearchAsset("Layered Research", "ipfs://layered-research");
+        uint64 layerOnePositionA = researchRegistry.createPatchPosition(
             SparkDaoTypes.CreatePatchPositionParams({
                 assetId: assetId,
                 layerIndex: 1,
@@ -992,7 +1481,7 @@ contract TeachingRegistryTest {
                 beneficiary: contributorOne
             })
         );
-        uint64 layerOnePositionB = registry.createPatchPosition(
+        uint64 layerOnePositionB = researchRegistry.createPatchPosition(
             SparkDaoTypes.CreatePatchPositionParams({
                 assetId: assetId,
                 layerIndex: 1,
@@ -1004,8 +1493,8 @@ contract TeachingRegistryTest {
                 beneficiary: contributorTwo
             })
         );
-        registry.sealLayer(assetId, 1);
-        uint64 layerTwoPosition = registry.createPatchPosition(
+        researchRegistry.sealLayer(assetId, 1);
+        uint64 layerTwoPosition = researchRegistry.createPatchPosition(
             SparkDaoTypes.CreatePatchPositionParams({
                 assetId: assetId,
                 layerIndex: 2,
@@ -1017,10 +1506,11 @@ contract TeachingRegistryTest {
                 beneficiary: contributorThree
             })
         );
-        registry.sealLayer(assetId, 2);
+        researchRegistry.sealLayer(assetId, 2);
 
-        uint64 courseTypeId =
-            registry.createTeachingCourseType("Snapshot Theory", 1_000_000, 400_000, 2_500);
+        uint64 courseTypeId = registry.createTeachingCourseType(
+            "Snapshot Theory", 1_000_000, 400_000, SAFE_RESEARCH_SHARE_BPS
+        );
         uint64[] memory linkedAssetIds = new uint64[](1);
         linkedAssetIds[0] = assetId;
         uint64 teachingNftId = registry.createTeachingSession(
@@ -1052,11 +1542,11 @@ contract TeachingRegistryTest {
         VM.stopPrank();
 
         VM.warp(block.timestamp + 8 days);
-        registry.markPositionReady(assetId, layerOnePositionA);
-        registry.markPositionReady(assetId, layerOnePositionB);
+        researchRegistry.markPositionReady(assetId, layerOnePositionA);
+        researchRegistry.markPositionReady(assetId, layerOnePositionB);
         uint64[] memory preparedPositionIds = new uint64[](1);
         preparedPositionIds[0] = layerTwoPosition;
-        registry.advanceLayer(assetId, preparedPositionIds);
+        researchRegistry.advanceLayer(assetId, preparedPositionIds);
 
         VM.prank(customer);
         registry.confirmTeachingCompletion(teachingNftId, false);
@@ -1067,15 +1557,15 @@ contract TeachingRegistryTest {
             registry.getTeachingSessionSettlementResearchLayers(teachingNftId);
         assertTrue(settlementLayers[0] == 1);
 
-        assertTrue(_claimableAmount(teachingNftId, assetId, layerOnePositionA) == 120_000);
+        assertTrue(_claimableAmount(teachingNftId, assetId, layerOnePositionA) == 48_000);
         assertTrue(_claimableAmount(teachingNftId, assetId, layerTwoPosition) == 0);
     }
 
     function testTransferredResearchPositionLetsNewHolderClaimTeachingReward() public {
         VM.startPrank(coordinator);
         uint64 assetId =
-            registry.createResearchAsset("Transferable Research", "ipfs://transferable");
-        uint64 layerOnePosition = registry.createPatchPosition(
+            researchRegistry.createResearchAsset("Transferable Research", "ipfs://transferable");
+        uint64 layerOnePosition = researchRegistry.createPatchPosition(
             SparkDaoTypes.CreatePatchPositionParams({
                 assetId: assetId,
                 layerIndex: 1,
@@ -1087,10 +1577,11 @@ contract TeachingRegistryTest {
                 beneficiary: contributorOne
             })
         );
-        registry.sealLayer(assetId, 1);
+        researchRegistry.sealLayer(assetId, 1);
 
-        uint64 courseTypeId =
-            registry.createTeachingCourseType("Transfer Seminar", 1_000_000, 400_000, 2_500);
+        uint64 courseTypeId = registry.createTeachingCourseType(
+            "Transfer Seminar", 1_000_000, 400_000, SAFE_RESEARCH_SHARE_BPS
+        );
         uint64[] memory linkedAssetIds = new uint64[](1);
         linkedAssetIds[0] = assetId;
         uint64 teachingNftId = registry.createTeachingSession(
@@ -1109,7 +1600,7 @@ contract TeachingRegistryTest {
         _completeTeachingLifecycle(teachingNftId);
 
         VM.prank(contributorOne);
-        registry.transferResearchPosition(assetId, layerOnePosition, contributorTwo);
+        researchRegistry.transferResearchPosition(assetId, layerOnePosition, contributorTwo);
         assertTrue(
             researchToken.ownerOf(_researchTokenId(assetId, layerOnePosition)) == contributorTwo
         );
@@ -1124,13 +1615,14 @@ contract TeachingRegistryTest {
         VM.prank(contributorTwo);
         rewardDistributor.claimTeachingReward(teachingNftId, assetId, layerOnePosition);
         uint256 afterClaim = stable.balanceOf(contributorTwo);
-        assertTrue(afterClaim == beforeClaim + 200_000);
+        assertTrue(afterClaim == beforeClaim + 80_000);
     }
 
     function testBoughtBackResearchPositionLetsTreasuryClaimTeachingReward() public {
         VM.startPrank(coordinator);
-        uint64 assetId = registry.createResearchAsset("Dao Buyback Research", "ipfs://dao-buyback");
-        uint64 layerOnePosition = registry.createPatchPosition(
+        uint64 assetId =
+            researchRegistry.createResearchAsset("Dao Buyback Research", "ipfs://dao-buyback");
+        uint64 layerOnePosition = researchRegistry.createPatchPosition(
             SparkDaoTypes.CreatePatchPositionParams({
                 assetId: assetId,
                 layerIndex: 1,
@@ -1142,10 +1634,11 @@ contract TeachingRegistryTest {
                 beneficiary: contributorOne
             })
         );
-        registry.sealLayer(assetId, 1);
+        researchRegistry.sealLayer(assetId, 1);
 
-        uint64 courseTypeId =
-            registry.createTeachingCourseType("Buyback Seminar", 1_000_000, 400_000, 2_500);
+        uint64 courseTypeId = registry.createTeachingCourseType(
+            "Buyback Seminar", 1_000_000, 400_000, SAFE_RESEARCH_SHARE_BPS
+        );
         uint64[] memory linkedAssetIds = new uint64[](1);
         linkedAssetIds[0] = assetId;
         uint64 teachingNftId = registry.createTeachingSession(
@@ -1164,11 +1657,11 @@ contract TeachingRegistryTest {
         _completeTeachingLifecycle(teachingNftId);
 
         VM.prank(authority);
-        assertTrue(stable.transfer(address(registry), 500_000));
+        assertTrue(stable.transfer(address(researchRegistry), 500_000));
 
         VM.warp(block.timestamp + 31 days);
         VM.prank(contributorOne);
-        registry.sellPositionBackToDao(assetId, layerOnePosition);
+        researchRegistry.sellPositionBackToDao(assetId, layerOnePosition);
         assertTrue(researchToken.ownerOf(_researchTokenId(assetId, layerOnePosition)) == treasury);
 
         VM.warp(block.timestamp + 91 days);
@@ -1181,14 +1674,15 @@ contract TeachingRegistryTest {
         VM.prank(treasury);
         rewardDistributor.claimTeachingReward(teachingNftId, assetId, layerOnePosition);
         uint256 afterClaim = stable.balanceOf(treasury);
-        assertTrue(afterClaim == beforeClaim + 200_000);
+        assertTrue(afterClaim == beforeClaim + 80_000);
     }
 
     function testBoughtBackTeachingRewardClaimUsesTreasuryAfterAuthorityRotation() public {
         VM.startPrank(coordinator);
-        uint64 assetId =
-            registry.createResearchAsset("Rotated Buyback Research", "ipfs://rotated-buyback");
-        uint64 layerOnePosition = registry.createPatchPosition(
+        uint64 assetId = researchRegistry.createResearchAsset(
+            "Rotated Buyback Research", "ipfs://rotated-buyback"
+        );
+        uint64 layerOnePosition = researchRegistry.createPatchPosition(
             SparkDaoTypes.CreatePatchPositionParams({
                 assetId: assetId,
                 layerIndex: 1,
@@ -1200,10 +1694,11 @@ contract TeachingRegistryTest {
                 beneficiary: contributorOne
             })
         );
-        registry.sealLayer(assetId, 1);
+        researchRegistry.sealLayer(assetId, 1);
 
-        uint64 courseTypeId =
-            registry.createTeachingCourseType("Rotated Buyback", 1_000_000, 400_000, 2_500);
+        uint64 courseTypeId = registry.createTeachingCourseType(
+            "Rotated Buyback", 1_000_000, 400_000, SAFE_RESEARCH_SHARE_BPS
+        );
         uint64[] memory linkedAssetIds = new uint64[](1);
         linkedAssetIds[0] = assetId;
         uint64 teachingNftId = registry.createTeachingSession(
@@ -1222,11 +1717,11 @@ contract TeachingRegistryTest {
         _completeTeachingLifecycle(teachingNftId);
 
         VM.prank(authority);
-        assertTrue(stable.transfer(address(registry), 500_000));
+        assertTrue(stable.transfer(address(researchRegistry), 500_000));
 
         VM.warp(block.timestamp + 31 days);
         VM.prank(contributorOne);
-        registry.sellPositionBackToDao(assetId, layerOnePosition);
+        researchRegistry.sellPositionBackToDao(assetId, layerOnePosition);
 
         address newAuthority = address(0xA22CE);
         VM.prank(authority);
@@ -1244,13 +1739,14 @@ contract TeachingRegistryTest {
         uint256 beforeClaim = stable.balanceOf(treasury);
         VM.prank(treasury);
         rewardDistributor.claimTeachingReward(teachingNftId, assetId, layerOnePosition);
-        assertTrue(stable.balanceOf(treasury) == beforeClaim + 200_000);
+        assertTrue(stable.balanceOf(treasury) == beforeClaim + 80_000);
     }
 
     function testResearchForceValidStillDistributesSnapshotRewards() public {
         VM.startPrank(coordinator);
-        uint64 assetId = registry.createResearchAsset("Forced Research", "ipfs://forced-research");
-        uint64 layerOnePositionA = registry.createPatchPosition(
+        uint64 assetId =
+            researchRegistry.createResearchAsset("Forced Research", "ipfs://forced-research");
+        uint64 layerOnePositionA = researchRegistry.createPatchPosition(
             SparkDaoTypes.CreatePatchPositionParams({
                 assetId: assetId,
                 layerIndex: 1,
@@ -1262,7 +1758,7 @@ contract TeachingRegistryTest {
                 beneficiary: contributorOne
             })
         );
-        uint64 layerOnePositionB = registry.createPatchPosition(
+        uint64 layerOnePositionB = researchRegistry.createPatchPosition(
             SparkDaoTypes.CreatePatchPositionParams({
                 assetId: assetId,
                 layerIndex: 1,
@@ -1274,10 +1770,11 @@ contract TeachingRegistryTest {
                 beneficiary: contributorTwo
             })
         );
-        registry.sealLayer(assetId, 1);
+        researchRegistry.sealLayer(assetId, 1);
 
-        uint64 courseTypeId =
-            registry.createTeachingCourseType("Coordinator Rescue", 1_000_000, 400_000, 2_500);
+        uint64 courseTypeId = registry.createTeachingCourseType(
+            "Coordinator Rescue", 1_000_000, 400_000, SAFE_RESEARCH_SHARE_BPS
+        );
         uint64[] memory linkedAssetIds = new uint64[](1);
         linkedAssetIds[0] = assetId;
         uint64 teachingNftId = registry.createTeachingSession(
@@ -1317,14 +1814,14 @@ contract TeachingRegistryTest {
         assertTrue(settlementLayers.length == 1);
         assertTrue(settlementLayers[0] == 1);
 
-        assertTrue(_claimableAmount(teachingNftId, assetId, layerOnePositionA) == 120_000);
-        assertTrue(_claimableAmount(teachingNftId, assetId, layerOnePositionB) == 80_000);
+        assertTrue(_claimableAmount(teachingNftId, assetId, layerOnePositionA) == 48_000);
+        assertTrue(_claimableAmount(teachingNftId, assetId, layerOnePositionB) == 32_000);
     }
 
     function testWeightedMultiAssetTeachingDistribution() public {
         VM.startPrank(coordinator);
-        uint64 assetOne = registry.createResearchAsset("Asset One", "ipfs://asset-one");
-        uint64 positionOne = registry.createPatchPosition(
+        uint64 assetOne = researchRegistry.createResearchAsset("Asset One", "ipfs://asset-one");
+        uint64 positionOne = researchRegistry.createPatchPosition(
             SparkDaoTypes.CreatePatchPositionParams({
                 assetId: assetOne,
                 layerIndex: 1,
@@ -1336,10 +1833,10 @@ contract TeachingRegistryTest {
                 beneficiary: contributorOne
             })
         );
-        registry.sealLayer(assetOne, 1);
+        researchRegistry.sealLayer(assetOne, 1);
 
-        uint64 assetTwo = registry.createResearchAsset("Asset Two", "ipfs://asset-two");
-        uint64 positionTwo = registry.createPatchPosition(
+        uint64 assetTwo = researchRegistry.createResearchAsset("Asset Two", "ipfs://asset-two");
+        uint64 positionTwo = researchRegistry.createPatchPosition(
             SparkDaoTypes.CreatePatchPositionParams({
                 assetId: assetTwo,
                 layerIndex: 1,
@@ -1351,10 +1848,11 @@ contract TeachingRegistryTest {
                 beneficiary: contributorTwo
             })
         );
-        registry.sealLayer(assetTwo, 1);
+        researchRegistry.sealLayer(assetTwo, 1);
 
-        uint64 courseTypeId =
-            registry.createTeachingCourseType("Weighted Seminar", 1_000_000, 400_000, 2_500);
+        uint64 courseTypeId = registry.createTeachingCourseType(
+            "Weighted Seminar", 1_000_000, 400_000, SAFE_RESEARCH_SHARE_BPS
+        );
         uint64[] memory linkedAssetIds = new uint64[](2);
         linkedAssetIds[0] = assetOne;
         linkedAssetIds[1] = assetTwo;
@@ -1376,14 +1874,14 @@ contract TeachingRegistryTest {
 
         _completeTeachingLifecycle(teachingNftId);
 
-        assertTrue(_claimableAmount(teachingNftId, assetOne, positionOne) == 140_000);
-        assertTrue(_claimableAmount(teachingNftId, assetTwo, positionTwo) == 60_000);
+        assertTrue(_claimableAmount(teachingNftId, assetOne, positionOne) == 56_000);
+        assertTrue(_claimableAmount(teachingNftId, assetTwo, positionTwo) == 24_000);
     }
 
     function testBatchTeachingRewardClaim() public {
         VM.startPrank(coordinator);
-        uint64 assetOne = registry.createResearchAsset("Batch One", "ipfs://batch-one");
-        uint64 positionOne = registry.createPatchPosition(
+        uint64 assetOne = researchRegistry.createResearchAsset("Batch One", "ipfs://batch-one");
+        uint64 positionOne = researchRegistry.createPatchPosition(
             SparkDaoTypes.CreatePatchPositionParams({
                 assetId: assetOne,
                 layerIndex: 1,
@@ -1395,10 +1893,10 @@ contract TeachingRegistryTest {
                 beneficiary: contributorOne
             })
         );
-        registry.sealLayer(assetOne, 1);
+        researchRegistry.sealLayer(assetOne, 1);
 
-        uint64 assetTwo = registry.createResearchAsset("Batch Two", "ipfs://batch-two");
-        uint64 positionTwo = registry.createPatchPosition(
+        uint64 assetTwo = researchRegistry.createResearchAsset("Batch Two", "ipfs://batch-two");
+        uint64 positionTwo = researchRegistry.createPatchPosition(
             SparkDaoTypes.CreatePatchPositionParams({
                 assetId: assetTwo,
                 layerIndex: 1,
@@ -1410,10 +1908,11 @@ contract TeachingRegistryTest {
                 beneficiary: contributorOne
             })
         );
-        registry.sealLayer(assetTwo, 1);
+        researchRegistry.sealLayer(assetTwo, 1);
 
-        uint64 courseTypeId =
-            registry.createTeachingCourseType("Batch Claim Seminar", 1_000_000, 400_000, 2_500);
+        uint64 courseTypeId = registry.createTeachingCourseType(
+            "Batch Claim Seminar", 1_000_000, 400_000, SAFE_RESEARCH_SHARE_BPS
+        );
         uint64[] memory linkedAssetIds = new uint64[](2);
         linkedAssetIds[0] = assetOne;
         linkedAssetIds[1] = assetTwo;
@@ -1450,13 +1949,13 @@ contract TeachingRegistryTest {
         VM.prank(contributorOne);
         rewardDistributor.claimTeachingRewardBatch(teachingNftIds, assetIds, positionIds);
         uint256 afterClaim = stable.balanceOf(contributorOne);
-        assertTrue(afterClaim == beforeClaim + 200_000);
+        assertTrue(afterClaim == beforeClaim + 80_000);
     }
 
     function testDustTeachingRewardSkipsZeroAmountPositions() public {
         VM.startPrank(coordinator);
-        uint64 assetId = registry.createResearchAsset("Dust Asset", "ipfs://dust-asset");
-        uint64 positionA = registry.createPatchPosition(
+        uint64 assetId = researchRegistry.createResearchAsset("Dust Asset", "ipfs://dust-asset");
+        uint64 positionA = researchRegistry.createPatchPosition(
             SparkDaoTypes.CreatePatchPositionParams({
                 assetId: assetId,
                 layerIndex: 1,
@@ -1468,7 +1967,7 @@ contract TeachingRegistryTest {
                 beneficiary: contributorOne
             })
         );
-        uint64 positionB = registry.createPatchPosition(
+        uint64 positionB = researchRegistry.createPatchPosition(
             SparkDaoTypes.CreatePatchPositionParams({
                 assetId: assetId,
                 layerIndex: 1,
@@ -1480,7 +1979,7 @@ contract TeachingRegistryTest {
                 beneficiary: contributorTwo
             })
         );
-        registry.sealLayer(assetId, 1);
+        researchRegistry.sealLayer(assetId, 1);
 
         uint64 courseTypeId = registry.createTeachingCourseType("Dust Seminar", 12, 1, 2_500);
         uint64[] memory linkedAssetIds = new uint64[](1);
@@ -1526,8 +2025,9 @@ contract TeachingRegistryTest {
 
     function testBatchTeachingRewardRejectsDuplicateEntries() public {
         VM.startPrank(coordinator);
-        uint64 assetId = registry.createResearchAsset("Duplicate Batch", "ipfs://duplicate-batch");
-        uint64 positionId = registry.createPatchPosition(
+        uint64 assetId =
+            researchRegistry.createResearchAsset("Duplicate Batch", "ipfs://duplicate-batch");
+        uint64 positionId = researchRegistry.createPatchPosition(
             SparkDaoTypes.CreatePatchPositionParams({
                 assetId: assetId,
                 layerIndex: 1,
@@ -1539,10 +2039,11 @@ contract TeachingRegistryTest {
                 beneficiary: contributorOne
             })
         );
-        registry.sealLayer(assetId, 1);
+        researchRegistry.sealLayer(assetId, 1);
 
-        uint64 courseTypeId =
-            registry.createTeachingCourseType("Duplicate Batch Seminar", 1_000_000, 400_000, 2_500);
+        uint64 courseTypeId = registry.createTeachingCourseType(
+            "Duplicate Batch Seminar", 1_000_000, 400_000, SAFE_RESEARCH_SHARE_BPS
+        );
         uint64[] memory linkedAssetIds = new uint64[](1);
         linkedAssetIds[0] = assetId;
         uint64 teachingNftId = registry.createTeachingSession(
@@ -1579,13 +2080,14 @@ contract TeachingRegistryTest {
         VM.prank(contributorOne);
         rewardDistributor.claimTeachingReward(teachingNftId, assetId, positionId);
         uint256 afterClaim = stable.balanceOf(contributorOne);
-        assertTrue(afterClaim == beforeClaim + 200_000);
+        assertTrue(afterClaim == beforeClaim + 80_000);
     }
 
     function testBatchTeachingRewardRejectsMixedHolders() public {
         VM.startPrank(coordinator);
-        uint64 assetOne = registry.createResearchAsset("Mixed Batch One", "ipfs://mixed-batch-one");
-        uint64 positionOne = registry.createPatchPosition(
+        uint64 assetOne =
+            researchRegistry.createResearchAsset("Mixed Batch One", "ipfs://mixed-batch-one");
+        uint64 positionOne = researchRegistry.createPatchPosition(
             SparkDaoTypes.CreatePatchPositionParams({
                 assetId: assetOne,
                 layerIndex: 1,
@@ -1597,10 +2099,11 @@ contract TeachingRegistryTest {
                 beneficiary: contributorOne
             })
         );
-        registry.sealLayer(assetOne, 1);
+        researchRegistry.sealLayer(assetOne, 1);
 
-        uint64 assetTwo = registry.createResearchAsset("Mixed Batch Two", "ipfs://mixed-batch-two");
-        uint64 positionTwo = registry.createPatchPosition(
+        uint64 assetTwo =
+            researchRegistry.createResearchAsset("Mixed Batch Two", "ipfs://mixed-batch-two");
+        uint64 positionTwo = researchRegistry.createPatchPosition(
             SparkDaoTypes.CreatePatchPositionParams({
                 assetId: assetTwo,
                 layerIndex: 1,
@@ -1612,10 +2115,11 @@ contract TeachingRegistryTest {
                 beneficiary: contributorOne
             })
         );
-        registry.sealLayer(assetTwo, 1);
+        researchRegistry.sealLayer(assetTwo, 1);
 
-        uint64 courseTypeId =
-            registry.createTeachingCourseType("Mixed Holder Seminar", 1_000_000, 400_000, 2_500);
+        uint64 courseTypeId = registry.createTeachingCourseType(
+            "Mixed Holder Seminar", 1_000_000, 400_000, SAFE_RESEARCH_SHARE_BPS
+        );
         uint64[] memory linkedAssetIds = new uint64[](2);
         linkedAssetIds[0] = assetOne;
         linkedAssetIds[1] = assetTwo;
@@ -1638,7 +2142,7 @@ contract TeachingRegistryTest {
         _completeTeachingLifecycle(teachingNftId);
 
         VM.prank(contributorOne);
-        registry.transferResearchPosition(assetTwo, positionTwo, contributorTwo);
+        researchRegistry.transferResearchPosition(assetTwo, positionTwo, contributorTwo);
 
         VM.warp(block.timestamp + 91 days);
 
@@ -1660,20 +2164,20 @@ contract TeachingRegistryTest {
         VM.prank(contributorOne);
         rewardDistributor.claimTeachingReward(teachingNftId, assetOne, positionOne);
         uint256 oneAfter = stable.balanceOf(contributorOne);
-        assertTrue(oneAfter == oneBefore + 100_000);
+        assertTrue(oneAfter == oneBefore + 40_000);
 
         uint256 twoBefore = stable.balanceOf(contributorTwo);
         VM.prank(contributorTwo);
         rewardDistributor.claimTeachingReward(teachingNftId, assetTwo, positionTwo);
         uint256 twoAfter = stable.balanceOf(contributorTwo);
-        assertTrue(twoAfter == twoBefore + 100_000);
+        assertTrue(twoAfter == twoBefore + 40_000);
     }
 
     function testMultiAssetMultiLayerDistributionConservesTotalValue() public {
         VM.startPrank(coordinator);
         uint64 assetOne =
-            registry.createResearchAsset("Conservation One", "ipfs://conservation-one");
-        uint64 assetOneLayerOneA = registry.createPatchPosition(
+            researchRegistry.createResearchAsset("Conservation One", "ipfs://conservation-one");
+        uint64 assetOneLayerOneA = researchRegistry.createPatchPosition(
             SparkDaoTypes.CreatePatchPositionParams({
                 assetId: assetOne,
                 layerIndex: 1,
@@ -1685,7 +2189,7 @@ contract TeachingRegistryTest {
                 beneficiary: contributorOne
             })
         );
-        uint64 assetOneLayerOneB = registry.createPatchPosition(
+        uint64 assetOneLayerOneB = researchRegistry.createPatchPosition(
             SparkDaoTypes.CreatePatchPositionParams({
                 assetId: assetOne,
                 layerIndex: 1,
@@ -1697,8 +2201,8 @@ contract TeachingRegistryTest {
                 beneficiary: contributorTwo
             })
         );
-        registry.sealLayer(assetOne, 1);
-        uint64 assetOneLayerTwo = registry.createPatchPosition(
+        researchRegistry.sealLayer(assetOne, 1);
+        uint64 assetOneLayerTwo = researchRegistry.createPatchPosition(
             SparkDaoTypes.CreatePatchPositionParams({
                 assetId: assetOne,
                 layerIndex: 2,
@@ -1710,11 +2214,11 @@ contract TeachingRegistryTest {
                 beneficiary: contributorThree
             })
         );
-        registry.sealLayer(assetOne, 2);
+        researchRegistry.sealLayer(assetOne, 2);
 
         uint64 assetTwo =
-            registry.createResearchAsset("Conservation Two", "ipfs://conservation-two");
-        uint64 assetTwoLayerOneA = registry.createPatchPosition(
+            researchRegistry.createResearchAsset("Conservation Two", "ipfs://conservation-two");
+        uint64 assetTwoLayerOneA = researchRegistry.createPatchPosition(
             SparkDaoTypes.CreatePatchPositionParams({
                 assetId: assetTwo,
                 layerIndex: 1,
@@ -1726,7 +2230,7 @@ contract TeachingRegistryTest {
                 beneficiary: contributorThree
             })
         );
-        uint64 assetTwoLayerOneB = registry.createPatchPosition(
+        uint64 assetTwoLayerOneB = researchRegistry.createPatchPosition(
             SparkDaoTypes.CreatePatchPositionParams({
                 assetId: assetTwo,
                 layerIndex: 1,
@@ -1738,8 +2242,8 @@ contract TeachingRegistryTest {
                 beneficiary: contributorFour
             })
         );
-        registry.sealLayer(assetTwo, 1);
-        uint64 assetTwoLayerTwo = registry.createPatchPosition(
+        researchRegistry.sealLayer(assetTwo, 1);
+        uint64 assetTwoLayerTwo = researchRegistry.createPatchPosition(
             SparkDaoTypes.CreatePatchPositionParams({
                 assetId: assetTwo,
                 layerIndex: 2,
@@ -1751,10 +2255,11 @@ contract TeachingRegistryTest {
                 beneficiary: customer
             })
         );
-        registry.sealLayer(assetTwo, 2);
+        researchRegistry.sealLayer(assetTwo, 2);
 
-        uint64 courseTypeId =
-            registry.createTeachingCourseType("Conservation Seminar", 1_000_000, 400_000, 2_500);
+        uint64 courseTypeId = registry.createTeachingCourseType(
+            "Conservation Seminar", 1_000_000, 400_000, SAFE_RESEARCH_SHARE_BPS
+        );
         uint64[] memory linkedAssetIds = new uint64[](2);
         linkedAssetIds[0] = assetOne;
         linkedAssetIds[1] = assetTwo;
@@ -1790,17 +2295,17 @@ contract TeachingRegistryTest {
         VM.stopPrank();
 
         VM.warp(block.timestamp + 8 days);
-        registry.markPositionReady(assetOne, assetOneLayerOneA);
-        registry.markPositionReady(assetOne, assetOneLayerOneB);
+        researchRegistry.markPositionReady(assetOne, assetOneLayerOneA);
+        researchRegistry.markPositionReady(assetOne, assetOneLayerOneB);
         uint64[] memory assetOnePrepared = new uint64[](1);
         assetOnePrepared[0] = assetOneLayerTwo;
-        registry.advanceLayer(assetOne, assetOnePrepared);
+        researchRegistry.advanceLayer(assetOne, assetOnePrepared);
 
-        registry.markPositionReady(assetTwo, assetTwoLayerOneA);
-        registry.markPositionReady(assetTwo, assetTwoLayerOneB);
+        researchRegistry.markPositionReady(assetTwo, assetTwoLayerOneA);
+        researchRegistry.markPositionReady(assetTwo, assetTwoLayerOneB);
         uint64[] memory assetTwoPrepared = new uint64[](1);
         assetTwoPrepared[0] = assetTwoLayerTwo;
-        registry.advanceLayer(assetTwo, assetTwoPrepared);
+        researchRegistry.advanceLayer(assetTwo, assetTwoPrepared);
 
         VM.prank(teacher);
         registry.confirmTeachingCompletion(teachingNftId, true);
@@ -1814,11 +2319,11 @@ contract TeachingRegistryTest {
 
         uint256 totalDistributed =
             assetOneAmountA + assetOneAmountB + assetTwoAmountA + assetTwoAmountB;
-        assertTrue(assetOneAmountA == 84_000);
-        assertTrue(assetOneAmountB == 56_000);
-        assertTrue(assetTwoAmountA == 45_000);
-        assertTrue(assetTwoAmountB == 15_000);
-        assertTrue(totalDistributed == 200_000);
+        assertTrue(assetOneAmountA == 33_600);
+        assertTrue(assetOneAmountB == 22_400);
+        assertTrue(assetTwoAmountA == 18_000);
+        assertTrue(assetTwoAmountB == 6_000);
+        assertTrue(totalDistributed == 80_000);
 
         assertTrue(_claimableAmount(teachingNftId, assetOne, assetOneLayerTwo) == 0);
         assertTrue(_claimableAmount(teachingNftId, assetTwo, assetTwoLayerTwo) == 0);
@@ -1826,8 +2331,9 @@ contract TeachingRegistryTest {
 
     function testPastDeadlineResearchBackedTeachingNeedsCoordinatorAndKeepsSnapshot() public {
         VM.startPrank(coordinator);
-        uint64 assetId = registry.createResearchAsset("Timeout Research", "ipfs://timeout-research");
-        uint64 layerOnePositionA = registry.createPatchPosition(
+        uint64 assetId =
+            researchRegistry.createResearchAsset("Timeout Research", "ipfs://timeout-research");
+        uint64 layerOnePositionA = researchRegistry.createPatchPosition(
             SparkDaoTypes.CreatePatchPositionParams({
                 assetId: assetId,
                 layerIndex: 1,
@@ -1839,7 +2345,7 @@ contract TeachingRegistryTest {
                 beneficiary: contributorOne
             })
         );
-        uint64 layerOnePositionB = registry.createPatchPosition(
+        uint64 layerOnePositionB = researchRegistry.createPatchPosition(
             SparkDaoTypes.CreatePatchPositionParams({
                 assetId: assetId,
                 layerIndex: 1,
@@ -1851,8 +2357,8 @@ contract TeachingRegistryTest {
                 beneficiary: contributorTwo
             })
         );
-        registry.sealLayer(assetId, 1);
-        uint64 layerTwoPosition = registry.createPatchPosition(
+        researchRegistry.sealLayer(assetId, 1);
+        uint64 layerTwoPosition = researchRegistry.createPatchPosition(
             SparkDaoTypes.CreatePatchPositionParams({
                 assetId: assetId,
                 layerIndex: 2,
@@ -1864,10 +2370,11 @@ contract TeachingRegistryTest {
                 beneficiary: contributorThree
             })
         );
-        registry.sealLayer(assetId, 2);
+        researchRegistry.sealLayer(assetId, 2);
 
-        uint64 courseTypeId =
-            registry.createTeachingCourseType("Timeout Seminar", 1_000_000, 400_000, 2_500);
+        uint64 courseTypeId = registry.createTeachingCourseType(
+            "Timeout Seminar", 1_000_000, 400_000, SAFE_RESEARCH_SHARE_BPS
+        );
         uint64[] memory linkedAssetIds = new uint64[](1);
         linkedAssetIds[0] = assetId;
         uint64 teachingNftId = registry.createTeachingSession(
@@ -1899,11 +2406,11 @@ contract TeachingRegistryTest {
         VM.stopPrank();
 
         VM.warp(block.timestamp + 8 days);
-        registry.markPositionReady(assetId, layerOnePositionA);
-        registry.markPositionReady(assetId, layerOnePositionB);
+        researchRegistry.markPositionReady(assetId, layerOnePositionA);
+        researchRegistry.markPositionReady(assetId, layerOnePositionB);
         uint64[] memory preparedPositionIds = new uint64[](1);
         preparedPositionIds[0] = layerTwoPosition;
-        registry.advanceLayer(assetId, preparedPositionIds);
+        researchRegistry.advanceLayer(assetId, preparedPositionIds);
 
         VM.warp(block.timestamp + 31 days);
 
@@ -1924,15 +2431,16 @@ contract TeachingRegistryTest {
         assertTrue(settlementLayers.length == 1);
         assertTrue(settlementLayers[0] == 1);
 
-        assertTrue(_claimableAmount(teachingNftId, assetId, layerOnePositionA) == 120_000);
-        assertTrue(_claimableAmount(teachingNftId, assetId, layerOnePositionB) == 80_000);
+        assertTrue(_claimableAmount(teachingNftId, assetId, layerOnePositionA) == 48_000);
+        assertTrue(_claimableAmount(teachingNftId, assetId, layerOnePositionB) == 32_000);
         assertTrue(_claimableAmount(teachingNftId, assetId, layerTwoPosition) == 0);
     }
 
     function testTeacherFaultUsesHalfPriceToFundTwoResearchShares() public {
         VM.startPrank(coordinator);
-        uint64 assetId = registry.createResearchAsset("Fault Research", "ipfs://fault-research");
-        uint64 positionId = registry.createPatchPosition(
+        uint64 assetId =
+            researchRegistry.createResearchAsset("Fault Research", "ipfs://fault-research");
+        uint64 positionId = researchRegistry.createPatchPosition(
             SparkDaoTypes.CreatePatchPositionParams({
                 assetId: assetId,
                 layerIndex: 1,
@@ -1944,10 +2452,11 @@ contract TeachingRegistryTest {
                 beneficiary: contributorOne
             })
         );
-        registry.sealLayer(assetId, 1);
+        researchRegistry.sealLayer(assetId, 1);
 
-        uint64 courseTypeId =
-            registry.createTeachingCourseType("Fault Seminar", 1_000_000, 400_000, 2_500);
+        uint64 courseTypeId = registry.createTeachingCourseType(
+            "Fault Seminar", 1_000_000, 400_000, SAFE_RESEARCH_SHARE_BPS
+        );
         uint64[] memory linkedAssetIds = new uint64[](1);
         linkedAssetIds[0] = assetId;
         uint64 teachingNftId = registry.createTeachingSession(
@@ -1999,13 +2508,14 @@ contract TeachingRegistryTest {
         assertTrue(afterRefund == beforeRefund + 400_000);
         assertTrue(afterTeacher == beforeTeacher + 800_000);
 
-        assertTrue(_claimableAmount(teachingNftId, assetId, positionId) == 400_000);
+        assertTrue(_claimableAmount(teachingNftId, assetId, positionId) == 160_000);
 
         (
             uint8 remedialLessonCount,
             uint256 customerChargeUnits,
             uint256 customerRefundUnits,
             uint256 teacherPayoutUnits,
+            uint256 remedialTeacherPayoutUnits,
             uint256 researchRewardUnits,
             uint256 serviceReserveUnits
         ) = registry.getTeachingFaultSettlement(teachingNftId);
@@ -2013,14 +2523,86 @@ contract TeachingRegistryTest {
         assertTrue(customerChargeUnits == 400_000);
         assertTrue(customerRefundUnits == 400_000);
         assertTrue(teacherPayoutUnits == 0);
-        assertTrue(researchRewardUnits == 400_000);
-        assertTrue(serviceReserveUnits == 0);
+        assertTrue(remedialTeacherPayoutUnits == 200_000);
+        assertTrue(researchRewardUnits == 160_000);
+        assertTrue(serviceReserveUnits == 40_000);
+        assertTrue(registry.getVaultReservedUnits(address(stable)) == 360_000);
+
+        VM.prank(coordinator);
+        registry.coordinatorSettleTeacherFaultRemedialWage(teachingNftId);
+        assertTrue(registry.getVaultReservedUnits(address(stable)) == 160_000);
+
+        VM.warp(block.timestamp + 91 days);
+        VM.prank(contributorOne);
+        rewardDistributor.claimTeachingReward(teachingNftId, assetId, positionId);
+        assertTrue(registry.getVaultReservedUnits(address(stable)) == 0);
+    }
+
+    function testTeacherFaultRecordsResearchPoolWhenOrdinaryResearchRewardIsZero() public {
+        MockTeachingEconomicsPolicy faultOnlyResearchPolicy = new MockTeachingEconomicsPolicy(2, 5);
+        VM.prank(authority);
+        registry.updateDefaultTeachingEconomicsPolicy(address(faultOnlyResearchPolicy));
+
+        VM.startPrank(coordinator);
+        uint64 assetId = researchRegistry.createResearchAsset(
+            "Fault Only Research", "ipfs://fault-only-research"
+        );
+        uint64 positionId = researchRegistry.createPatchPosition(
+            SparkDaoTypes.CreatePatchPositionParams({
+                assetId: assetId,
+                layerIndex: 1,
+                layerShareBps: 10_000,
+                buybackFloor: 250_000,
+                decayWaitSeconds: 365 days,
+                decayPeriodSeconds: 365 days,
+                decayRateBps: 5_000,
+                beneficiary: contributorOne
+            })
+        );
+        researchRegistry.sealLayer(assetId, 1);
+
+        uint64 courseTypeId = registry.createTeachingCourseType(
+            "Fault Only Research Seminar", 1_000_000, 400_000, SAFE_RESEARCH_SHARE_BPS
+        );
+        uint64[] memory linkedAssetIds = new uint64[](1);
+        linkedAssetIds[0] = assetId;
+        uint64 teachingNftId = registry.createTeachingSession(
+            SparkDaoTypes.CreateTeachingSessionParams({
+                courseTypeId: courseTypeId,
+                teacher: teacher,
+                customer: customer,
+                scheduledAt: uint64(block.timestamp + 2 days),
+                customerDiscountBps: 8_000,
+                linkedResearchAssetIds: linkedAssetIds,
+                linkedResearchWeightBps: new uint16[](0)
+            })
+        );
+        VM.stopPrank();
+
+        _prepareTeachingSession(teachingNftId);
+        VM.warp(block.timestamp + 33 days);
+
+        VM.prank(coordinator);
+        registry.coordinatorResolveTeacherFault(teachingNftId, 4);
+
+        assertTrue(_claimableAmount(teachingNftId, assetId, positionId) == 160_000);
+
+        (
+            ,,,,
+            uint256 remedialTeacherPayoutUnits,
+            uint256 researchRewardUnits,
+            uint256 serviceReserveUnits
+        ) = registry.getTeachingFaultSettlement(teachingNftId);
+        assertTrue(remedialTeacherPayoutUnits == 200_000);
+        assertTrue(researchRewardUnits == 160_000);
+        assertTrue(serviceReserveUnits == 40_000);
     }
 
     function testForceValidPreservesWeightedHistoricalSnapshot() public {
         VM.startPrank(coordinator);
-        uint64 assetOne = registry.createResearchAsset("Force Asset One", "ipfs://force-asset-one");
-        uint64 assetOneLayerOne = registry.createPatchPosition(
+        uint64 assetOne =
+            researchRegistry.createResearchAsset("Force Asset One", "ipfs://force-asset-one");
+        uint64 assetOneLayerOne = researchRegistry.createPatchPosition(
             SparkDaoTypes.CreatePatchPositionParams({
                 assetId: assetOne,
                 layerIndex: 1,
@@ -2032,8 +2614,8 @@ contract TeachingRegistryTest {
                 beneficiary: contributorOne
             })
         );
-        registry.sealLayer(assetOne, 1);
-        uint64 assetOneLayerTwo = registry.createPatchPosition(
+        researchRegistry.sealLayer(assetOne, 1);
+        uint64 assetOneLayerTwo = researchRegistry.createPatchPosition(
             SparkDaoTypes.CreatePatchPositionParams({
                 assetId: assetOne,
                 layerIndex: 2,
@@ -2045,10 +2627,11 @@ contract TeachingRegistryTest {
                 beneficiary: contributorThree
             })
         );
-        registry.sealLayer(assetOne, 2);
+        researchRegistry.sealLayer(assetOne, 2);
 
-        uint64 assetTwo = registry.createResearchAsset("Force Asset Two", "ipfs://force-asset-two");
-        uint64 assetTwoLayerOne = registry.createPatchPosition(
+        uint64 assetTwo =
+            researchRegistry.createResearchAsset("Force Asset Two", "ipfs://force-asset-two");
+        uint64 assetTwoLayerOne = researchRegistry.createPatchPosition(
             SparkDaoTypes.CreatePatchPositionParams({
                 assetId: assetTwo,
                 layerIndex: 1,
@@ -2060,8 +2643,8 @@ contract TeachingRegistryTest {
                 beneficiary: contributorTwo
             })
         );
-        registry.sealLayer(assetTwo, 1);
-        uint64 assetTwoLayerTwo = registry.createPatchPosition(
+        researchRegistry.sealLayer(assetTwo, 1);
+        uint64 assetTwoLayerTwo = researchRegistry.createPatchPosition(
             SparkDaoTypes.CreatePatchPositionParams({
                 assetId: assetTwo,
                 layerIndex: 2,
@@ -2073,10 +2656,11 @@ contract TeachingRegistryTest {
                 beneficiary: contributorFour
             })
         );
-        registry.sealLayer(assetTwo, 2);
+        researchRegistry.sealLayer(assetTwo, 2);
 
-        uint64 courseTypeId =
-            registry.createTeachingCourseType("Force Weighted Seminar", 1_000_000, 400_000, 2_500);
+        uint64 courseTypeId = registry.createTeachingCourseType(
+            "Force Weighted Seminar", 1_000_000, 400_000, SAFE_RESEARCH_SHARE_BPS
+        );
         uint64[] memory linkedAssetIds = new uint64[](2);
         linkedAssetIds[0] = assetOne;
         linkedAssetIds[1] = assetTwo;
@@ -2114,13 +2698,13 @@ contract TeachingRegistryTest {
         VM.warp(block.timestamp + 8 days);
         uint64[] memory preparedOne = new uint64[](1);
         preparedOne[0] = assetOneLayerTwo;
-        registry.markPositionReady(assetOne, assetOneLayerOne);
-        registry.advanceLayer(assetOne, preparedOne);
+        researchRegistry.markPositionReady(assetOne, assetOneLayerOne);
+        researchRegistry.advanceLayer(assetOne, preparedOne);
 
         uint64[] memory preparedTwo = new uint64[](1);
         preparedTwo[0] = assetTwoLayerTwo;
-        registry.markPositionReady(assetTwo, assetTwoLayerOne);
-        registry.advanceLayer(assetTwo, preparedTwo);
+        researchRegistry.markPositionReady(assetTwo, assetTwoLayerOne);
+        researchRegistry.advanceLayer(assetTwo, preparedTwo);
 
         VM.warp(block.timestamp + 31 days);
         VM.prank(coordinator);
@@ -2132,8 +2716,8 @@ contract TeachingRegistryTest {
         assertTrue(settlementLayers[0] == 1);
         assertTrue(settlementLayers[1] == 1);
 
-        assertTrue(_claimableAmount(teachingNftId, assetOne, assetOneLayerOne) == 140_000);
-        assertTrue(_claimableAmount(teachingNftId, assetTwo, assetTwoLayerOne) == 60_000);
+        assertTrue(_claimableAmount(teachingNftId, assetOne, assetOneLayerOne) == 56_000);
+        assertTrue(_claimableAmount(teachingNftId, assetTwo, assetTwoLayerOne) == 24_000);
 
         assertTrue(_claimableAmount(teachingNftId, assetOne, assetOneLayerTwo) == 0);
         assertTrue(_claimableAmount(teachingNftId, assetTwo, assetTwoLayerTwo) == 0);
@@ -2141,8 +2725,9 @@ contract TeachingRegistryTest {
 
     function testTeachingRewardClaimPullSupportsStagedClaims() public {
         VM.startPrank(coordinator);
-        uint64 assetId = registry.createResearchAsset("Bucket Research", "ipfs://bucket-research");
-        uint64 positionId = registry.createPatchPosition(
+        uint64 assetId =
+            researchRegistry.createResearchAsset("Bucket Research", "ipfs://bucket-research");
+        uint64 positionId = researchRegistry.createPatchPosition(
             SparkDaoTypes.CreatePatchPositionParams({
                 assetId: assetId,
                 layerIndex: 1,
@@ -2154,10 +2739,11 @@ contract TeachingRegistryTest {
                 beneficiary: contributorOne
             })
         );
-        registry.sealLayer(assetId, 1);
+        researchRegistry.sealLayer(assetId, 1);
 
-        uint64 courseTypeId =
-            registry.createTeachingCourseType("Bucket Seminar", 1_000_000, 400_000, 2_500);
+        uint64 courseTypeId = registry.createTeachingCourseType(
+            "Bucket Seminar", 1_000_000, 400_000, SAFE_RESEARCH_SHARE_BPS
+        );
         uint64[] memory linkedAssetIds = new uint64[](1);
         linkedAssetIds[0] = assetId;
         uint64 teachingOne = registry.createTeachingSession(
@@ -2203,8 +2789,8 @@ contract TeachingRegistryTest {
             rewardDistributor.getTeachingRewardClaimable(teachingOne, assetId, positionId);
         (uint256 amountTwo, uint64 unlockTwo,) =
             rewardDistributor.getTeachingRewardClaimable(teachingTwo, assetId, positionId);
-        assertTrue(amountOne == 200_000);
-        assertTrue(amountTwo == 200_000);
+        assertTrue(amountOne == 80_000);
+        assertTrue(amountTwo == 80_000);
         assertTrue(unlockTwo > unlockOne);
 
         uint256 beforeFirstClaim = stable.balanceOf(contributorOne);
@@ -2212,19 +2798,19 @@ contract TeachingRegistryTest {
         VM.prank(contributorOne);
         rewardDistributor.claimTeachingReward(teachingOne, assetId, positionId);
         uint256 afterFirstClaim = stable.balanceOf(contributorOne);
-        assertTrue(afterFirstClaim == beforeFirstClaim + 200_000);
+        assertTrue(afterFirstClaim == beforeFirstClaim + 80_000);
 
         (,, bool firstClaimed) =
             rewardDistributor.getTeachingRewardClaimable(teachingOne, assetId, positionId);
         assertTrue(firstClaimed);
-        assertTrue(_claimableAmount(teachingTwo, assetId, positionId) == 200_000);
+        assertTrue(_claimableAmount(teachingTwo, assetId, positionId) == 80_000);
 
         uint256 beforeSecondClaim = stable.balanceOf(contributorOne);
         VM.warp(unlockTwo);
         VM.prank(contributorOne);
         rewardDistributor.claimTeachingReward(teachingTwo, assetId, positionId);
         uint256 afterSecondClaim = stable.balanceOf(contributorOne);
-        assertTrue(afterSecondClaim == beforeSecondClaim + 200_000);
+        assertTrue(afterSecondClaim == beforeSecondClaim + 80_000);
 
         VM.expectRevert();
         VM.prank(contributorOne);
@@ -2233,8 +2819,8 @@ contract TeachingRegistryTest {
 
     function testBatchTeachingRewardClaimRevertsWhenOnePoolIsLocked() public {
         VM.startPrank(coordinator);
-        uint64 assetOne = registry.createResearchAsset("Atomic One", "ipfs://atomic-one");
-        uint64 positionOne = registry.createPatchPosition(
+        uint64 assetOne = researchRegistry.createResearchAsset("Atomic One", "ipfs://atomic-one");
+        uint64 positionOne = researchRegistry.createPatchPosition(
             SparkDaoTypes.CreatePatchPositionParams({
                 assetId: assetOne,
                 layerIndex: 1,
@@ -2246,10 +2832,10 @@ contract TeachingRegistryTest {
                 beneficiary: contributorOne
             })
         );
-        registry.sealLayer(assetOne, 1);
+        researchRegistry.sealLayer(assetOne, 1);
 
-        uint64 assetTwo = registry.createResearchAsset("Atomic Two", "ipfs://atomic-two");
-        uint64 positionTwo = registry.createPatchPosition(
+        uint64 assetTwo = researchRegistry.createResearchAsset("Atomic Two", "ipfs://atomic-two");
+        uint64 positionTwo = researchRegistry.createPatchPosition(
             SparkDaoTypes.CreatePatchPositionParams({
                 assetId: assetTwo,
                 layerIndex: 1,
@@ -2261,10 +2847,11 @@ contract TeachingRegistryTest {
                 beneficiary: contributorOne
             })
         );
-        registry.sealLayer(assetTwo, 1);
+        researchRegistry.sealLayer(assetTwo, 1);
 
-        uint64 courseTypeId =
-            registry.createTeachingCourseType("Atomic Seminar", 1_000_000, 400_000, 2_500);
+        uint64 courseTypeId = registry.createTeachingCourseType(
+            "Atomic Seminar", 1_000_000, 400_000, SAFE_RESEARCH_SHARE_BPS
+        );
         uint64[] memory oneAsset = new uint64[](1);
         oneAsset[0] = assetOne;
         uint64 teachingOne = registry.createTeachingSession(
@@ -2335,7 +2922,7 @@ contract TeachingRegistryTest {
         VM.prank(contributorOne);
         rewardDistributor.claimTeachingReward(teachingOne, assetOne, positionOne);
         uint256 afterSingleClaim = stable.balanceOf(contributorOne);
-        assertTrue(afterSingleClaim == beforeBatch + 200_000);
+        assertTrue(afterSingleClaim == beforeBatch + 80_000);
 
         VM.expectRevert();
         VM.prank(contributorOne);
@@ -2345,14 +2932,14 @@ contract TeachingRegistryTest {
         VM.prank(contributorOne);
         rewardDistributor.claimTeachingReward(teachingTwo, assetTwo, positionTwo);
         uint256 afterSecondClaim = stable.balanceOf(contributorOne);
-        assertTrue(afterSecondClaim == beforeBatch + 400_000);
+        assertTrue(afterSecondClaim == beforeBatch + 160_000);
     }
 
     function testVaultReservedUnitsTrackTeachingSettlementFlow() public {
         VM.startPrank(coordinator);
         uint64 assetId =
-            registry.createResearchAsset("Reserved Research", "ipfs://reserved-research");
-        uint64 positionId = registry.createPatchPosition(
+            researchRegistry.createResearchAsset("Reserved Research", "ipfs://reserved-research");
+        uint64 positionId = researchRegistry.createPatchPosition(
             SparkDaoTypes.CreatePatchPositionParams({
                 assetId: assetId,
                 layerIndex: 1,
@@ -2364,10 +2951,11 @@ contract TeachingRegistryTest {
                 beneficiary: contributorOne
             })
         );
-        registry.sealLayer(assetId, 1);
+        researchRegistry.sealLayer(assetId, 1);
 
-        uint64 courseTypeId =
-            registry.createTeachingCourseType("Reserved Seminar", 1_000_000, 400_000, 2_500);
+        uint64 courseTypeId = registry.createTeachingCourseType(
+            "Reserved Seminar", 1_000_000, 400_000, SAFE_RESEARCH_SHARE_BPS
+        );
         uint64[] memory linkedAssetIds = new uint64[](1);
         linkedAssetIds[0] = assetId;
         uint64 teachingNftId = registry.createTeachingSession(
@@ -2396,18 +2984,18 @@ contract TeachingRegistryTest {
         registry.confirmTeachingCompletion(teachingNftId, false);
 
         uint256 reservedAfterSettlement = registry.getVaultReservedUnits(address(stable));
-        assertTrue(reservedAfterSettlement == 600_000);
+        assertTrue(reservedAfterSettlement == 480_000);
         assertTrue(stable.balanceOf(address(registry)) == 800_000);
-        assertTrue(stable.balanceOf(address(registry)) - reservedAfterSettlement == 200_000);
+        assertTrue(stable.balanceOf(address(registry)) - reservedAfterSettlement == 320_000);
 
         VM.warp(block.timestamp + 31 days);
         VM.prank(teacher);
         registry.redeemTeachingPayout(teachingNftId);
 
         uint256 reservedAfterRedeem = registry.getVaultReservedUnits(address(stable));
-        assertTrue(reservedAfterRedeem == 200_000);
+        assertTrue(reservedAfterRedeem == 80_000);
         assertTrue(stable.balanceOf(address(registry)) == 400_000);
-        assertTrue(stable.balanceOf(address(registry)) - reservedAfterRedeem == 200_000);
+        assertTrue(stable.balanceOf(address(registry)) - reservedAfterRedeem == 320_000);
 
         (, uint64 unlockAt,) =
             rewardDistributor.getTeachingRewardClaimable(teachingNftId, assetId, positionId);
@@ -2417,11 +3005,11 @@ contract TeachingRegistryTest {
         rewardDistributor.claimTeachingReward(teachingNftId, assetId, positionId);
 
         assertTrue(registry.getVaultReservedUnits(address(stable)) == 0);
-        assertTrue(stable.balanceOf(address(registry)) == 200_000);
-        assertTrue(stable.balanceOf(contributorOne) == contributorBeforeClaim + 200_000);
+        assertTrue(stable.balanceOf(address(registry)) == 320_000);
+        assertTrue(stable.balanceOf(contributorOne) == contributorBeforeClaim + 80_000);
         SparkDaoTypes.ResearchPosition memory position =
-            registry.getResearchPosition(assetId, positionId);
-        assertTrue(position.totalClaimedUnits == 200_000);
+            researchRegistry.getResearchPosition(assetId, positionId);
+        assertTrue(position.totalClaimedUnits == 80_000);
     }
 
     function testSettlementGasDoesNotScaleLinearlyWithResearchPositionCount() public {
@@ -2503,8 +3091,9 @@ contract TeachingRegistryTest {
 
     function testTeachingRewardPoolUsesFrozenSessionStableAsset() public {
         VM.startPrank(coordinator);
-        uint64 assetId = registry.createResearchAsset("EURC Reward Asset", "ipfs://eurc-reward");
-        uint64 positionId = registry.createPatchPosition(
+        uint64 assetId =
+            researchRegistry.createResearchAsset("EURC Reward Asset", "ipfs://eurc-reward");
+        uint64 positionId = researchRegistry.createPatchPosition(
             SparkDaoTypes.CreatePatchPositionParams({
                 assetId: assetId,
                 layerIndex: 1,
@@ -2516,7 +3105,7 @@ contract TeachingRegistryTest {
                 beneficiary: contributorOne
             })
         );
-        registry.sealLayer(assetId, 1);
+        researchRegistry.sealLayer(assetId, 1);
         VM.stopPrank();
 
         VM.prank(authority);
@@ -2536,7 +3125,7 @@ contract TeachingRegistryTest {
         rewardDistributor.claimTeachingReward(teachingNftId, assetId, positionId);
 
         assertTrue(stable.balanceOf(contributorOne) == stableBefore);
-        assertTrue(eurc.balanceOf(contributorOne) == eurcBefore + 200_000);
+        assertTrue(eurc.balanceOf(contributorOne) == eurcBefore + 80_000);
     }
 
     function testLockedTokenMintersBlockRotationButRegistryStillMints() public {
@@ -2553,8 +3142,9 @@ contract TeachingRegistryTest {
         teachingToken.setMinter(address(0xBEEF));
 
         VM.startPrank(coordinator);
-        uint64 assetId = registry.createResearchAsset("Locked Minter Research", "ipfs://locked");
-        uint64 positionId = registry.createPatchPosition(
+        uint64 assetId =
+            researchRegistry.createResearchAsset("Locked Minter Research", "ipfs://locked");
+        uint64 positionId = researchRegistry.createPatchPosition(
             SparkDaoTypes.CreatePatchPositionParams({
                 assetId: assetId,
                 layerIndex: 1,
@@ -2614,6 +3204,23 @@ contract TeachingRegistryTest {
         VM.stopPrank();
     }
 
+    function _prepareTeachingSessionFor(TeachingRegistry target, uint64 teachingNftId) internal {
+        VM.prank(teacher);
+        target.confirmTeachingSchedule(teachingNftId, true);
+        VM.prank(customer);
+        target.confirmTeachingSchedule(teachingNftId, false);
+
+        VM.startPrank(teacher);
+        stable.approve(address(target), 800_000);
+        target.lockTeachingCollateral(teachingNftId, true);
+        VM.stopPrank();
+
+        VM.startPrank(customer);
+        stable.approve(address(target), 800_000);
+        target.lockTeachingCollateral(teachingNftId, false);
+        VM.stopPrank();
+    }
+
     function _completeTeachingLifecycle(uint64 teachingNftId) internal {
         _prepareTeachingSession(teachingNftId);
         _settlePreparedTeaching(teachingNftId);
@@ -2649,9 +3256,9 @@ contract TeachingRegistryTest {
         uint16 shareBps
     ) internal returns (uint64 assetId) {
         VM.startPrank(coordinator);
-        assetId = registry.createResearchAsset(title, "ipfs://scalable-asset");
+        assetId = researchRegistry.createResearchAsset(title, "ipfs://scalable-asset");
         for (uint64 i = 0; i < positionCount;) {
-            registry.createPatchPosition(
+            researchRegistry.createPatchPosition(
                 SparkDaoTypes.CreatePatchPositionParams({
                     assetId: assetId,
                     layerIndex: 1,
@@ -2667,7 +3274,7 @@ contract TeachingRegistryTest {
                 ++i;
             }
         }
-        registry.sealLayer(assetId, 1);
+        researchRegistry.sealLayer(assetId, 1);
         VM.stopPrank();
     }
 
@@ -2676,8 +3283,9 @@ contract TeachingRegistryTest {
         returns (uint64 teachingNftId)
     {
         VM.prank(coordinator);
-        uint64 courseTypeId =
-            registry.createTeachingCourseType(courseTitle, 1_000_000, 400_000, 2_500);
+        uint64 courseTypeId = registry.createTeachingCourseType(
+            courseTitle, 1_000_000, 400_000, SAFE_RESEARCH_SHARE_BPS
+        );
         uint64[] memory linkedAssetIds = new uint64[](1);
         linkedAssetIds[0] = assetId;
         VM.prank(coordinator);
@@ -2704,6 +3312,30 @@ contract TeachingRegistryTest {
     }
 
     function _deployUnwiredRegistry() internal returns (TeachingRegistry unwired) {
+        unwired = _deployRegistryWithPolicy(address(faultPolicy));
+    }
+
+    function _deployRegistryWithEconomicsPolicy(address policy)
+        internal
+        returns (TeachingRegistry unwired)
+    {
+        ResearchRegistry linkedResearch = _deployAuxResearchRegistry();
+        unwired = _deployRegistryWithEconomicsPolicy(policy, linkedResearch);
+    }
+
+    function _deployRegistryWithEconomicsPolicy(address policy, ResearchRegistry linkedResearch)
+        internal
+        returns (TeachingRegistry unwired)
+    {
+        unwired = _deployRegistryWithEconomicsPolicyOnly(policy, linkedResearch);
+        VM.prank(authority);
+        linkedResearch.setTeachingRegistry(address(unwired));
+    }
+
+    function _deployRegistryWithEconomicsPolicyOnly(address policy, ResearchRegistry linkedResearch)
+        internal
+        returns (TeachingRegistry unwired)
+    {
         unwired = new TeachingRegistry(
             authority,
             coordinator,
@@ -2711,16 +3343,112 @@ contract TeachingRegistryTest {
             address(stable),
             90 days,
             30 days,
-            address(researchToken),
-            address(teachingToken)
+            address(linkedResearch),
+            address(teachingToken),
+            address(policyGuard),
+            policy,
+            address(faultPolicy)
         );
     }
 
-    function _wireTokensTo(TeachingRegistry target) internal {
+    function _deployRegistryWithPolicy(address policy) internal returns (TeachingRegistry unwired) {
+        ResearchRegistry linkedResearch = _deployAuxResearchRegistry();
+        unwired = _deployRegistryWithPolicy(policy, linkedResearch);
+    }
+
+    function _deployRegistryWithPolicy(address policy, ResearchRegistry linkedResearch)
+        internal
+        returns (TeachingRegistry unwired)
+    {
+        unwired = _deployRegistryWithPolicyOnly(policy, linkedResearch);
         VM.prank(authority);
-        researchToken.setMinter(address(target));
+        linkedResearch.setTeachingRegistry(address(unwired));
+    }
+
+    function _deployRegistryWithPolicyOnly(address policy, ResearchRegistry linkedResearch)
+        internal
+        returns (TeachingRegistry unwired)
+    {
+        unwired = new TeachingRegistry(
+            authority,
+            coordinator,
+            treasury,
+            address(stable),
+            90 days,
+            30 days,
+            address(linkedResearch),
+            address(teachingToken),
+            address(policyGuard),
+            address(economicsPolicy),
+            policy
+        );
+    }
+
+    function _assertCourseCreationRejectedByEconomicsPolicy(MockTeachingEconomicsPolicy policy)
+        internal
+    {
+        VM.prank(authority);
+        registry.updateDefaultTeachingEconomicsPolicy(address(policy));
+        VM.expectRevert();
+        VM.prank(coordinator);
+        registry.createTeachingCourseType("Unsafe Economics Course", 1_000_000, 400_000, 0);
+        VM.prank(authority);
+        registry.updateDefaultTeachingEconomicsPolicy(address(economicsPolicy));
+    }
+
+    function _assertCourseCreationRejectedByPolicy(MockTeachingFaultPolicy policy) internal {
+        VM.prank(authority);
+        registry.updateDefaultTeachingFaultPolicy(address(policy));
+        VM.expectRevert();
+        VM.prank(coordinator);
+        registry.createTeachingCourseType("Unsafe Policy Course", 1_000_000, 400_000, 0);
+        VM.prank(authority);
+        registry.updateDefaultTeachingFaultPolicy(address(faultPolicy));
+    }
+
+    function _deployAuxResearchRegistry() internal returns (ResearchRegistry linkedResearch) {
+        linkedResearch = new ResearchRegistry(
+            authority,
+            coordinator,
+            treasury,
+            address(stable),
+            90 days,
+            30 days,
+            address(researchToken)
+        );
+        auxResearchRegistry = linkedResearch;
+    }
+
+    function _wireTokensTo(TeachingRegistry target, ResearchRegistry linkedResearch) internal {
+        VM.prank(authority);
+        researchToken.setMinter(address(linkedResearch));
         VM.prank(authority);
         teachingToken.setMinter(address(target));
+    }
+
+    function _createNoResearchTeachingSession(uint64 courseTypeId)
+        internal
+        returns (uint64 teachingNftId)
+    {
+        VM.prank(coordinator);
+        teachingNftId = registry.createTeachingSession(
+            SparkDaoTypes.CreateTeachingSessionParams({
+                courseTypeId: courseTypeId,
+                teacher: teacher,
+                customer: customer,
+                scheduledAt: uint64(block.timestamp + 7 days),
+                customerDiscountBps: 10_000,
+                linkedResearchAssetIds: new uint64[](0),
+                linkedResearchWeightBps: new uint16[](0)
+            })
+        );
+    }
+
+    function _confirmSchedule(uint64 teachingNftId) internal {
+        VM.prank(teacher);
+        registry.confirmTeachingSchedule(teachingNftId, true);
+        VM.prank(customer);
+        registry.confirmTeachingSchedule(teachingNftId, false);
     }
 
     function assertTrue(bool ok) internal pure {

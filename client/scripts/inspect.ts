@@ -1,11 +1,12 @@
 import "dotenv/config";
 import { loadClientConfigFromEnv } from "../src/config.js";
 import {
-  getDaoState,
+  getResearchDaoState,
   getResearchAsset,
   getResearchPosition,
 } from "../src/research.js";
 import {
+  getTeachingDaoState,
   getTeachingRewardPreview,
   getTeachingSessionSettlementLayers,
   getTeachingSessionState,
@@ -24,8 +25,8 @@ async function main() {
     ? BigInt(process.env.INSPECT_TEACHING_NFT_ID)
     : undefined;
 
-  const daoState = await getDaoState(config);
-  console.log("daoState", daoState);
+  console.log("researchDaoState", await getResearchDaoState(config));
+  console.log("teachingDaoState", await getTeachingDaoState(config));
 
   if (assetId !== undefined) {
     console.log("researchAsset", await getResearchAsset(config, assetId));

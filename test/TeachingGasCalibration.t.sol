@@ -2,7 +2,11 @@
 pragma solidity ^0.8.26;
 
 import { TeachingRegistry } from "../src/TeachingRegistry.sol";
+import { ResearchRegistry } from "../src/ResearchRegistry.sol";
 import { TeachingRewardDistributor } from "../src/TeachingRewardDistributor.sol";
+import { TeachingEconomicsPolicyV1 } from "../src/TeachingEconomicsPolicyV1.sol";
+import { TeachingFaultPolicyV1 } from "../src/TeachingFaultPolicyV1.sol";
+import { TeachingPolicyGuard } from "../src/TeachingPolicyGuard.sol";
 import { TeachingNftToken } from "../src/TeachingNftToken.sol";
 import { ResearchPositionToken } from "../src/ResearchPositionToken.sol";
 import { SparkDaoTypes } from "../src/SparkDaoTypes.sol";
@@ -13,6 +17,7 @@ interface GasCalibrationVm {
     function startPrank(address) external;
     function stopPrank() external;
     function warp(uint256) external;
+    function removeFile(string calldata path) external;
     function writeFile(string calldata path, string calldata data) external;
     function writeLine(string calldata path, string calldata data) external;
 }
@@ -23,9 +28,14 @@ contract TeachingGasCalibrationTest {
 
     string internal constant OUT = "teaching_gas_calibration.csv";
     string internal constant CLAIM_OUT = "teaching_claim_gas_calibration.csv";
+    uint16 internal constant SAFE_RESEARCH_SHARE_BPS = 1_000;
 
     TeachingRegistry internal registry;
+    ResearchRegistry internal researchRegistry;
     TeachingRewardDistributor internal rewardDistributor;
+    TeachingEconomicsPolicyV1 internal economicsPolicy;
+    TeachingFaultPolicyV1 internal faultPolicy;
+    TeachingPolicyGuard internal policyGuard;
     TeachingNftToken internal teachingToken;
     ResearchPositionToken internal researchToken;
     MockERC20 internal stable;
@@ -80,6 +90,18 @@ contract TeachingGasCalibrationTest {
         );
         teachingToken =
             new TeachingNftToken(authority, "Spark Teaching NFT", "STN", "ipfs://teaching/");
+        economicsPolicy = new TeachingEconomicsPolicyV1();
+        faultPolicy = new TeachingFaultPolicyV1();
+        policyGuard = new TeachingPolicyGuard();
+        researchRegistry = new ResearchRegistry(
+            authority,
+            coordinator,
+            treasury,
+            address(stable),
+            90 days,
+            30 days,
+            address(researchToken)
+        );
         registry = new TeachingRegistry(
             authority,
             coordinator,
@@ -87,14 +109,20 @@ contract TeachingGasCalibrationTest {
             address(stable),
             90 days,
             30 days,
-            address(researchToken),
-            address(teachingToken)
+            address(researchRegistry),
+            address(teachingToken),
+            address(policyGuard),
+            address(economicsPolicy),
+            address(faultPolicy)
         );
-        rewardDistributor = new TeachingRewardDistributor(address(registry));
+        rewardDistributor =
+            new TeachingRewardDistributor(address(registry), address(researchRegistry));
+        VM.prank(authority);
+        researchRegistry.setTeachingRegistry(address(registry));
         VM.prank(authority);
         registry.setTeachingRewardDistributor(address(rewardDistributor));
         VM.prank(authority);
-        researchToken.setMinter(address(registry));
+        researchToken.setMinter(address(researchRegistry));
         VM.prank(authority);
         teachingToken.setMinter(address(registry));
 
@@ -104,6 +132,8 @@ contract TeachingGasCalibrationTest {
     }
 
     function testWriteTeachingGasCalibrationCsv() public {
+        _clearOutput(OUT);
+        _clearOutput(CLAIM_OUT);
         VM.writeFile(
             OUT,
             "path,category,total_gas,setup_gas,lesson_gas,claim_gas,valid_lesson,revenue_weight_bps\n"
@@ -139,6 +169,10 @@ contract TeachingGasCalibrationTest {
         );
         _recordClaimPrimitive("CLAIM_BATCH_TWO", "batch_claim", _claimBatchTwoPools(), 2, false);
         _recordClaimPrimitive("CLAIM_DUST_RELEASE", "dust_release", _claimDustRelease(), 1, true);
+    }
+
+    function _clearOutput(string memory path) internal {
+        try VM.removeFile(path) { } catch { }
     }
 
     function _recordPath(PathInput memory input) internal {
@@ -296,7 +330,7 @@ contract TeachingGasCalibrationTest {
     ) internal returns (PathInput memory input) {
         AssetBundle memory bundle = _oneLayerTwoPositions(path);
         input = _oneAssetInput(
-            path, category, bundle, 2_500, forceValid, customerFault, teacherFault
+            path, category, bundle, SAFE_RESEARCH_SHARE_BPS, forceValid, customerFault, teacherFault
         );
     }
 
@@ -311,7 +345,7 @@ contract TeachingGasCalibrationTest {
         AssetBundle memory bundleTwo = _oneLayerOnePosition(string.concat(path, "_B"));
         input.path = path;
         input.category = category;
-        input.researchShareBps = 2_500;
+        input.researchShareBps = SAFE_RESEARCH_SHARE_BPS;
         input.linkedAssetIds = new uint64[](2);
         input.linkedAssetIds[0] = bundleOne.assetId;
         input.linkedAssetIds[1] = bundleTwo.assetId;
@@ -339,7 +373,7 @@ contract TeachingGasCalibrationTest {
     ) internal returns (PathInput memory input) {
         input.path = path;
         input.category = category;
-        input.researchShareBps = 2_500;
+        input.researchShareBps = SAFE_RESEARCH_SHARE_BPS;
         input.forceValid = forceValid;
         input.customerFault = customerFault;
         input.teacherFault = teacherFault;
@@ -395,14 +429,14 @@ contract TeachingGasCalibrationTest {
         uint256 setupGas;
         VM.prank(coordinator);
         uint256 gasBefore = gasleft();
-        uint64 assetId = registry.createResearchAsset(
+        uint64 assetId = researchRegistry.createResearchAsset(
             string.concat("Asset_", salt), string.concat("ipfs://", salt)
         );
         setupGas += gasBefore - gasleft();
 
         VM.prank(coordinator);
         gasBefore = gasleft();
-        uint64 positionId = registry.createPatchPosition(
+        uint64 positionId = researchRegistry.createPatchPosition(
             SparkDaoTypes.CreatePatchPositionParams({
                 assetId: assetId,
                 layerIndex: 1,
@@ -418,7 +452,7 @@ contract TeachingGasCalibrationTest {
 
         VM.prank(coordinator);
         gasBefore = gasleft();
-        registry.sealLayer(assetId, 1);
+        researchRegistry.sealLayer(assetId, 1);
         setupGas += gasBefore - gasleft();
 
         bundle.assetId = assetId;
@@ -433,14 +467,14 @@ contract TeachingGasCalibrationTest {
         uint256 setupGas;
         VM.prank(coordinator);
         uint256 gasBefore = gasleft();
-        uint64 assetId = registry.createResearchAsset(
+        uint64 assetId = researchRegistry.createResearchAsset(
             string.concat("Research_", salt), string.concat("ipfs://", salt)
         );
         setupGas += gasBefore - gasleft();
 
         VM.prank(coordinator);
         gasBefore = gasleft();
-        uint64 positionA = registry.createPatchPosition(
+        uint64 positionA = researchRegistry.createPatchPosition(
             SparkDaoTypes.CreatePatchPositionParams({
                 assetId: assetId,
                 layerIndex: 1,
@@ -456,7 +490,7 @@ contract TeachingGasCalibrationTest {
 
         VM.prank(coordinator);
         gasBefore = gasleft();
-        uint64 positionB = registry.createPatchPosition(
+        uint64 positionB = researchRegistry.createPatchPosition(
             SparkDaoTypes.CreatePatchPositionParams({
                 assetId: assetId,
                 layerIndex: 1,
@@ -472,7 +506,7 @@ contract TeachingGasCalibrationTest {
 
         VM.prank(coordinator);
         gasBefore = gasleft();
-        registry.sealLayer(assetId, 1);
+        researchRegistry.sealLayer(assetId, 1);
         setupGas += gasBefore - gasleft();
 
         bundle.assetId = assetId;
@@ -490,14 +524,14 @@ contract TeachingGasCalibrationTest {
         uint256 setupGas;
         VM.prank(coordinator);
         uint256 gasBefore = gasleft();
-        uint64 assetId = registry.createResearchAsset(
+        uint64 assetId = researchRegistry.createResearchAsset(
             string.concat(path, suffix), string.concat("ipfs://", path, suffix)
         );
         setupGas += gasBefore - gasleft();
 
         VM.prank(coordinator);
         gasBefore = gasleft();
-        uint64 layerOnePosition = registry.createPatchPosition(
+        uint64 layerOnePosition = researchRegistry.createPatchPosition(
             SparkDaoTypes.CreatePatchPositionParams({
                 assetId: assetId,
                 layerIndex: 1,
@@ -513,12 +547,12 @@ contract TeachingGasCalibrationTest {
 
         VM.prank(coordinator);
         gasBefore = gasleft();
-        registry.sealLayer(assetId, 1);
+        researchRegistry.sealLayer(assetId, 1);
         setupGas += gasBefore - gasleft();
 
         VM.prank(coordinator);
         gasBefore = gasleft();
-        uint64 layerTwoPosition = registry.createPatchPosition(
+        uint64 layerTwoPosition = researchRegistry.createPatchPosition(
             SparkDaoTypes.CreatePatchPositionParams({
                 assetId: assetId,
                 layerIndex: 2,
@@ -534,7 +568,7 @@ contract TeachingGasCalibrationTest {
 
         VM.prank(coordinator);
         gasBefore = gasleft();
-        registry.sealLayer(assetId, 2);
+        researchRegistry.sealLayer(assetId, 2);
         setupGas += gasBefore - gasleft();
 
         bundle.assetId = assetId;
@@ -549,24 +583,24 @@ contract TeachingGasCalibrationTest {
 
         VM.prank(coordinator);
         gasBefore = gasleft();
-        registry.markPositionReady(input.firstAsset, input.firstAssetLayerOneA);
+        researchRegistry.markPositionReady(input.firstAsset, input.firstAssetLayerOneA);
         gasUsed += gasBefore - gasleft();
 
         prepared[0] = input.firstAssetLayerTwo;
         VM.prank(coordinator);
         gasBefore = gasleft();
-        registry.advanceLayer(input.firstAsset, prepared);
+        researchRegistry.advanceLayer(input.firstAsset, prepared);
         gasUsed += gasBefore - gasleft();
 
         VM.prank(coordinator);
         gasBefore = gasleft();
-        registry.markPositionReady(input.secondAsset, input.secondAssetLayerOneA);
+        researchRegistry.markPositionReady(input.secondAsset, input.secondAssetLayerOneA);
         gasUsed += gasBefore - gasleft();
 
         prepared[0] = input.secondAssetLayerTwo;
         VM.prank(coordinator);
         gasBefore = gasleft();
-        registry.advanceLayer(input.secondAsset, prepared);
+        researchRegistry.advanceLayer(input.secondAsset, prepared);
         gasUsed += gasBefore - gasleft();
     }
 
@@ -699,8 +733,9 @@ contract TeachingGasCalibrationTest {
 
     function _claimSingleFullShare() internal returns (uint256 gasUsed) {
         AssetBundle memory bundle = _oneLayerOnePosition("CLAIM_SINGLE_FULL");
-        PathInput memory input =
-            _oneAssetInput("CLAIM_SINGLE_FULL", "claim", bundle, 2_500, false, false, false);
+        PathInput memory input = _oneAssetInput(
+            "CLAIM_SINGLE_FULL", "claim", bundle, SAFE_RESEARCH_SHARE_BPS, false, false, false
+        );
         uint64 teachingNftId = _createSettledClaimFixture(input);
         _warpToRewardUnlock(teachingNftId, input.firstAsset, input.firstAssetLayerOneA);
         gasUsed =
@@ -731,8 +766,9 @@ contract TeachingGasCalibrationTest {
 
     function _claimDustRelease() internal returns (uint256 gasUsed) {
         VM.startPrank(coordinator);
-        uint64 assetId = registry.createResearchAsset("Claim Dust Asset", "ipfs://claim-dust");
-        uint64 positionA = registry.createPatchPosition(
+        uint64 assetId =
+            researchRegistry.createResearchAsset("Claim Dust Asset", "ipfs://claim-dust");
+        uint64 positionA = researchRegistry.createPatchPosition(
             SparkDaoTypes.CreatePatchPositionParams({
                 assetId: assetId,
                 layerIndex: 1,
@@ -744,7 +780,7 @@ contract TeachingGasCalibrationTest {
                 beneficiary: contributorOne
             })
         );
-        uint64 positionB = registry.createPatchPosition(
+        uint64 positionB = researchRegistry.createPatchPosition(
             SparkDaoTypes.CreatePatchPositionParams({
                 assetId: assetId,
                 layerIndex: 1,
@@ -756,7 +792,7 @@ contract TeachingGasCalibrationTest {
                 beneficiary: contributorTwo
             })
         );
-        registry.sealLayer(assetId, 1);
+        researchRegistry.sealLayer(assetId, 1);
 
         uint64 courseTypeId = registry.createTeachingCourseType("Claim Dust Seminar", 12, 1, 2_500);
         uint64[] memory linkedAssetIds = new uint64[](1);

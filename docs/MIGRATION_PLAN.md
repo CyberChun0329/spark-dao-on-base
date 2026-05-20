@@ -31,6 +31,9 @@ not as a snapshot or review-package checklist.
 - `ResearchPosition`
 - `TeachingCourseType`
 - `TeachingSession`（Base 版 `TeachingNft`）
+- `TeachingPolicyGuard`
+- `TeachingEconomicsPolicyV1`
+- `TeachingFaultPolicyV1`
 - `TeachingRewardDistributor` / `TeachingRewardPool`
 
 ### 阶段 2：research 主线
@@ -59,7 +62,12 @@ not as a snapshot or review-package checklist.
 - batch claim
 - claim right follows current research position holder; transfer sends claim right to the
   new holder and buyback sends claim right to treasury
-- distributor calls back into registry for vault release and stable transfer
+- `TeachingRegistry` reads research snapshots through `ResearchRegistry` rather than
+  inheriting it
+- teaching sessions freeze the policy-derived fault quotes used by later coordinator
+  settlement
+- distributor calls back into `TeachingRegistry` for teaching vault release and stable
+  transfer; `TeachingRegistry` records claim totals back into `ResearchRegistry`
 - interleaved teaching/research stress tests
 
 ## Solana 到 Base 的映射原则

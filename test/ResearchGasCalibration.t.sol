@@ -10,6 +10,7 @@ interface ResearchGasCalibrationVm {
     function prank(address) external;
     function startPrank(address) external;
     function stopPrank() external;
+    function removeFile(string calldata path) external;
     function writeFile(string calldata path, string calldata data) external;
     function writeLine(string calldata path, string calldata data) external;
 }
@@ -50,6 +51,7 @@ contract ResearchGasCalibrationTest {
     }
 
     function testWriteResearchGasCalibrationCsv() public {
+        try VM.removeFile(OUT) { } catch { }
         VM.writeFile(OUT, "path,gas\n");
 
         VM.startPrank(coordinator);

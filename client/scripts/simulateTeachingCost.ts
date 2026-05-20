@@ -702,7 +702,7 @@ measurementWindow = ${feeAssumptions.measurementWindow}
 unit = ${feeAssumptions.unit}
 \`\`\`
 
-The simulation uses \`lesson_gas + claim_gas\` for the recurring teaching-management coefficient. \`lesson_gas\` measures settlement through \`TeachingRegistry\`; \`claim_gas\` measures reward withdrawal through \`TeachingRewardDistributor\`. \`setup_gas\` is reported separately because research setup and catalogue maintenance are low-frequency components in the model. Claim primitives below record single-claim, batch-claim, and dust-release paths, while the path table reports the deterministic claim policy used by the calibration test.
+The simulation uses \`lesson_gas + claim_gas\` for the recurring teaching-management coefficient. \`lesson_gas\` measures settlement through \`TeachingRegistry\`, including the deployed \`TeachingPolicyGuard\` / policy quote path for economics and fault cases; \`claim_gas\` measures reward withdrawal through \`TeachingRewardDistributor\`. \`setup_gas\` is reported separately because research setup and catalogue maintenance are low-frequency components in the model. Claim primitives below record single-claim, batch-claim, and dust-release paths, while the path table reports the deterministic claim policy used by the calibration test.
 
 ## Measured Contract Paths
 

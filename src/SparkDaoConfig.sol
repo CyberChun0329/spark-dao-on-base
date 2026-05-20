@@ -38,6 +38,7 @@ abstract contract SparkDaoConfig {
         ) {
             revert SparkDaoErrors.ZeroAddress();
         }
+        _assertContract(stableAsset_);
 
         daoState = SparkDaoTypes.DaoState({
             authority: authority_,
@@ -103,6 +104,7 @@ abstract contract SparkDaoConfig {
 
     function updateStableAsset(address newStableAsset) external onlyAuthority {
         if (newStableAsset == address(0)) revert SparkDaoErrors.ZeroAddress();
+        _assertContract(newStableAsset);
         address previousStableAsset = daoState.stableAsset;
         daoState.stableAsset = newStableAsset;
         emit StableAssetUpdated(previousStableAsset, newStableAsset);
@@ -141,6 +143,10 @@ abstract contract SparkDaoConfig {
     function _idleVaultUnits(address stableAsset) internal view returns (uint256) {
         return
             IERC20(stableAsset).balanceOf(address(this)) - reservedUnitsByStableAsset[stableAsset];
+    }
+
+    function _assertContract(address target) internal view {
+        if (target.code.length == 0) revert SparkDaoErrors.InvalidContractAddress();
     }
 
     function _safeTransfer(address token, address to, uint256 amount) internal {

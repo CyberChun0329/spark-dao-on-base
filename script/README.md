@@ -20,12 +20,14 @@ Usage:
 forge script script/DeployTokens.s.sol:DeployTokens --rpc-url <BASE_RPC> --broadcast
 ```
 
-`DeployRegistry.s.sol` deploys `TeachingRegistry`, deploys `TeachingRewardDistributor`,
-and wires the distributor into the registry. The broadcast signer must be `DAO_AUTHORITY`
-for the wiring call. The registry stores the distributor only once and verifies that the
-candidate distributor's `TEACHING_REGISTRY()` points back to the new registry. This
-prevents common address mismatches but does not replace trusted deployment of the
-intended distributor bytecode.
+`DeployRegistry.s.sol` deploys `TeachingPolicyGuard`, `TeachingEconomicsPolicyV1`,
+`TeachingFaultPolicyV1`, `ResearchRegistry`, `TeachingRegistry`, and
+`TeachingRewardDistributor`. It wires `ResearchRegistry` to the teaching registry and
+wires the distributor into the teaching registry. The broadcast signer must be
+`DAO_AUTHORITY` for both wiring calls. The teaching registry verifies that the candidate
+distributor points back to the new teaching and research registries; the research
+registry verifies that the teaching registry points back to it. These checks prevent
+common address mismatches but do not replace trusted deployment of the intended bytecode.
 
 It expects:
 
@@ -38,22 +40,34 @@ It expects:
 - `REWARD_UNLOCK_SECONDS`
 - `BUYBACK_WAIT_SECONDS`
 
+`STABLE_ASSET`, `RESEARCH_POSITION_TOKEN`, and `TEACHING_NFT_TOKEN` must be deployed
+contract addresses. The registries reject EOA placeholders before storing them.
+
 Usage:
 
 ```bash
 forge script script/DeployRegistry.s.sol:DeployRegistry --rpc-url <BASE_RPC> --broadcast
 ```
 
-After this script, record the returned registry address as `TEACHING_REGISTRY`. In a full
-teaching deployment the same address also serves the research surface, so set
-`RESEARCH_REGISTRY` to the same address unless you intentionally deployed a separate
-research-only registry. Record the second returned address as
-`TEACHING_REWARD_DISTRIBUTOR`.
+After this script, record the first returned address as `RESEARCH_REGISTRY`, the second
+as `TEACHING_REGISTRY`, the third as `TEACHING_REWARD_DISTRIBUTOR`, the fourth as
+`TEACHING_POLICY_GUARD`, the fifth as `TEACHING_ECONOMICS_POLICY`, and the sixth as
+`TEACHING_FAULT_POLICY`.
+
+If research and teaching should remain under the same admin/default settings, run
+`npm run check:registry-admin-state` after deployment and after later admin rotations.
 
 `SetTokenMinters.s.sol` expects:
 
+- `RESEARCH_REGISTRY`
 - `TEACHING_REGISTRY`
 - `TEACHING_REWARD_DISTRIBUTOR` is not used by this script, but should be recorded in
+  client/runtime configuration after `DeployRegistry.s.sol`
+- `TEACHING_POLICY_GUARD` is not used by this script, but should be recorded in
+  client/runtime configuration after `DeployRegistry.s.sol`
+- `TEACHING_ECONOMICS_POLICY` is not used by this script, but should be recorded in
+  client/runtime configuration after `DeployRegistry.s.sol`
+- `TEACHING_FAULT_POLICY` is not used by this script, but should be recorded in
   client/runtime configuration after `DeployRegistry.s.sol`
 - `RESEARCH_POSITION_TOKEN`
 - `TEACHING_NFT_TOKEN`
@@ -73,9 +87,11 @@ forge script script/SetTokenMinters.s.sol:SetTokenMinters --rpc-url <BASE_RPC> -
 `ResearchRegistry`.
 
 `DemoTeaching.s.sol` deploys its own `MockERC20`, `ResearchPositionToken`,
-`TeachingNftToken`, `TeachingRegistry`, and `TeachingRewardDistributor`. It wires the
-distributor into the registry, then claims teaching rewards through the distributor
-rather than through `TeachingRegistry`.
+`TeachingNftToken`, `TeachingPolicyGuard`, `TeachingEconomicsPolicyV1`,
+`TeachingFaultPolicyV1`, `ResearchRegistry`, `TeachingRegistry`, and
+`TeachingRewardDistributor`. It wires research to teaching, wires the distributor into
+the teaching registry, then claims teaching rewards through the distributor rather than
+through `TeachingRegistry`.
 
 Both demo scripts set `rewardUnlockSeconds` and `buybackWaitSeconds` to `0` so the full
 demo path runs in one local pass.

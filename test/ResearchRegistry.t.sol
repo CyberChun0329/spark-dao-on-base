@@ -3,6 +3,7 @@ pragma solidity ^0.8.26;
 
 import { ResearchRegistry } from "../src/ResearchRegistry.sol";
 import { ResearchPositionToken } from "../src/ResearchPositionToken.sol";
+import { SparkDaoErrors } from "../src/SparkDaoErrors.sol";
 import { SparkDaoTypes } from "../src/SparkDaoTypes.sol";
 import { MockERC20 } from "./mocks/MockERC20.sol";
 
@@ -12,6 +13,7 @@ interface Vm {
     function stopPrank() external;
     function warp(uint256) external;
     function expectRevert() external;
+    function expectRevert(bytes4) external;
 }
 
 contract ResearchRegistryTest {
@@ -50,6 +52,38 @@ contract ResearchRegistryTest {
         stable.mint(address(registry), 1_000_000_000);
         eurc.mint(authority, 1_000_000_000);
         eurc.mint(address(registry), 1_000_000_000);
+    }
+
+    function testConstructorRejectsNonContractStableAssetOrToken() public {
+        VM.expectRevert(SparkDaoErrors.InvalidContractAddress.selector);
+        new ResearchRegistry(
+            authority,
+            coordinator,
+            treasury,
+            address(0xBEEF),
+            90 days,
+            30 days,
+            address(researchToken)
+        );
+
+        VM.expectRevert(SparkDaoErrors.InvalidContractAddress.selector);
+        new ResearchRegistry(
+            authority, coordinator, treasury, address(stable), 90 days, 30 days, address(0xBEEF)
+        );
+    }
+
+    function testStableAssetUpdatesAndVaultFundingRequireTokenContracts() public {
+        VM.expectRevert(SparkDaoErrors.InvalidContractAddress.selector);
+        VM.prank(authority);
+        registry.updateStableAsset(address(0xBEEF));
+
+        VM.expectRevert(SparkDaoErrors.InvalidContractAddress.selector);
+        VM.prank(authority);
+        registry.fundDaoVaultFor(address(0xBEEF), 1);
+
+        VM.expectRevert(SparkDaoErrors.InvalidContractAddress.selector);
+        VM.prank(authority);
+        registry.withdrawDaoVaultFor(address(0xBEEF), 1);
     }
 
     function testCreateResearchAssetAndCurrentLayerPosition() public {

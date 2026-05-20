@@ -1,0 +1,12 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "ignoreDeprecations": "5.0",
+    "paths": {
+      "viem": ["client/types/viem.d.ts"],
+      "viem/accounts": ["client/types/viem-accounts.d.ts"],
+      "viem/chains": ["client/types/viem-chains.d.ts"]
+    }
+  }
+}

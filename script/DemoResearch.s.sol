@@ -69,7 +69,7 @@ contract DemoResearch {
             SparkDaoTypes.CreatePatchPositionParams({
                 assetId: assetId,
                 layerIndex: 2,
-                layerShareBps: 10_000,
+                layerShareBps: 5_000,
                 buybackFloor: 250_000_000,
                 decayWaitSeconds: 0,
                 decayPeriodSeconds: SparkDaoTypes.DEFAULT_RESEARCH_DECAY_PERIOD_SECONDS,
@@ -82,7 +82,6 @@ contract DemoResearch {
 
         VM.startBroadcast(contributorOnePk);
         registry.approveEarlyDecay(assetId, positionOneId);
-        registry.markPositionReady(assetId, positionOneId);
         VM.stopBroadcast();
 
         VM.startBroadcast(coordinatorPk);

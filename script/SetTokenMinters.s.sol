@@ -14,14 +14,15 @@ contract SetTokenMinters {
     Vm internal constant VM = Vm(address(uint160(uint256(keccak256("hevm cheat code")))));
 
     function run() external {
-        address registry = VM.envAddress("TEACHING_REGISTRY");
+        address researchRegistry = VM.envAddress("RESEARCH_REGISTRY");
+        address teachingRegistry = VM.envAddress("TEACHING_REGISTRY");
         address researchPositionToken = VM.envAddress("RESEARCH_POSITION_TOKEN");
         address teachingNftToken = VM.envAddress("TEACHING_NFT_TOKEN");
 
         VM.startBroadcast();
 
-        ResearchPositionToken(researchPositionToken).setMinter(registry);
-        TeachingNftToken(teachingNftToken).setMinter(registry);
+        ResearchPositionToken(researchPositionToken).setMinter(researchRegistry);
+        TeachingNftToken(teachingNftToken).setMinter(teachingRegistry);
         ResearchPositionToken(researchPositionToken).lockMinter();
         TeachingNftToken(teachingNftToken).lockMinter();
 

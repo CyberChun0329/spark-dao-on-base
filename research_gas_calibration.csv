@@ -1,8 +1,8 @@
 path,gas
-createResearchAsset,218852
-createPatchPosition_current,297843
-sealLayer_current,3834
-createPatchPosition_prepared,259356
-sealLayer_prepared,3869
-approveEarlyDecay,30699
-advanceLayer,56161
+createResearchAsset,218918
+createPatchPosition_current,297952
+sealLayer_current,3959
+createPatchPosition_prepared,259467
+sealLayer_prepared,3994
+approveEarlyDecay,30787
+advanceLayer,56249

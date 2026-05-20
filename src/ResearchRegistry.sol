@@ -6,11 +6,13 @@ import { SparkDaoErrors } from "./SparkDaoErrors.sol";
 import { SparkDaoTypes } from "./SparkDaoTypes.sol";
 import { SparkMath } from "./SparkMath.sol";
 import { IResearchPositionToken } from "./interfaces/IResearchPositionToken.sol";
+import { ITeachingRegistryForResearch } from "./interfaces/ITeachingRegistryForResearch.sol";
 
 contract ResearchRegistry is SparkDaoConfig {
     using SparkMath for uint16;
 
     address public immutable RESEARCH_POSITION_TOKEN;
+    address public teachingRegistry;
     mapping(uint64 assetId => SparkDaoTypes.ResearchAsset) internal researchAssets;
     mapping(uint64 assetId => mapping(uint64 positionId => SparkDaoTypes.ResearchPosition)) internal
         researchPositions;
@@ -65,6 +67,7 @@ contract ResearchRegistry is SparkDaoConfig {
         address treasuryHolder,
         uint256 price
     );
+    event TeachingRegistrySet(address indexed teachingRegistry);
 
     constructor(
         address authority_,
@@ -87,7 +90,30 @@ contract ResearchRegistry is SparkDaoConfig {
         if (researchPositionToken_ == address(0)) {
             revert SparkDaoErrors.ZeroAddress();
         }
+        _assertContract(researchPositionToken_);
         RESEARCH_POSITION_TOKEN = researchPositionToken_;
+    }
+
+    function setTeachingRegistry(address teachingRegistry_) external onlyAuthority {
+        if (teachingRegistry != address(0)) {
+            revert SparkDaoErrors.TeachingRegistryAlreadySet();
+        }
+        if (teachingRegistry_ == address(0) || teachingRegistry_.code.length == 0) {
+            revert SparkDaoErrors.InvalidResearchRegistry();
+        }
+        address configuredResearchRegistry;
+        try ITeachingRegistryForResearch(teachingRegistry_).RESEARCH_REGISTRY() returns (
+            address value
+        ) {
+            configuredResearchRegistry = value;
+        } catch {
+            revert SparkDaoErrors.InvalidResearchRegistry();
+        }
+        if (configuredResearchRegistry != address(this)) {
+            revert SparkDaoErrors.InvalidResearchRegistry();
+        }
+        teachingRegistry = teachingRegistry_;
+        emit TeachingRegistrySet(teachingRegistry_);
     }
 
     function getResearchAsset(uint64 assetId)
@@ -474,12 +500,43 @@ contract ResearchRegistry is SparkDaoConfig {
         emit RevenueClaimed(assetId, positionId, revenueId, msg.sender, escrow.amount);
     }
 
+    function requireTeachingResearchAssetReady(uint64 assetId, uint16 researchShareBps)
+        external
+        view
+    {
+        SparkDaoTypes.ResearchAsset storage asset = _requireAsset(assetId);
+        if (researchShareBps > 0 && !asset.currentLayerSealed) {
+            revert SparkDaoErrors.LinkedResearchLayerNotSealed();
+        }
+    }
+
+    function getTeachingResearchSnapshot(uint64 assetId, uint64 snapshotAt)
+        external
+        view
+        returns (uint16 snapshotActiveLayer, uint16 totalEffectiveShareBps)
+    {
+        _requireAsset(assetId);
+        snapshotActiveLayer = _snapshotActiveLayerFromCheckpoints(assetId, snapshotAt);
+        totalEffectiveShareBps = _snapshotEffectiveShareBps(assetId, snapshotAt);
+    }
+
+    function recordTeachingRewardClaim(uint64 assetId, uint64 positionId, uint256 claimAmount)
+        external
+    {
+        if (msg.sender != teachingRegistry) revert SparkDaoErrors.UnauthorizedTeachingRegistry();
+        SparkDaoTypes.ResearchPosition storage position = _requirePosition(assetId, positionId);
+        if (claimAmount != 0) {
+            position.totalClaimedUnits += claimAmount;
+        }
+    }
+
     function fundDaoVault(uint256 amount) external onlyAuthority {
         fundDaoVaultFor(daoState.stableAsset, amount);
     }
 
     function fundDaoVaultFor(address stableAsset, uint256 amount) public onlyAuthority {
         if (stableAsset == address(0)) revert SparkDaoErrors.ZeroAddress();
+        _assertContract(stableAsset);
         if (amount == 0) revert SparkDaoErrors.InvalidAmount();
         _safeTransferFrom(stableAsset, msg.sender, address(this), amount);
     }
@@ -490,6 +547,7 @@ contract ResearchRegistry is SparkDaoConfig {
 
     function withdrawDaoVaultFor(address stableAsset, uint256 amount) public onlyAuthority {
         if (stableAsset == address(0)) revert SparkDaoErrors.ZeroAddress();
+        _assertContract(stableAsset);
         if (amount == 0) revert SparkDaoErrors.InvalidAmount();
         uint256 idleVaultUnits = _idleVaultUnits(stableAsset);
         if (amount > idleVaultUnits) revert SparkDaoErrors.VaultFundsReserved();

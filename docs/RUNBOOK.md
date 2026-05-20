@@ -26,7 +26,8 @@ anvil
 
 - `DemoResearch.s.sol` 部署 `MockERC20`、`ResearchPositionToken`、`ResearchRegistry`
 - `DemoTeaching.s.sol` 部署 `MockERC20`、`ResearchPositionToken`、`TeachingNftToken`、
-  `TeachingRegistry`、`TeachingRewardDistributor`
+  `TeachingPolicyGuard`、`TeachingEconomicsPolicyV1`、`TeachingFaultPolicyV1`、
+  `ResearchRegistry`、`TeachingRegistry`、`TeachingRewardDistributor`
 
 Teaching demo 会把 distributor 接入 registry，并通过 distributor 执行 teaching
 reward claim。演示脚本还会把：
@@ -52,6 +53,8 @@ npm run simulate:teaching-cost
 
 - `build:sizes` 默认带 `--skip script`，只看真正部署到链上的协议合约尺寸
 - 直接跑 `forge build --sizes` 会把 `.s.sol` 脚本合约也统计进去，噪音更大
+- `check:registry-admin-state` 需要连到已部署环境；它检查 research / teaching 两个
+  registry 的 authority、coordinator、treasury、stable asset 和时间参数是否保持一致
 
 ## 3. 正式部署顺序
 
@@ -63,33 +66,50 @@ npm run simulate:teaching-cost
 npm run deploy:tokens
 ```
 
-2. 部署 registry + reward distributor
+2. 部署 research registry + teaching registry + policy + reward distributor
 
 ```bash
 npm run deploy:registry
 ```
 
-`DeployRegistry.s.sol` 会部署 `TeachingRewardDistributor` 并调用
-`setTeachingRewardDistributor`。因此广播 signer 必须是 `DAO_AUTHORITY`，或者至少必须
-能代表 `DAO_AUTHORITY` 完成这一步。
+`DeployRegistry.s.sol` 会部署 `TeachingPolicyGuard`、`TeachingEconomicsPolicyV1`、
+`TeachingFaultPolicyV1`、`ResearchRegistry`、`TeachingRegistry`、
+`TeachingRewardDistributor`，并调用 `ResearchRegistry.setTeachingRegistry` 和
+`TeachingRegistry.setTeachingRewardDistributor`。因此广播 signer 必须是
+`DAO_AUTHORITY`，或者至少必须能代表 `DAO_AUTHORITY` 完成这一步。
+脚本输入里的 stable asset 和 token 地址会被 registry 当作合约地址校验；如果填入 EOA
+或未部署地址，部署会直接 revert，而不是留下一个后续才失败的 registry。
 
-这一步是 one-time wiring。registry 会检查 distributor 的 `TEACHING_REGISTRY()` 是否
-等于自己，能防常见地址填错；但它不能证明 bytecode 没被替换，所以 authority 仍要使用
-可信部署产物。
+这一步是 one-time wiring。teaching registry 会检查 distributor 的
+`TEACHING_REGISTRY()` 和 `RESEARCH_REGISTRY()` 是否都匹配；research registry 会检查
+teaching registry 的 `RESEARCH_REGISTRY()` 是否指回自己。这能防常见地址填错；但它不能
+证明 bytecode 没被替换，所以 authority 仍要使用可信部署产物。
+部署后可以用 `TeachingRegistry.getTeachingModuleState` 或
+`npm run check:registry-admin-state` 核验 registry、distributor、policy、token wiring。
 
 记录输出地址：
 
-- `TEACHING_REGISTRY` = registry address
-- `RESEARCH_REGISTRY` = registry address，除非你刻意部署 research-only registry
+- `RESEARCH_REGISTRY` = research registry address
+- `TEACHING_REGISTRY` = teaching registry address
 - `TEACHING_REWARD_DISTRIBUTOR` = reward distributor address
+- `TEACHING_POLICY_GUARD` = policy guard address
+- `TEACHING_ECONOMICS_POLICY` = economics policy address
+- `TEACHING_FAULT_POLICY` = fault policy address
 
-3. 把 token minter 指到 registry 并锁定
+3. 把 token minter 指到对应 registry 并锁定
 
 ```bash
 npm run deploy:set-minters
 ```
 
 对应环境变量见 `.env.example`。
+
+如果运营上要求 research 和 teaching 使用同一组 admin/default settings，部署后和每次
+admin rotation 后都跑：
+
+```bash
+npm run check:registry-admin-state
+```
 
 ## 4. 本地 demo
 
@@ -128,7 +148,12 @@ npm run client:inspect
 - 把 `BASE_RPC_URL` 改成 Sepolia RPC
 - `DAO_AUTHORITY / DAO_COORDINATOR` 改成真实部署地址
 - `DAO_TREASURY` 改成真实 treasury 或多签地址
+- `STABLE_ASSET`、`RESEARCH_POSITION_TOKEN`、`TEACHING_NFT_TOKEN` 必须是已部署合约地址，
+  不能用 EOA 占位地址
 - `TEACHING_REWARD_DISTRIBUTOR` 填入 `DeployRegistry.s.sol` 输出的 distributor 地址
+- `TEACHING_POLICY_GUARD` 填入 `DeployRegistry.s.sol` 输出的 guard 地址
+- `TEACHING_ECONOMICS_POLICY` 填入 `DeployRegistry.s.sol` 输出的 economics policy 地址
+- `TEACHING_FAULT_POLICY` 填入 `DeployRegistry.s.sol` 输出的 policy 地址
 - `REWARD_UNLOCK_SECONDS / BUYBACK_WAIT_SECONDS` 改回正式业务值
 - 不要再用 demo 脚本里的零等待参数
 
@@ -151,6 +176,7 @@ forge test --match-contract ResearchGasCalibrationTest
 npm run simulate:teaching-cost
 ```
 
-The calibration tests write `teaching_gas_calibration.csv` and
-`research_gas_calibration.csv`; the simulation script reads those CSVs plus
-`simulation_inputs/fee_assumptions.json` and rewrites `simulation_outputs/`.
+The calibration tests write `teaching_gas_calibration.csv`,
+`teaching_claim_gas_calibration.csv`, and `research_gas_calibration.csv`; the simulation
+script reads those CSVs plus `simulation_inputs/fee_assumptions.json` and rewrites
+`simulation_outputs/`.

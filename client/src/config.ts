@@ -5,6 +5,9 @@ export type SparkDaoAddresses = {
   researchRegistry: Address;
   teachingRegistry: Address;
   teachingRewardDistributor?: Address;
+  teachingPolicyGuard?: Address;
+  teachingEconomicsPolicy?: Address;
+  teachingFaultPolicy?: Address;
   researchPositionToken?: Address;
   teachingNftToken?: Address;
 };
@@ -43,6 +46,9 @@ export function loadClientConfigFromEnv(): SparkDaoClientConfig {
       researchRegistry: requireEnv("RESEARCH_REGISTRY") as Address,
       teachingRegistry: requireEnv("TEACHING_REGISTRY") as Address,
       teachingRewardDistributor: optionalAddress("TEACHING_REWARD_DISTRIBUTOR"),
+      teachingPolicyGuard: optionalAddress("TEACHING_POLICY_GUARD"),
+      teachingEconomicsPolicy: optionalAddress("TEACHING_ECONOMICS_POLICY"),
+      teachingFaultPolicy: optionalAddress("TEACHING_FAULT_POLICY"),
       researchPositionToken: optionalAddress("RESEARCH_POSITION_TOKEN"),
       teachingNftToken: optionalAddress("TEACHING_NFT_TOKEN"),
     },

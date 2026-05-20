@@ -37,6 +37,7 @@ library SparkDaoErrors {
     error BuybackNotYetAvailable();
     error VaultFundsReserved();
     error TokenTransferFailed();
+    error InvalidContractAddress();
     error InvalidCourseTypeId();
     error InvalidTeachingNftId();
     error InvalidCourseTypeName();
@@ -59,9 +60,16 @@ library SparkDaoErrors {
     error TeachingNotRedeemableYet();
     error InvalidTeachingResolutionCode();
     error FaultSettlementInsolvent();
+    error InvalidTeachingEconomicsPolicy();
+    error InvalidTeachingEconomicsPolicyQuote();
+    error InvalidTeachingFaultPolicy();
+    error InvalidTeachingFaultPolicyQuote();
     error InvalidTeachingRewardPool();
     error TeachingRewardDistributorAlreadySet();
     error UnauthorizedTeachingRewardDistributor();
+    error InvalidResearchRegistry();
+    error TeachingRegistryAlreadySet();
+    error UnauthorizedTeachingRegistry();
     error LinkedResearchLayerNotSealed();
     error TeachingRewardAlreadyClaimed();
 }

@@ -16,6 +16,9 @@ for (const key of [
   "RESEARCH_REGISTRY",
   "TEACHING_REGISTRY",
   "TEACHING_REWARD_DISTRIBUTOR",
+  "TEACHING_POLICY_GUARD",
+  "TEACHING_ECONOMICS_POLICY",
+  "TEACHING_FAULT_POLICY",
   "DAO_TREASURY",
 ]) {
   assertIncludes(envExample, `${key}=`, ".env.example");
@@ -23,7 +26,42 @@ for (const key of [
 
 assertIncludes(
   requireText("script/DeployRegistry.s.sol"),
+  "setTeachingRegistry",
+  "DeployRegistry.s.sol",
+);
+assertIncludes(
+  requireText("script/DeployRegistry.s.sol"),
   "setTeachingRewardDistributor",
+  "DeployRegistry.s.sol",
+);
+assertIncludes(
+  requireText("src/TeachingRegistry.sol"),
+  "getTeachingModuleState",
+  "TeachingRegistry.sol",
+);
+assertIncludes(
+  requireText("src/TeachingRegistry.sol"),
+  "coordinatorSettleTeacherFaultRemedialWage",
+  "TeachingRegistry.sol",
+);
+assertIncludes(
+  requireText("script/DeployRegistry.s.sol"),
+  "ResearchRegistry",
+  "DeployRegistry.s.sol",
+);
+assertIncludes(
+  requireText("script/DeployRegistry.s.sol"),
+  "TeachingEconomicsPolicyV1",
+  "DeployRegistry.s.sol",
+);
+assertIncludes(
+  requireText("script/DeployRegistry.s.sol"),
+  "TeachingFaultPolicyV1",
+  "DeployRegistry.s.sol",
+);
+assertIncludes(
+  requireText("script/DeployRegistry.s.sol"),
+  "TeachingPolicyGuard",
   "DeployRegistry.s.sol",
 );
 
@@ -32,6 +70,12 @@ const packageJson = JSON.parse(requireText("package.json")) as {
 };
 if (packageJson.scripts?.["simulate:teaching-cost"] !== "tsx client/scripts/simulateTeachingCost.ts") {
   throw new Error("package.json is missing simulate:teaching-cost");
+}
+if (
+  packageJson.scripts?.["check:registry-admin-state"]
+  !== "tsx client/scripts/checkRegistryAdminState.ts"
+) {
+  throw new Error("package.json is missing check:registry-admin-state");
 }
 
 assertIncludes(

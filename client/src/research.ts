@@ -11,7 +11,7 @@ export function createResearchClient(config: SparkDaoClientConfig, privateKey?: 
   });
 }
 
-export async function getDaoState(config: SparkDaoClientConfig) {
+export async function getResearchDaoState(config: SparkDaoClientConfig) {
   const client = createResearchClient(config);
   return client.publicClient.readContract({
     ...client.contracts.researchRegistry,
@@ -19,7 +19,9 @@ export async function getDaoState(config: SparkDaoClientConfig) {
   });
 }
 
-export async function getVaultReservedUnits(
+export const getDaoState = getResearchDaoState;
+
+export async function getResearchVaultReservedUnits(
   config: SparkDaoClientConfig,
   stableAsset: Address,
 ) {
@@ -30,6 +32,8 @@ export async function getVaultReservedUnits(
     args: [stableAsset],
   });
 }
+
+export const getVaultReservedUnits = getResearchVaultReservedUnits;
 
 export async function getResearchAsset(
   config: SparkDaoClientConfig,

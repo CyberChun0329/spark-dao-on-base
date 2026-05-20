@@ -2,7 +2,11 @@
 pragma solidity ^0.8.26;
 
 import { TeachingRegistry } from "../src/TeachingRegistry.sol";
+import { ResearchRegistry } from "../src/ResearchRegistry.sol";
 import { TeachingRewardDistributor } from "../src/TeachingRewardDistributor.sol";
+import { TeachingEconomicsPolicyV1 } from "../src/TeachingEconomicsPolicyV1.sol";
+import { TeachingFaultPolicyV1 } from "../src/TeachingFaultPolicyV1.sol";
+import { TeachingPolicyGuard } from "../src/TeachingPolicyGuard.sol";
 
 interface Vm {
     function envAddress(string calldata name) external returns (address);
@@ -14,7 +18,17 @@ interface Vm {
 contract DeployRegistry {
     Vm internal constant VM = Vm(address(uint160(uint256(keccak256("hevm cheat code")))));
 
-    function run() external returns (address registryAddress, address rewardDistributorAddress) {
+    function run()
+        external
+        returns (
+            address researchRegistryAddress,
+            address teachingRegistryAddress,
+            address rewardDistributorAddress,
+            address policyGuardAddress,
+            address economicsPolicyAddress,
+            address faultPolicyAddress
+        )
+    {
         address authority = VM.envAddress("DAO_AUTHORITY");
         address coordinator = VM.envAddress("DAO_COORDINATOR");
         address treasury = VM.envAddress("DAO_TREASURY");
@@ -32,6 +46,18 @@ contract DeployRegistry {
 
         VM.startBroadcast();
 
+        TeachingEconomicsPolicyV1 economicsPolicy = new TeachingEconomicsPolicyV1();
+        TeachingFaultPolicyV1 faultPolicy = new TeachingFaultPolicyV1();
+        TeachingPolicyGuard policyGuard = new TeachingPolicyGuard();
+        ResearchRegistry researchRegistry = new ResearchRegistry(
+            authority,
+            coordinator,
+            treasury,
+            stableAsset,
+            rewardUnlockSeconds,
+            buybackWaitSeconds,
+            researchPositionToken
+        );
         TeachingRegistry registry = new TeachingRegistry(
             authority,
             coordinator,
@@ -39,16 +65,24 @@ contract DeployRegistry {
             stableAsset,
             rewardUnlockSeconds,
             buybackWaitSeconds,
-            researchPositionToken,
-            teachingNftToken
+            address(researchRegistry),
+            teachingNftToken,
+            address(policyGuard),
+            address(economicsPolicy),
+            address(faultPolicy)
         );
         TeachingRewardDistributor rewardDistributor =
-            new TeachingRewardDistributor(address(registry));
+            new TeachingRewardDistributor(address(registry), address(researchRegistry));
+        researchRegistry.setTeachingRegistry(address(registry));
         registry.setTeachingRewardDistributor(address(rewardDistributor));
 
         VM.stopBroadcast();
 
-        registryAddress = address(registry);
+        researchRegistryAddress = address(researchRegistry);
+        teachingRegistryAddress = address(registry);
         rewardDistributorAddress = address(rewardDistributor);
+        policyGuardAddress = address(policyGuard);
+        economicsPolicyAddress = address(economicsPolicy);
+        faultPolicyAddress = address(faultPolicy);
     }
 }

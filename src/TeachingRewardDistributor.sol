@@ -3,10 +3,12 @@ pragma solidity ^0.8.26;
 
 import { SparkDaoErrors } from "./SparkDaoErrors.sol";
 import { SparkDaoTypes } from "./SparkDaoTypes.sol";
+import { IResearchRegistryForTeaching } from "./interfaces/IResearchRegistryForTeaching.sol";
 import { ITeachingRewardSource } from "./interfaces/ITeachingRewardSource.sol";
 
 contract TeachingRewardDistributor {
     address public immutable TEACHING_REGISTRY;
+    address public immutable RESEARCH_REGISTRY;
 
     mapping(
         uint64 teachingNftId => mapping(uint64 assetId => SparkDaoTypes.TeachingRewardPool)
@@ -35,9 +37,12 @@ contract TeachingRewardDistributor {
         _;
     }
 
-    constructor(address teachingRegistry_) {
-        if (teachingRegistry_ == address(0)) revert SparkDaoErrors.ZeroAddress();
+    constructor(address teachingRegistry_, address researchRegistry_) {
+        if (teachingRegistry_ == address(0) || researchRegistry_ == address(0)) {
+            revert SparkDaoErrors.ZeroAddress();
+        }
         TEACHING_REGISTRY = teachingRegistry_;
+        RESEARCH_REGISTRY = researchRegistry_;
     }
 
     function recordTeachingRewardPool(
@@ -75,8 +80,9 @@ contract TeachingRewardDistributor {
     {
         SparkDaoTypes.TeachingRewardPool storage pool =
             _requireTeachingRewardPool(teachingNftId, assetId);
-        SparkDaoTypes.ResearchPosition memory position =
-            ITeachingRewardSource(TEACHING_REGISTRY).getResearchPosition(assetId, positionId);
+        SparkDaoTypes.ResearchPosition memory position = IResearchRegistryForTeaching(
+                RESEARCH_REGISTRY
+            ).getResearchPosition(assetId, positionId);
         uint16 effectiveShareBps = _effectiveClaimShareBps(pool, position);
         amount = _computeWeightedAmount(pool.assetPoolUnits, effectiveShareBps);
         claimed = teachingRewardClaimed[teachingNftId][assetId][positionId];
@@ -101,8 +107,9 @@ contract TeachingRewardDistributor {
         uint64 assetId,
         uint64 positionId
     ) internal {
-        SparkDaoTypes.ResearchPosition memory position = ITeachingRewardSource(TEACHING_REGISTRY)
-            .getResearchPosition(assetId, positionId);
+        SparkDaoTypes.ResearchPosition memory position = IResearchRegistryForTeaching(
+                RESEARCH_REGISTRY
+            ).getResearchPosition(assetId, positionId);
         if (position.currentHolder != claimant) revert SparkDaoErrors.UnauthorizedHolder();
 
         SparkDaoTypes.TeachingRewardPool storage pool =

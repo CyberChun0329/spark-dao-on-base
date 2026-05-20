@@ -8,8 +8,9 @@
     "build:sizes": "forge build --sizes --skip script",
     "test": "forge test -vvv",
     "fmt": "forge fmt",
-    "client:typecheck": "tsc --noEmit -p tsconfig.json",
+    "client:typecheck": "tsc --noEmit -p tsconfig.typecheck.json",
     "check:reproducibility-config": "tsx client/scripts/checkReproducibilityConfig.ts",
+    "check:registry-admin-state": "tsx client/scripts/checkRegistryAdminState.ts",
     "simulate:teaching-cost": "tsx client/scripts/simulateTeachingCost.ts",
     "client:inspect": "tsx client/scripts/inspect.ts",
     "deploy:tokens": "forge script script/DeployTokens.s.sol:DeployTokens --rpc-url $BASE_RPC_URL --broadcast",
@@ -26,8 +27,8 @@
     "ws": "^8.20.1"
   },
   "devDependencies": {
-    "@types/node": "^25.6.0",
+    "@types/node": "^22.19.19",
     "tsx": "^4.21.0",
-    "typescript": "^6.0.2"
+    "typescript": "^5.9.3"
   }
 }

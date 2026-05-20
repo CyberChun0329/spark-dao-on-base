@@ -7,12 +7,14 @@ settlement, customer-fault half-price settlement, teacher-fault remedial settlem
 distributor wiring, registry-only reward pool recording, claim-pull teaching rewards,
 single and batch claims, transfer/buyback claim-right ownership, authority rotation after
 buyback, dust release, settlement scalability, multi-stable teaching reserves, frozen
-session stable assets, and locked token minters.
+session stable assets, frozen fault quotes, paired registry admin-state initialisation,
+and locked token minters.
 
-`TeachingGasCalibration.t.sol` writes `teaching_gas_calibration.csv`, the measured gas
-table used by the cost simulation. It includes ordinary, forced-valid, customer-fault,
-and teacher-fault paths across no-research, zero-share, research-backed, weighted
-multi-asset, and multi-layer settings.
+`TeachingGasCalibration.t.sol` writes `teaching_gas_calibration.csv` and
+`teaching_claim_gas_calibration.csv`, the measured settlement and claim gas tables used
+by the cost simulation. It includes ordinary, forced-valid, customer-fault, and
+teacher-fault paths across no-research, zero-share, research-backed, weighted multi-asset,
+and multi-layer settings.
 
 `ResearchRegistry.t.sol` covers research assets, positions, layer progression, revenue
 escrows, buybacks, per-stable reserves, minter locking, treasury rotation, stable-asset

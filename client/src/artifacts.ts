@@ -1,4 +1,3 @@
-import type { Abi } from "viem";
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -6,7 +5,7 @@ import { fileURLToPath } from "node:url";
 const ROOT_DIR = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 
 type ArtifactJson = {
-  abi: Abi;
+  abi: readonly unknown[];
 };
 
 function readArtifact(relativePath: string): ArtifactJson {
@@ -22,6 +21,15 @@ export const teachingRegistryArtifact = readArtifact(
 );
 export const teachingRewardDistributorArtifact = readArtifact(
   "out/TeachingRewardDistributor.sol/TeachingRewardDistributor.json",
+);
+export const teachingEconomicsPolicyArtifact = readArtifact(
+  "out/TeachingEconomicsPolicyV1.sol/TeachingEconomicsPolicyV1.json",
+);
+export const teachingFaultPolicyArtifact = readArtifact(
+  "out/TeachingFaultPolicyV1.sol/TeachingFaultPolicyV1.json",
+);
+export const teachingPolicyGuardArtifact = readArtifact(
+  "out/TeachingPolicyGuard.sol/TeachingPolicyGuard.json",
 );
 export const researchPositionTokenArtifact = readArtifact(
   "out/ResearchPositionToken.sol/ResearchPositionToken.json",

@@ -100,24 +100,34 @@ library SparkDaoTypes {
     }
 
     struct TeachingCourseType {
+        address economicsPolicy;
+        address faultPolicy;
         address stableAsset;
         uint256 listPriceUnits;
         uint256 teacherSalaryUnits;
         uint64 courseTypeId;
         uint16 researchShareBps;
+        uint8 faultPolicyVersion;
         bool exists;
         string name;
     }
 
     struct TeachingSession {
+        address faultPolicy;
         address teacher;
         address customer;
         address stableAsset;
         uint256 listPriceUnits;
+        uint256 lessonPriceUnits;
         uint256 teacherSalaryUnits;
+        uint256 teacherBondUnits;
+        uint256 researchRewardUnits;
+        uint256 teacherFaultResearchRewardUnits;
+        uint256 serviceReserveUnits;
         uint256 faultCustomerChargeUnits;
         uint256 faultCustomerRefundUnits;
         uint256 faultTeacherPayoutUnits;
+        uint256 faultRemedialTeacherPayoutUnits;
         uint256 faultResearchRewardUnits;
         uint256 faultServiceReserveUnits;
         uint256 settlementResearchActiveLayersPacked;
@@ -129,9 +139,11 @@ library SparkDaoTypes {
         uint64 resolvedAt;
         uint64 teacherBondReleasedAt;
         uint64 redeemedAt;
+        uint64 remedialWageSettledAt;
         uint16 customerDiscountBps;
         uint16 researchShareBps;
         uint8 status;
+        uint8 faultPolicyVersion;
         uint8 remedialLessonCount;
         uint8 settlementResearchLayerCount;
         bool exists;
@@ -144,6 +156,30 @@ library SparkDaoTypes {
         bool teacherConfirmedCompletion;
         bool customerConfirmedCompletion;
         uint80[] linkedResearchLinks;
+    }
+
+    struct TeachingFaultQuote {
+        uint256 customerChargeUnits;
+        uint256 customerRefundUnits;
+        uint256 teacherImmediatePayoutUnits;
+        uint256 remedialTeacherPayoutUnits;
+        uint256 researchRewardUnits;
+        uint256 serviceReserveUnits;
+        uint8 remedialLessonCount;
+    }
+
+    struct FrozenTeachingFaultQuotes {
+        TeachingFaultQuote customerFaultQuote;
+        TeachingFaultQuote teacherFaultQuote;
+    }
+
+    struct TeachingEconomicsQuote {
+        uint256 lessonPriceUnits;
+        uint256 teacherSalaryUnits;
+        uint256 teacherBondUnits;
+        uint256 researchRewardUnits;
+        uint256 teacherFaultResearchRewardUnits;
+        uint256 serviceReserveUnits;
     }
 
     struct LayerCheckpoint {

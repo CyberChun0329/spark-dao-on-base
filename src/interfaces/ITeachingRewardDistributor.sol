@@ -4,6 +4,8 @@ pragma solidity ^0.8.26;
 interface ITeachingRewardDistributor {
     function TEACHING_REGISTRY() external view returns (address);
 
+    function RESEARCH_REGISTRY() external view returns (address);
+
     function recordTeachingRewardPool(
         uint64 teachingNftId,
         uint64 assetId,

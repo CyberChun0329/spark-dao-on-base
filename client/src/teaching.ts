@@ -1,4 +1,4 @@
-import type { Hex } from "viem";
+import type { Address, Hex } from "viem";
 import type { SparkDaoClientConfig } from "./config.js";
 import { createSparkDaoClient } from "./createSparkDaoClient.js";
 
@@ -11,6 +11,26 @@ export function createTeachingClient(
     chain: config.chain,
     addresses: config.addresses,
     privateKey,
+  });
+}
+
+export async function getTeachingDaoState(config: SparkDaoClientConfig) {
+  const client = createTeachingClient(config);
+  return client.publicClient.readContract({
+    ...client.contracts.teachingRegistry,
+    functionName: "getDaoState",
+  });
+}
+
+export async function getTeachingVaultReservedUnits(
+  config: SparkDaoClientConfig,
+  stableAsset: Address,
+) {
+  const client = createTeachingClient(config);
+  return client.publicClient.readContract({
+    ...client.contracts.teachingRegistry,
+    functionName: "getVaultReservedUnits",
+    args: [stableAsset],
   });
 }
 
@@ -47,6 +67,26 @@ export async function getTeachingFaultSettlement(
     ...client.contracts.teachingRegistry,
     functionName: "getTeachingFaultSettlement",
     args: [teachingNftId],
+  });
+}
+
+export async function getTeachingRemedialWageSettlement(
+  config: SparkDaoClientConfig,
+  teachingNftId: bigint,
+) {
+  const client = createTeachingClient(config);
+  return client.publicClient.readContract({
+    ...client.contracts.teachingRegistry,
+    functionName: "getTeachingRemedialWageSettlement",
+    args: [teachingNftId],
+  });
+}
+
+export async function getTeachingModuleState(config: SparkDaoClientConfig) {
+  const client = createTeachingClient(config);
+  return client.publicClient.readContract({
+    ...client.contracts.teachingRegistry,
+    functionName: "getTeachingModuleState",
   });
 }
 
