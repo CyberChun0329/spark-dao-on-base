@@ -639,6 +639,118 @@ contract TeachingRegistryTest {
         );
     }
 
+    function testFuzzDuplicateTeachingRewardPoolCannotOverwriteExistingClaimable(
+        uint256 originalPoolUnitsSeed,
+        uint256 overwritePoolUnitsSeed,
+        uint64 originalUnlockDelaySeed,
+        uint64 overwriteUnlockDelaySeed
+    ) public {
+        VM.startPrank(coordinator);
+        uint64 assetId =
+            researchRegistry.createResearchAsset("No Overwrite Pool", "ipfs://no-overwrite");
+        uint64 positionId = researchRegistry.createPatchPosition(
+            SparkDaoTypes.CreatePatchPositionParams({
+                assetId: assetId,
+                layerIndex: 1,
+                layerShareBps: 10_000,
+                buybackFloor: 250_000,
+                decayWaitSeconds: 365 days,
+                decayPeriodSeconds: 365 days,
+                decayRateBps: 5_000,
+                beneficiary: contributorOne
+            })
+        );
+        researchRegistry.sealLayer(assetId, 1);
+        VM.stopPrank();
+
+        uint256 originalPoolUnits = 1 + (originalPoolUnitsSeed % 1_000_000_000);
+        uint256 overwritePoolUnits = 1 + (overwritePoolUnitsSeed % 1_000_000_000);
+        uint64 originalUnlockDelay = 1 + (originalUnlockDelaySeed % 365 days);
+        uint64 overwriteUnlockDelay = 1 + (overwriteUnlockDelaySeed % 365 days);
+        uint64 teachingNftId = 77;
+        uint64 snapshotAt = uint64(block.timestamp);
+        uint64 unlockAt = uint64(block.timestamp + originalUnlockDelay);
+        VM.prank(address(registry));
+        rewardDistributor.recordTeachingRewardPool(
+            teachingNftId,
+            assetId,
+            address(stable),
+            originalPoolUnits,
+            originalPoolUnits,
+            snapshotAt,
+            unlockAt,
+            1,
+            10_000
+        );
+
+        VM.expectRevert(SparkDaoErrors.InvalidTeachingRewardPool.selector);
+        VM.prank(address(registry));
+        rewardDistributor.recordTeachingRewardPool(
+            teachingNftId,
+            assetId,
+            address(eurc),
+            overwritePoolUnits,
+            overwritePoolUnits,
+            uint64(block.timestamp + 1 days),
+            uint64(block.timestamp + overwriteUnlockDelay),
+            1,
+            10_000
+        );
+
+        (uint256 amount, uint64 storedUnlockAt, bool claimed) =
+            rewardDistributor.getTeachingRewardClaimable(teachingNftId, assetId, positionId);
+        assertTrue(amount == originalPoolUnits);
+        assertTrue(storedUnlockAt == unlockAt);
+        assertTrue(!claimed);
+    }
+
+    function testWrongDistributorCannotSettleCallbackOrMarkClaimed() public {
+        TeachingRewardDistributor wrongDistributor =
+            new TeachingRewardDistributor(address(registry), address(researchRegistry));
+
+        VM.startPrank(coordinator);
+        uint64 assetId =
+            researchRegistry.createResearchAsset("Wrong Distributor", "ipfs://wrong-distributor");
+        uint64 positionId = researchRegistry.createPatchPosition(
+            SparkDaoTypes.CreatePatchPositionParams({
+                assetId: assetId,
+                layerIndex: 1,
+                layerShareBps: 10_000,
+                buybackFloor: 250_000,
+                decayWaitSeconds: 365 days,
+                decayPeriodSeconds: 365 days,
+                decayRateBps: 5_000,
+                beneficiary: contributorOne
+            })
+        );
+        researchRegistry.sealLayer(assetId, 1);
+        VM.stopPrank();
+
+        VM.prank(address(registry));
+        wrongDistributor.recordTeachingRewardPool(
+            78,
+            assetId,
+            address(stable),
+            100,
+            100,
+            uint64(block.timestamp),
+            uint64(block.timestamp),
+            1,
+            10_000
+        );
+
+        uint256 reservedBefore = registry.getVaultReservedUnits(address(stable));
+        uint256 balanceBefore = stable.balanceOf(contributorOne);
+        VM.expectRevert(SparkDaoErrors.UnauthorizedTeachingRewardDistributor.selector);
+        VM.prank(contributorOne);
+        wrongDistributor.claimTeachingReward(78, assetId, positionId);
+
+        assertTrue(registry.getVaultReservedUnits(address(stable)) == reservedBefore);
+        assertTrue(stable.balanceOf(contributorOne) == balanceBefore);
+        (,, bool claimed) = wrongDistributor.getTeachingRewardClaimable(78, assetId, positionId);
+        assertTrue(!claimed);
+    }
+
     function testCreateCourseTypeAndFreezeRoundOne() public {
         VM.prank(coordinator);
         uint64 courseTypeId =
@@ -2012,15 +2124,30 @@ contract TeachingRegistryTest {
         uint256 reservedAfterPositiveClaim = registry.getVaultReservedUnits(address(stable));
         assertTrue(reservedAfterPositiveClaim == reservedBeforeClaim - 2);
 
+        VM.expectRevert(SparkDaoErrors.TeachingRewardAlreadyClaimed.selector);
+        VM.prank(contributorOne);
+        rewardDistributor.claimTeachingReward(teachingNftId, assetId, positionA);
+        assertTrue(registry.getVaultReservedUnits(address(stable)) == reservedAfterPositiveClaim);
+
+        uint256 contributorTwoBefore = stable.balanceOf(contributorTwo);
         VM.prank(contributorTwo);
         rewardDistributor.claimTeachingReward(teachingNftId, assetId, positionB);
         uint256 reservedAfterZeroClaim = registry.getVaultReservedUnits(address(stable));
         assertTrue(reservedAfterZeroClaim == reservedAfterPositiveClaim - 1);
+        assertTrue(reservedAfterZeroClaim == reservedBeforeClaim - 3);
+        assertTrue(stable.balanceOf(contributorTwo) == contributorTwoBefore);
 
-        VM.expectRevert();
+        VM.expectRevert(SparkDaoErrors.TeachingRewardAlreadyClaimed.selector);
         VM.prank(contributorTwo);
         rewardDistributor.claimTeachingReward(teachingNftId, assetId, positionB);
         assertTrue(registry.getVaultReservedUnits(address(stable)) == reservedAfterZeroClaim);
+
+        (,, bool positionAClaimed) =
+            rewardDistributor.getTeachingRewardClaimable(teachingNftId, assetId, positionA);
+        (,, bool positionBClaimed) =
+            rewardDistributor.getTeachingRewardClaimable(teachingNftId, assetId, positionB);
+        assertTrue(positionAClaimed);
+        assertTrue(positionBClaimed);
     }
 
     function testBatchTeachingRewardRejectsDuplicateEntries() public {

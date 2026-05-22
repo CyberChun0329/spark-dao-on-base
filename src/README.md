@@ -10,8 +10,8 @@ vault funding, withdrawals, and per-stable reserved-unit accounting.
 teaching lifecycle: course types, teaching sessions, first-round freeze, collateral
 lock, ordinary completion, coordinator-forced valid settlement, customer-fault
 settlement, teacher-fault remedial settlement, scheduled-time snapshot use, teacher
-redeem, teaching vault reserve updates, and the stable transfer callback used by reward
-claims. It reads research readiness and snapshot values through
+redeem, teaching vault reserve updates, and the distributor-only reward settlement
+callback. It reads research readiness and snapshot values through
 `IResearchRegistryForTeaching`. `TeachingPolicyGuard.sol`,
 `TeachingEconomicsPolicyV1.sol`, and `TeachingFaultPolicyV1.sol` are deployed separately.
 Course types freeze the economics and fault policy addresses, sessions freeze the
@@ -33,6 +33,12 @@ Only its configured `TEACHING_REGISTRY()` can record pools. During a claim it re
 current research position holder through `IResearchRegistryForTeaching`; transfer after
 settlement sends claim rights to the new holder, and buyback sends claim rights to the
 treasury holder.
+
+`TeachingPolicyGuard.sol` is a validation adapter for policy modules. It validates
+policy versions and quote invariants, but does not own teaching lifecycle state, reward
+pools, reserves, or treasury accounting. `TeachingEconomicsPolicyV1.sol` and
+`TeachingFaultPolicyV1.sol` are stateless quote modules; registry-created course types
+and teaching sessions freeze their returned values before later settlement.
 
 `TeachingRegistry.setTeachingRewardDistributor` is authority-only and one-time. It
 checks the distributor's `TEACHING_REGISTRY()` and `RESEARCH_REGISTRY()` values before

@@ -1,0 +1,81 @@
+{
+  "schema": "spark-dao-module-compatibility/v1",
+  "chain": {
+    "name": "base-sepolia",
+    "chainId": 84532
+  },
+  "contracts": [
+    {
+      "key": "researchRegistry",
+      "contractName": "ResearchRegistry",
+      "address": "0x0000000000000000000000000000000000000000",
+      "artifact": "out/ResearchRegistry.sol/ResearchRegistry.json"
+    },
+    {
+      "key": "teachingRegistry",
+      "contractName": "TeachingRegistry",
+      "address": "0x0000000000000000000000000000000000000000",
+      "artifact": "out/TeachingRegistry.sol/TeachingRegistry.json",
+      "immutableWiring": {
+        "RESEARCH_REGISTRY": "researchRegistry"
+      }
+    },
+    {
+      "key": "teachingRewardDistributor",
+      "contractName": "TeachingRewardDistributor",
+      "address": "0x0000000000000000000000000000000000000000",
+      "artifact": "out/TeachingRewardDistributor.sol/TeachingRewardDistributor.json",
+      "immutableWiring": {
+        "TEACHING_REGISTRY": "teachingRegistry",
+        "RESEARCH_REGISTRY": "researchRegistry"
+      }
+    },
+    {
+      "key": "teachingPolicyGuard",
+      "contractName": "TeachingPolicyGuard",
+      "address": "0x0000000000000000000000000000000000000000",
+      "artifact": "out/TeachingPolicyGuard.sol/TeachingPolicyGuard.json"
+    },
+    {
+      "key": "teachingEconomicsPolicy",
+      "contractName": "TeachingEconomicsPolicyV1",
+      "address": "0x0000000000000000000000000000000000000000",
+      "artifact": "out/TeachingEconomicsPolicyV1.sol/TeachingEconomicsPolicyV1.json"
+    },
+    {
+      "key": "teachingFaultPolicy",
+      "contractName": "TeachingFaultPolicyV1",
+      "address": "0x0000000000000000000000000000000000000000",
+      "artifact": "out/TeachingFaultPolicyV1.sol/TeachingFaultPolicyV1.json"
+    },
+    {
+      "key": "researchPositionToken",
+      "contractName": "ResearchPositionToken",
+      "address": "0x0000000000000000000000000000000000000000",
+      "artifact": "out/ResearchPositionToken.sol/ResearchPositionToken.json"
+    },
+    {
+      "key": "teachingNftToken",
+      "contractName": "TeachingNftToken",
+      "address": "0x0000000000000000000000000000000000000000",
+      "artifact": "out/TeachingNftToken.sol/TeachingNftToken.json"
+    }
+  ],
+  "expectedRelationships": {
+    "teachingRegistry": {
+      "researchRegistry": "researchRegistry",
+      "rewardDistributor": "teachingRewardDistributor",
+      "policyGuard": "teachingPolicyGuard",
+      "economicsPolicy": "teachingEconomicsPolicy",
+      "faultPolicy": "teachingFaultPolicy"
+    },
+    "teachingRewardDistributor": {
+      "teachingRegistry": "teachingRegistry",
+      "researchRegistry": "researchRegistry"
+    },
+    "policyVersions": {
+      "economics": 1,
+      "fault": 1
+    }
+  }
+}

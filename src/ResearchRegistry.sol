@@ -9,8 +9,6 @@ import { IResearchPositionToken } from "./interfaces/IResearchPositionToken.sol"
 import { ITeachingRegistryForResearch } from "./interfaces/ITeachingRegistryForResearch.sol";
 
 contract ResearchRegistry is SparkDaoConfig {
-    using SparkMath for uint16;
-
     address public immutable RESEARCH_POSITION_TOKEN;
     address public teachingRegistry;
     mapping(uint64 assetId => SparkDaoTypes.ResearchAsset) internal researchAssets;

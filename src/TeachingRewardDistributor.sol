@@ -115,7 +115,9 @@ contract TeachingRewardDistributor {
         SparkDaoTypes.TeachingRewardPool storage pool =
             _requireTeachingRewardPool(teachingNftId, assetId);
         if (block.timestamp < pool.unlockAt) revert SparkDaoErrors.RevenueStillLocked();
-        if (teachingRewardClaimed[teachingNftId][assetId][positionId]) {
+        mapping(uint64 => bool) storage claimedByPosition =
+            teachingRewardClaimed[teachingNftId][assetId];
+        if (claimedByPosition[positionId]) {
             revert SparkDaoErrors.TeachingRewardAlreadyClaimed();
         }
 
@@ -126,7 +128,7 @@ contract TeachingRewardDistributor {
         uint256 remainingUnits = pool.distributedUnits - pool.claimedUnits;
         if (claimAmount > remainingUnits) claimAmount = remainingUnits;
 
-        teachingRewardClaimed[teachingNftId][assetId][positionId] = true;
+        claimedByPosition[positionId] = true;
         pool.claimedShareBps += effectiveShareBps;
         if (claimAmount != 0) {
             pool.claimedUnits += claimAmount;
@@ -179,15 +181,15 @@ contract TeachingRewardDistributor {
         internal
         returns (uint256 dustUnits)
     {
-        if (
-            pool.dustReleased || pool.claimedShareBps < pool.totalEffectiveShareBps
-                || pool.claimedUnits >= pool.distributedUnits
-        ) {
-            return 0;
-        }
+        if (pool.dustReleased) return 0;
+        if (pool.claimedShareBps < pool.totalEffectiveShareBps) return 0;
 
-        dustUnits = pool.distributedUnits - pool.claimedUnits;
-        pool.claimedUnits = pool.distributedUnits;
+        uint256 claimedUnits = pool.claimedUnits;
+        uint256 distributedUnits = pool.distributedUnits;
+        if (claimedUnits >= distributedUnits) return 0;
+
+        dustUnits = distributedUnits - claimedUnits;
+        pool.claimedUnits = distributedUnits;
         pool.dustReleased = true;
     }
 

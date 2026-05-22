@@ -56,6 +56,10 @@ as `TEACHING_REGISTRY`, the third as `TEACHING_REWARD_DISTRIBUTOR`, the fourth a
 
 If research and teaching should remain under the same admin/default settings, run
 `npm run check:registry-admin-state` after deployment and after later admin rotations.
+Run `npm run check:module-compatibility` after recording the distributor and policy
+addresses to verify registry/distributor/policy wiring and policy versions. For bytecode
+checks, copy `client/module-compatibility.example.json`, fill the deployed addresses and
+optional deployed bytecode hashes, then set `MODULE_COMPATIBILITY_MANIFEST`.
 
 `SetTokenMinters.s.sol` expects:
 

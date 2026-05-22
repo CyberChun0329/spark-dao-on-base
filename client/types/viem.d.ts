@@ -9,6 +9,8 @@ export type Chain = {
 
 export function http(rpcUrl?: string): unknown;
 
+export function keccak256(value: Hex): Hex;
+
 export function createPublicClient(params: { chain: Chain; transport: unknown }): unknown;
 
 export function createWalletClient(params: {

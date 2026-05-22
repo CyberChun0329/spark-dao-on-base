@@ -5,6 +5,9 @@ import { SparkDaoErrors } from "./SparkDaoErrors.sol";
 import { SparkDaoTypes } from "./SparkDaoTypes.sol";
 import { ITeachingFaultPolicy } from "./interfaces/ITeachingFaultPolicy.sol";
 
+/// @notice V1 stateless fault-settlement quote module.
+/// @dev The registry stores the returned fault quotes; this module reads no registry
+/// state and performs no reserve, claim, or treasury accounting.
 contract TeachingFaultPolicyV1 is ITeachingFaultPolicy {
     uint8 public constant FAULT_POLICY_VERSION = 1;
 

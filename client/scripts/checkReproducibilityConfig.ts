@@ -19,6 +19,9 @@ for (const key of [
   "TEACHING_POLICY_GUARD",
   "TEACHING_ECONOMICS_POLICY",
   "TEACHING_FAULT_POLICY",
+  "MODULE_COMPATIBILITY_MANIFEST",
+  "EXPECTED_TEACHING_ECONOMICS_POLICY_VERSION",
+  "EXPECTED_TEACHING_FAULT_POLICY_VERSION",
   "DAO_TREASURY",
 ]) {
   assertIncludes(envExample, `${key}=`, ".env.example");
@@ -77,6 +80,24 @@ if (
 ) {
   throw new Error("package.json is missing check:registry-admin-state");
 }
+if (
+  packageJson.scripts?.["check:module-compatibility"]
+  !== "tsx client/scripts/checkModuleCompatibility.ts"
+) {
+  throw new Error("package.json is missing check:module-compatibility");
+}
+if (
+  packageJson.scripts?.["check:module-compatibility:example"]
+  !== "MODULE_COMPATIBILITY_VALIDATE_MANIFEST_ONLY=1 MODULE_COMPATIBILITY_MANIFEST=client/module-compatibility.example.json tsx client/scripts/checkModuleCompatibility.ts"
+) {
+  throw new Error("package.json is missing check:module-compatibility:example");
+}
+
+assertIncludes(
+  requireText("client/module-compatibility.example.json"),
+  "spark-dao-module-compatibility/v1",
+  "client/module-compatibility.example.json",
+);
 
 assertIncludes(
   requireText("script/DemoResearch.s.sol"),

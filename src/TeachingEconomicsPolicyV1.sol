@@ -5,6 +5,8 @@ import { SparkDaoErrors } from "./SparkDaoErrors.sol";
 import { SparkDaoTypes } from "./SparkDaoTypes.sol";
 import { ITeachingEconomicsPolicy } from "./interfaces/ITeachingEconomicsPolicy.sol";
 
+/// @notice V1 stateless teaching economics quote module.
+/// @dev The registry stores the returned values; this module reads no registry state.
 contract TeachingEconomicsPolicyV1 is ITeachingEconomicsPolicy {
     uint8 public constant TEACHING_ECONOMICS_POLICY_VERSION = 1;
 

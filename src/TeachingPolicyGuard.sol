@@ -8,6 +8,10 @@ import { ITeachingEconomicsPolicyGuard } from "./interfaces/ITeachingEconomicsPo
 import { ITeachingFaultPolicy } from "./interfaces/ITeachingFaultPolicy.sol";
 import { ITeachingFaultPolicyGuard } from "./interfaces/ITeachingFaultPolicyGuard.sol";
 
+/// @notice Validation adapter for external teaching economics and fault quote modules.
+/// @dev This contract intentionally owns no teaching lifecycle, reserve, claim, or
+/// treasury state. The registry uses it only to validate policy versions and quotes
+/// before freezing values into course types and sessions.
 contract TeachingPolicyGuard is ITeachingEconomicsPolicyGuard, ITeachingFaultPolicyGuard {
     function validatePolicy(address policy) public view returns (uint8 version) {
         if (policy.code.length == 0) revert SparkDaoErrors.InvalidTeachingFaultPolicy();

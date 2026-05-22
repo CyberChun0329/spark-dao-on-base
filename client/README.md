@@ -12,6 +12,7 @@
 - research-side 多稳定币 vault reserve 读取、定向 fund / withdraw helper
 - teaching-side DAO state 与 vault reserve 读取 helper
 - teaching fault-settlement、remedial wage closure state、module wiring 读取 helper
+- module compatibility checker，用于部署后核验 registry / distributor / policy wiring
 - coordinator fault-resolution helper
 - 一个 `inspect.ts` 示例脚本，方便直接读取 DAO / research / teaching 状态
 
@@ -27,12 +28,38 @@
 - `TEACHING_FAULT_POLICY`：可选，用于 client 侧暴露已部署 fault policy 的 ABI/address。
 - `RESEARCH_POSITION_TOKEN` / `TEACHING_NFT_TOKEN`：可选 token 描述符，目前主要用于
   client 合约集合暴露和检查部署配置。
+- `MODULE_COMPATIBILITY_MANIFEST`：可选，指向部署 manifest JSON。manifest 可以记录
+  chain、contract name、artifact path、deployed bytecode hash 和 registry/distributor
+  wiring 关系。
+- `EXPECTED_TEACHING_ECONOMICS_POLICY_VERSION` / `EXPECTED_TEACHING_FAULT_POLICY_VERSION`：
+  module compatibility checker 使用的预期 policy version；默认都是 `1`。
+
+部署后检查：
+
+```bash
+npm run check:registry-admin-state
+npm run check:module-compatibility
+```
+
+`check:module-compatibility` 会读取 `TeachingRegistry.getTeachingModuleState()`、
+`TeachingRewardDistributor.TEACHING_REGISTRY()`、`TeachingRewardDistributor.RESEARCH_REGISTRY()`、
+policy version getter，以及 `TeachingPolicyGuard` 的 validation result。若提供
+`MODULE_COMPATIBILITY_MANIFEST` 且 manifest 中包含 `deployedBytecodeHash`，脚本还会读取链上
+runtime bytecode 并比对 hash。没有 hash 时，manifest 只能证明地址、artifact 名称和预期
+wiring 是一致记录，不能单独证明部署 bytecode benign。
+
+只验证 example manifest 格式：
+
+```bash
+npm run check:module-compatibility:example
+```
 
 推荐顺序：
 
 1. 先跑合约测试
 2. 再部署或跑 demo
-3. 最后用 `client/scripts/inspect.ts` 读取链上状态
+3. 跑 registry admin / module compatibility checks
+4. 最后用 `client/scripts/inspect.ts` 读取链上状态
 
 当前还不是完整前端，只是一个足够稳的 SDK 骨架。
 

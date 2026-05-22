@@ -3,6 +3,9 @@ pragma solidity ^0.8.26;
 
 import { SparkDaoTypes } from "../SparkDaoTypes.sol";
 
+/// @notice Stateless quote module for teaching course and session economics.
+/// @dev The registry freezes returned values; policy modules do not read registry
+/// storage or mutate settlement state.
 interface ITeachingEconomicsPolicy {
     function TEACHING_ECONOMICS_POLICY_VERSION() external view returns (uint8);
 

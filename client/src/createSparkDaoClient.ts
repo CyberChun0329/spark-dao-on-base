@@ -36,6 +36,7 @@ type WriteContractParams = ReadContractParams & {
 
 export type SparkDaoPublicClient = {
   readContract(params: ReadContractParams): Promise<unknown>;
+  getBytecode(params: { address: Address }): Promise<Hex | undefined>;
 };
 
 export type SparkDaoWalletClient = {

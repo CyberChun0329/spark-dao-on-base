@@ -55,6 +55,10 @@ npm run simulate:teaching-cost
 - 直接跑 `forge build --sizes` 会把 `.s.sol` 脚本合约也统计进去，噪音更大
 - `check:registry-admin-state` 需要连到已部署环境；它检查 research / teaching 两个
   registry 的 authority、coordinator、treasury、stable asset 和时间参数是否保持一致
+- `check:module-compatibility` 需要连到已部署环境；它检查 registry 暴露的 distributor /
+  policy wiring、distributor 自报的 registry/research immutables、policy version getter
+  和 policy guard validation result
+- `check:module-compatibility:example` 只做 example manifest 静态校验，不需要链上环境
 
 ## 3. 正式部署顺序
 
@@ -86,6 +90,10 @@ teaching registry 的 `RESEARCH_REGISTRY()` 是否指回自己。这能防常见
 证明 bytecode 没被替换，所以 authority 仍要使用可信部署产物。
 部署后可以用 `TeachingRegistry.getTeachingModuleState` 或
 `npm run check:registry-admin-state` 核验 registry、distributor、policy、token wiring。
+如果要把 bytecode 也纳入部署复核，复制 `client/module-compatibility.example.json`，填入
+真实地址和可选的 `deployedBytecodeHash`，把路径写入 `MODULE_COMPATIBILITY_MANIFEST`，然后跑
+`npm run check:module-compatibility`。没有 `deployedBytecodeHash` 时，该检查只能证明地址和
+wiring 一致，不能证明实际 bytecode 与预期 artifact 完全相同。
 
 记录输出地址：
 
@@ -109,6 +117,7 @@ admin rotation 后都跑：
 
 ```bash
 npm run check:registry-admin-state
+npm run check:module-compatibility
 ```
 
 ## 4. 本地 demo

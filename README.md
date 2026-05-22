@@ -35,7 +35,7 @@ its own contract and wired once to the teaching registry.
 `TeachingRegistry` manages teaching lifecycle state: course types, scheduled teaching
 sessions, first-round schedule freeze, collateral locks, second-round completion,
 coordinator settlement decisions, settlement snapshot calculation, teacher redeem,
-vault reserve accounting, and the stable-token transfer callback used by reward claims.
+vault reserve accounting, and the distributor-only reward settlement callback.
 It reads research readiness and scheduled-time snapshots through a narrow
 `ResearchRegistry` interface rather than inheriting the research implementation.
 Teaching economics are quoted through `TeachingEconomicsPolicyV1`; fault-contingent
@@ -47,6 +47,12 @@ and the fault quotes used by later coordinator settlement.
 reward pools, tracks single-use claims, previews claimable amounts, handles single and
 batch claims, and releases rounding dust once all effective snapshot shares have been
 accounted for. A reward pool can only be recorded by its configured registry.
+
+`TeachingPolicyGuard` is a validation adapter for externally deployed policy modules.
+It validates policy versions and quote invariants, but does not own lifecycle state,
+reward pools, reserves, or treasury accounting. The V1 economics and fault policies are
+stateless quote modules; course types and teaching sessions freeze their returned values
+before later settlement.
 
 `ResearchPositionToken` and `TeachingNftToken` are minimal soulbound ERC-721-like
 tokens. The research token minter should be set to `ResearchRegistry`, the teaching NFT
@@ -179,6 +185,12 @@ settings can drift after deployment. Use `npm run check:registry-admin-state` ag
 deployed environment when authority, coordinator, treasury, stable asset, or timing
 defaults are expected to remain aligned. The check also compares configured teaching
 module addresses when the corresponding environment variables are present.
+Use `npm run check:module-compatibility` after deployment to verify the registry's
+module state, the distributor's immutable registry/research wiring, policy versions, and
+policy guard validation results. If `MODULE_COMPATIBILITY_MANIFEST` points to a filled
+manifest, the checker also compares manifest addresses and optional deployed bytecode
+hashes. The handshake and manifest checks reduce address and artifact mistakes; without
+recorded bytecode hashes, they still do not prove arbitrary bytecode is benign.
 
 This repository is maintained as the public Base implementation. Packaging,
 archival uploads, and review bundles are separate workflows.

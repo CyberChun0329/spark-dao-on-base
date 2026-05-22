@@ -3,6 +3,9 @@ pragma solidity ^0.8.26;
 
 import { SparkDaoTypes } from "../SparkDaoTypes.sol";
 
+/// @notice Validation adapter for teaching fault quote modules.
+/// @dev Callers pass a candidate policy address; the guard validates version and
+/// quote invariants without owning registry or distributor state.
 interface ITeachingFaultPolicyGuard {
     function validatePolicy(address policy) external view returns (uint8 version);
 
