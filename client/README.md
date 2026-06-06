@@ -1,73 +1,83 @@
 # Client
 
-这里是 Base 版最小 `viem` 客户端层。
+This directory contains the minimal `viem` client layer for the Base/Solidity
+implementation.
 
-当前提供：
+It currently provides:
 
-- ABI 自动读取
-- `BASE_RPC_URL` + 地址环境变量加载
-- `ResearchRegistry` / `TeachingRegistry` 的最小读写 helper
-- `TeachingRewardDistributor` 的 claim-pull teaching reward preview、单笔 claim、批量 claim helper
-- optional `TeachingPolicyGuard` / `TeachingEconomicsPolicyV1` / `TeachingFaultPolicyV1` artifact bindings for deployed policy inspection
-- research-side 多稳定币 vault reserve 读取、定向 fund / withdraw helper
-- teaching-side DAO state 与 vault reserve 读取 helper
-- teaching fault-settlement、remedial wage closure state、module wiring 读取 helper
-- module compatibility checker，用于部署后核验 registry / distributor / policy wiring
-- coordinator fault-resolution helper
-- 一个 `inspect.ts` 示例脚本，方便直接读取 DAO / research / teaching 状态
+- automatic ABI loading
+- `BASE_RPC_URL` and address configuration from environment variables
+- minimal read/write helpers for `ResearchRegistry` and `TeachingRegistry`
+- claim-pull teaching reward preview, single-claim, and batch-claim helpers for
+  `TeachingRewardDistributor`
+- optional `TeachingPolicyGuard`, `TeachingEconomicsPolicyV1`, and
+  `TeachingFaultPolicyV1` artifact bindings for deployed policy inspection
+- research-side multi-stable vault reserve reads and targeted fund/withdraw helpers
+- teaching-side DAO state and vault reserve read helpers
+- teaching fault-settlement, remedial wage closure, and module wiring read helpers
+- a module compatibility checker for post-deployment registry/distributor/policy wiring
+- coordinator fault-resolution helpers
+- an `inspect.ts` script for direct DAO, research, and teaching state reads
 
-地址配置：
+## Address Configuration
 
-- `RESEARCH_REGISTRY`：research helper 的读取/写入目标，也是 teaching settlement
-  读取 research readiness、snapshot 和 position holder 的目标。
-- `TEACHING_REGISTRY`：teaching lifecycle、settlement state、vault reserve 读取目标。
-- `TEACHING_REWARD_DISTRIBUTOR`：teaching reward preview、单笔 claim、批量 claim 必需。
-  没有这个地址时，相关 helper 会直接报错，避免误以为 claim 仍在 registry 上。
-- `TEACHING_POLICY_GUARD`：可选，用于 client 侧暴露已部署 policy guard。
-- `TEACHING_ECONOMICS_POLICY`：可选，用于 client 侧暴露已部署 economics policy 的 ABI/address。
-- `TEACHING_FAULT_POLICY`：可选，用于 client 侧暴露已部署 fault policy 的 ABI/address。
-- `RESEARCH_POSITION_TOKEN` / `TEACHING_NFT_TOKEN`：可选 token 描述符，目前主要用于
-  client 合约集合暴露和检查部署配置。
-- `MODULE_COMPATIBILITY_MANIFEST`：可选，指向部署 manifest JSON。manifest 可以记录
-  chain、contract name、artifact path、deployed bytecode hash 和 registry/distributor
-  wiring 关系。
-- `EXPECTED_TEACHING_ECONOMICS_POLICY_VERSION` / `EXPECTED_TEACHING_FAULT_POLICY_VERSION`：
-  module compatibility checker 使用的预期 policy version；默认都是 `1`。
+- `RESEARCH_REGISTRY`: target for research helper reads/writes and for teaching
+  settlement reads of research readiness, scheduled snapshots, and position holders.
+- `TEACHING_REGISTRY`: target for teaching lifecycle, settlement state, and teaching
+  vault reserve reads.
+- `TEACHING_REWARD_DISTRIBUTOR`: required for teaching reward preview, single claim, and
+  batch claim helpers. Reward helpers fail fast when this address is missing so callers
+  do not accidentally assume claims still live on the registry.
+- `TEACHING_POLICY_GUARD`: optional address for exposing the deployed policy guard.
+- `TEACHING_ECONOMICS_POLICY`: optional address for exposing the deployed economics
+  policy ABI/address.
+- `TEACHING_FAULT_POLICY`: optional address for exposing the deployed fault policy
+  ABI/address.
+- `RESEARCH_POSITION_TOKEN` and `TEACHING_NFT_TOKEN`: optional token descriptors used
+  mainly for client contract exposure and deployment configuration checks.
+- `MODULE_COMPATIBILITY_MANIFEST`: optional path to a deployment manifest JSON file. The
+  manifest can record chain data, contract names, artifact paths, deployed bytecode
+  hashes, and expected registry/distributor wiring.
+- `EXPECTED_TEACHING_ECONOMICS_POLICY_VERSION` and
+  `EXPECTED_TEACHING_FAULT_POLICY_VERSION`: expected policy versions for the module
+  compatibility checker. Both default to `1`.
 
-部署后检查：
+## Post-Deployment Checks
 
 ```bash
 npm run check:registry-admin-state
 npm run check:module-compatibility
 ```
 
-`check:module-compatibility` 会读取 `TeachingRegistry.getTeachingModuleState()`、
-`TeachingRewardDistributor.TEACHING_REGISTRY()`、`TeachingRewardDistributor.RESEARCH_REGISTRY()`、
-policy version getter，以及 `TeachingPolicyGuard` 的 validation result。若提供
-`MODULE_COMPATIBILITY_MANIFEST` 且 manifest 中包含 `deployedBytecodeHash`，脚本还会读取链上
-runtime bytecode 并比对 hash。没有 hash 时，manifest 只能证明地址、artifact 名称和预期
-wiring 是一致记录，不能单独证明部署 bytecode benign。
+`check:module-compatibility` reads `TeachingRegistry.getTeachingModuleState()`,
+`TeachingRewardDistributor.TEACHING_REGISTRY()`,
+`TeachingRewardDistributor.RESEARCH_REGISTRY()`, policy version getters, and
+`TeachingPolicyGuard` validation results. If `MODULE_COMPATIBILITY_MANIFEST` is provided
+and contains `deployedBytecodeHash`, the script also reads runtime bytecode and compares
+hashes. Without bytecode hashes, the manifest can only prove address, artifact-name, and
+expected-wiring consistency.
 
-只验证 example manifest 格式：
+Validate the example manifest format without chain access:
 
 ```bash
 npm run check:module-compatibility:example
 ```
 
-推荐顺序：
+Recommended order:
 
-1. 先跑合约测试
-2. 再部署或跑 demo
-3. 跑 registry admin / module compatibility checks
-4. 最后用 `client/scripts/inspect.ts` 读取链上状态
+1. Run the contract tests.
+2. Deploy or run a local demo.
+3. Run registry admin and module compatibility checks.
+4. Use `client/scripts/inspect.ts` for read-only chain state inspection.
 
-当前还不是完整前端，只是一个足够稳的 SDK 骨架。
+This is not a full frontend. It is a minimal SDK and script layer for deployment,
+inspection, and compatibility checks.
 
-`npm run client:typecheck` 使用 `tsconfig.typecheck.json`。运行时脚本仍按普通
-Node/tsx 解析真实 `viem` 包；typecheck 配置只用轻量 shim 避免把完整 `viem`
-高阶类型图拖进可复现检查。
+`npm run client:typecheck` uses `tsconfig.typecheck.json`. Runtime scripts still resolve
+the real `viem` package through Node/tsx; the typecheck config uses lightweight shims to
+avoid pulling the full `viem` advanced type graph into reproducibility checks.
 
-注意：`ResearchRegistry` 和 `TeachingRegistry` 是两个独立合约，各自有
-`DaoState` 和 reserved-unit accounting。读取 reserve 时应使用
-`getResearchVaultReservedUnits` 或 `getTeachingVaultReservedUnits` 明确目标；旧的
-`getVaultReservedUnits` 只是 research helper 的兼容 alias。
+`ResearchRegistry` and `TeachingRegistry` are independent contracts with separate
+`DaoState` and reserved-unit accounting. Reserve reads should use
+`getResearchVaultReservedUnits` or `getTeachingVaultReservedUnits` to make the target
+explicit. `getVaultReservedUnits` remains only as a research helper compatibility alias.
