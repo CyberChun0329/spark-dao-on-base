@@ -27,6 +27,16 @@ The main contracts are:
 
 ## Current architecture
 
+At a high level, Spark DAO converts off-chain teaching responsibility into recognised
+on-chain state, bounded settlement outcomes, and claimable research reward rights:
+
+![Spark DAO teaching and research contribution-rights architecture](docs/assets/spark_dao_nft_rights_architecture.svg)
+
+This figure is a conceptual contribution-rights view, not a complete ABI or contract
+call graph. The implementation remains split across the registry, distributor, and
+policy modules described below; teaching reward settlement is claim-pull rather than
+automatic push payment.
+
 `ResearchRegistry` manages research assets, research positions, layer seal/advance
 state, direct revenue escrows, position transfers, DAO buybacks, vault funding, and
 per-stable reserved-unit accounting. In a full teaching deployment it is deployed as
