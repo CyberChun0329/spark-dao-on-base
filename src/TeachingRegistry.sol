@@ -197,8 +197,7 @@ contract TeachingRegistry is SparkDaoConfig {
             session.collateralLocked,
             statusValue == TEACHING_STATUS_COMPLETED || statusValue == TEACHING_STATUS_FORCED_VALID
                 || statusValue == TEACHING_STATUS_REDEEMED
-                || statusValue == TEACHING_STATUS_TEACHER_FAULT_REMEDIATION
-                || statusValue == TEACHING_STATUS_CUSTOMER_FAULT_SETTLED,
+                || statusValue == TEACHING_STATUS_TEACHER_FAULT_REMEDIATION,
             session.resolvedAt,
             session.redeemedAt
         );
@@ -410,11 +409,22 @@ contract TeachingRegistry is SparkDaoConfig {
         _lockTeachingCollateral(session, teacherSide);
     }
 
+    function withdrawUnmatchedTeachingCollateral(uint64 teachingNftId, bool teacherSide) external {
+        SparkDaoTypes.TeachingSession storage session = _requireTeachingSession(teachingNftId);
+        _withdrawUnmatchedTeachingCollateral(session, teacherSide);
+    }
+
+    /// @notice Records the caller's completion signature and settles when both sides have signed.
+    /// @dev This is the second-round entrypoint that can execute ordinary settlement, including
+    /// reward-pool recording, reserve releases, and stable-asset transfers.
     function confirmTeachingCompletion(uint64 teachingNftId, bool teacherSide) external {
         SparkDaoTypes.TeachingSession storage session = _requireTeachingSession(teachingNftId);
         _confirmTeachingCompletion(session, teacherSide);
     }
 
+    /// @notice Records only the first completion signature without attempting settlement.
+    /// @dev This helper is for first-mover UX. If the counterparty has already signed, callers
+    /// must use confirmTeachingCompletion so the second signature cannot bypass settlement.
     function acknowledgeTeachingCompletion(uint64 teachingNftId, bool teacherSide) external {
         SparkDaoTypes.TeachingSession storage session = _requireTeachingSession(teachingNftId);
         _acknowledgeTeachingCompletion(session, teacherSide);
@@ -559,6 +569,39 @@ contract TeachingRegistry is SparkDaoConfig {
 
         _updateCollateralState(session);
         _reserveVaultUnits(session.stableAsset, amount);
+    }
+
+    function _withdrawUnmatchedTeachingCollateral(
+        SparkDaoTypes.TeachingSession storage session,
+        bool teacherSide
+    ) internal {
+        if (
+            !session.firstRoundFrozen || session.status != TEACHING_STATUS_CONFIRMED
+                || session.collateralLocked
+        ) {
+            revert SparkDaoErrors.InvalidTeachingStatus();
+        }
+
+        address participant;
+        uint256 amount;
+        if (teacherSide) {
+            if (session.teacher != msg.sender) revert SparkDaoErrors.UnauthorizedTeacher();
+            if (!session.teacherBondLocked) revert SparkDaoErrors.TeachingCollateralNotLocked();
+            session.teacherBondLocked = false;
+            participant = session.teacher;
+            amount = session.teacherBondUnits;
+        } else {
+            if (session.customer != msg.sender) revert SparkDaoErrors.UnauthorizedCustomer();
+            if (!session.customerPaymentLocked) {
+                revert SparkDaoErrors.TeachingCollateralNotLocked();
+            }
+            session.customerPaymentLocked = false;
+            participant = session.customer;
+            amount = session.lessonPriceUnits;
+        }
+
+        _releaseVaultUnits(session.stableAsset, amount);
+        _safeTransfer(session.stableAsset, participant, amount);
     }
 
     function _confirmTeachingCompletion(

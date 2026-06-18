@@ -950,6 +950,86 @@ contract TeachingRegistryTest {
         assertTrue(afterRedeem == beforeRedeem + 400_000);
     }
 
+    function testTeacherCanWithdrawUnmatchedCollateralBeforeCustomerLocks() public {
+        VM.prank(coordinator);
+        uint64 courseTypeId =
+            registry.createTeachingCourseType("Unmatched Teacher", 1_000_000, 400_000, 0);
+        uint64 teachingNftId = _createNoResearchTeachingSession(courseTypeId);
+        _confirmSchedule(teachingNftId);
+
+        uint256 beforeLock = stable.balanceOf(teacher);
+        VM.startPrank(teacher);
+        stable.approve(address(registry), 800_000);
+        registry.lockTeachingCollateral(teachingNftId, true);
+        registry.withdrawUnmatchedTeachingCollateral(teachingNftId, true);
+        VM.stopPrank();
+
+        (uint8 status,, bool collateralLocked,,,) = registry.getTeachingSessionState(teachingNftId);
+        assertTrue(status == 1);
+        assertTrue(!collateralLocked);
+        assertTrue(stable.balanceOf(teacher) == beforeLock);
+        assertTrue(registry.getVaultReservedUnits(address(stable)) == 0);
+
+        VM.startPrank(teacher);
+        stable.approve(address(registry), 800_000);
+        registry.lockTeachingCollateral(teachingNftId, true);
+        VM.stopPrank();
+        VM.startPrank(customer);
+        stable.approve(address(registry), 1_000_000);
+        registry.lockTeachingCollateral(teachingNftId, false);
+        VM.stopPrank();
+    }
+
+    function testCustomerCanWithdrawUnmatchedPaymentBeforeTeacherLocks() public {
+        VM.prank(coordinator);
+        uint64 courseTypeId =
+            registry.createTeachingCourseType("Unmatched Customer", 1_000_000, 400_000, 0);
+        uint64 teachingNftId = _createNoResearchTeachingSession(courseTypeId);
+        _confirmSchedule(teachingNftId);
+
+        uint256 beforeLock = stable.balanceOf(customer);
+        VM.startPrank(customer);
+        stable.approve(address(registry), 1_000_000);
+        registry.lockTeachingCollateral(teachingNftId, false);
+        registry.withdrawUnmatchedTeachingCollateral(teachingNftId, false);
+        VM.stopPrank();
+
+        (uint8 status,, bool collateralLocked,,,) = registry.getTeachingSessionState(teachingNftId);
+        assertTrue(status == 1);
+        assertTrue(!collateralLocked);
+        assertTrue(stable.balanceOf(customer) == beforeLock);
+        assertTrue(registry.getVaultReservedUnits(address(stable)) == 0);
+
+        VM.startPrank(teacher);
+        stable.approve(address(registry), 800_000);
+        registry.lockTeachingCollateral(teachingNftId, true);
+        VM.stopPrank();
+        VM.startPrank(customer);
+        stable.approve(address(registry), 1_000_000);
+        registry.lockTeachingCollateral(teachingNftId, false);
+        VM.stopPrank();
+    }
+
+    function testCannotWithdrawTeachingCollateralAfterBothSidesLock() public {
+        VM.prank(coordinator);
+        uint64 courseTypeId =
+            registry.createTeachingCourseType("Matched Collateral", 1_000_000, 400_000, 0);
+        uint64 teachingNftId = _createNoResearchTeachingSession(courseTypeId);
+        _confirmSchedule(teachingNftId);
+        VM.startPrank(teacher);
+        stable.approve(address(registry), 800_000);
+        registry.lockTeachingCollateral(teachingNftId, true);
+        VM.stopPrank();
+        VM.startPrank(customer);
+        stable.approve(address(registry), 1_000_000);
+        registry.lockTeachingCollateral(teachingNftId, false);
+        VM.stopPrank();
+
+        VM.expectRevert(SparkDaoErrors.InvalidTeachingStatus.selector);
+        VM.prank(teacher);
+        registry.withdrawUnmatchedTeachingCollateral(teachingNftId, true);
+    }
+
     function testTeachingAcknowledgeThenCounterpartyConfirmSettles() public {
         VM.prank(coordinator);
         uint64 courseTypeId =
@@ -1437,8 +1517,10 @@ contract TeachingRegistryTest {
         uint256 afterRefund = stable.balanceOf(customer);
         uint256 afterTeacher = stable.balanceOf(teacher);
 
-        (uint8 status,,,, uint64 resolvedAt,) = registry.getTeachingSessionState(teachingNftId);
+        (uint8 status,,, bool distributionRecorded, uint64 resolvedAt,) =
+            registry.getTeachingSessionState(teachingNftId);
         assertTrue(status == 5);
+        assertTrue(!distributionRecorded);
         assertTrue(resolvedAt != 0);
         assertTrue(afterRefund == beforeRefund + 400_000);
         assertTrue(afterTeacher == beforeTeacher + 1_000_000);

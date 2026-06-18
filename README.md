@@ -65,8 +65,11 @@ stateless quote modules; course types and teaching sessions freeze their returne
 before later settlement.
 
 `ResearchPositionToken` and `TeachingNftToken` are minimal soulbound ERC-721-like
-tokens. The research token minter should be set to `ResearchRegistry`, the teaching NFT
-minter should be set to `TeachingRegistry`, and both minters should then be locked.
+tokens. They expose ERC-721-style metadata and ownership reads, but user-initiated
+transfers are intentionally disabled. Research position movement is mediated by
+`ResearchRegistry`; teaching NFTs remain non-transferable session records. The research
+token minter should be set to `ResearchRegistry`, the teaching NFT minter should be set
+to `TeachingRegistry`, and both minters should then be locked.
 
 ## Reproducibility
 
@@ -107,6 +110,26 @@ research position's claimed units through `ResearchRegistry`, releases teaching
 vault-reserved units, and transfers the frozen stable asset to the claimant. Direct
 calls to that callback are rejected unless they come from the configured distributor.
 
+The second-round completion API has two entrypoints. `acknowledgeTeachingCompletion`
+records the first side's completion signature only. `confirmTeachingCompletion` records a
+signature and, when it supplies the second signature, executes ordinary settlement. A
+caller that is signing after the counterparty has already signed must use
+`confirmTeachingCompletion`; `acknowledgeTeachingCompletion` intentionally reverts in that
+case so a completed two-sided lesson cannot remain signed but unsettled.
+
+Before both teacher and customer collateral have been locked, the side that already
+locked funds can recover only its own unmatched deposit through
+`withdrawUnmatchedTeachingCollateral(teachingNftId, teacherSide)`. This does not cancel or
+settle the teaching session; it returns the session to a confirmed-but-unmatched collateral
+state so the parties can re-lock later. Once both sides are locked and
+`collateralLocked` is true, this withdrawal path is unavailable and the existing
+completion or coordinator-resolution paths remain the only settlement paths.
+
+`getTeachingSessionState(...).researchDistributionRecorded` reports whether the session
+entered a reward-recording settlement path. Customer fault does not record research reward
+pools and therefore returns `false` for that flag; completed, forced-valid, redeemed, and
+teacher-fault remediation states continue to report `true`.
+
 ## Stable assets and reserves
 
 `daoState.stableAsset` is only the default for newly created objects. Course types,
@@ -117,6 +140,10 @@ available for explicit multi-stable funding.
 Stable asset addresses must point to deployed token contracts. The registries reject
 non-contract stable-token addresses at deployment, default-asset update, funding, and
 withdrawal time so misconfigured EOAs cannot be treated as ERC-20 reserves.
+Configured stable assets are expected to be standard ERC-20 tokens without transfer fees,
+rebasing balance changes, or transfer callbacks. The reserve accounting assumes the
+transferred amount equals the requested amount and that token transfers do not reenter the
+registry or distributor.
 
 ## Token minters
 
@@ -144,6 +171,12 @@ normally be a multisig or treasury account, not an operator hot wallet. Authorit
 changes administrative control only; it does not move already bought-back research
 positions or their future claim rights.
 
+Research position buybacks are paid from idle vault balance for the position's frozen
+stable asset. A `buybackFloor` records the minimum acceptable buyback price, but the v1
+contracts do not escrow a separate buyback guarantee. If idle vault balance is withdrawn
+or unavailable, the buyback path fails closed rather than using units reserved for other
+claims.
+
 ## Teaching fault settlement
 
 The Base teaching registry uses a fault-contingent settlement rule for lessons that cannot be closed by ordinary two-sided completion:
@@ -157,6 +190,11 @@ The remedial wage obligation remains vault-reserved until the coordinator closes
 `coordinatorSettleTeacherFaultRemedialWage`.
 Remaining retained funds are left in the registry as service-guarantee reserve, not
 booked as a teacher or customer payout.
+
+The static 2,500 bps teaching-research-share ceiling is only an absolute upper bound.
+Course creation can reject lower shares when the frozen teacher wage is high relative to
+the frozen lesson price, because teacher-fault settlement must also reserve the remedial
+half-wage.
 
 ## Deployment
 
@@ -201,6 +239,11 @@ policy guard validation results. If `MODULE_COMPATIBILITY_MANIFEST` points to a 
 manifest, the checker also compares manifest addresses and optional deployed bytecode
 hashes. The handshake and manifest checks reduce address and artifact mistakes; without
 recorded bytecode hashes, they still do not prove arbitrary bytecode is benign.
+
+The local demos set reward and buyback waiting windows to zero so a complete example can
+run in one pass. Production deployments should choose non-zero governance waiting periods
+in the environment before deployment; the v1 contracts treat those windows as configured
+deployment parameters rather than hard-coded protocol minimums.
 
 This repository is maintained as the public Base implementation. Packaging,
 archival uploads, and review bundles are separate workflows.

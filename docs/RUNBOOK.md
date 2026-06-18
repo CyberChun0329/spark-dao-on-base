@@ -35,6 +35,11 @@ The teaching demo wires the distributor into the registry and claims teaching re
 through the distributor. It sets `rewardUnlockSeconds` and `buybackWaitSeconds` to `0`
 so the full local claim and buyback path can run in a single pass.
 
+Do not reuse the demo timing values for production deployments. Production operators
+should choose non-zero reward and buyback waiting windows in the deployment environment;
+v1 treats those windows as configured deployment parameters rather than hard-coded
+protocol minimums.
+
 ## 2. Protocol Regression Checks
 
 Common checks:
@@ -85,6 +90,9 @@ wiring calls.
 
 Stable asset and token inputs are validated as deployed contract addresses. If an EOA or
 undeployed address is supplied, deployment reverts before the registry stores it.
+Stable assets are expected to be standard ERC-20 tokens without transfer fees, rebasing
+balance changes, or transfer callbacks, because registry reserve accounting assumes the
+requested transfer amount is the amount that actually moves.
 
 The registry/distributor handshake catches common address and deployment-order mistakes:
 the teaching registry checks the distributor's `TEACHING_REGISTRY()` and

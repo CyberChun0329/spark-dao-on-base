@@ -98,7 +98,9 @@ the teaching registry, then claims teaching rewards through the distributor rath
 through `TeachingRegistry`.
 
 Both demo scripts set `rewardUnlockSeconds` and `buybackWaitSeconds` to `0` so the full
-demo path runs in one local pass.
+demo path runs in one local pass. Production deployments should set non-zero governance
+waiting periods in the environment before running the deployment scripts; v1 treats these
+windows as configured deployment parameters rather than hard-coded protocol minimums.
 
 Additional environment variables:
 

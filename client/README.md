@@ -15,6 +15,7 @@ It currently provides:
 - research-side multi-stable vault reserve reads and targeted fund/withdraw helpers
 - teaching-side DAO state and vault reserve read helpers
 - teaching fault-settlement, remedial wage closure, and module wiring read helpers
+- unmatched teaching collateral withdrawal helper
 - a module compatibility checker for post-deployment registry/distributor/policy wiring
 - coordinator fault-resolution helpers
 - an `inspect.ts` script for direct DAO, research, and teaching state reads

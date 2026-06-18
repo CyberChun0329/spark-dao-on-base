@@ -157,6 +157,9 @@ abstract contract SparkDaoConfig {
         _callToken(token, abi.encodeCall(IERC20.transferFrom, (from, to, amount)));
     }
 
+    /// @dev Minimal ERC-20 call wrapper for the configured stable assets.
+    /// Stable assets are expected to move exactly the requested units and must not
+    /// charge transfer fees, rebase balances, or invoke transfer callbacks.
     function _callToken(address token, bytes memory callData) private {
         if (token == address(0)) revert SparkDaoErrors.ZeroAddress();
         (bool ok, bytes memory returnData) = token.call(callData);
