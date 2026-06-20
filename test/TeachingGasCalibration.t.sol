@@ -131,7 +131,7 @@ contract TeachingGasCalibrationTest {
         stable.mint(customer, 1_000_000_000);
     }
 
-    function testWriteTeachingGasCalibrationCsv() public {
+    function testWriteTeachingGasCalibrationCsv() public virtual {
         _clearOutput(OUT);
         _clearOutput(CLAIM_OUT);
         VM.writeFile(
@@ -943,5 +943,225 @@ contract TeachingGasCalibrationTest {
 
     function _b(bool value) internal pure returns (string memory) {
         return value ? "true" : "false";
+    }
+}
+
+contract TeachingGasCalibrationV2Test is TeachingGasCalibrationTest {
+    string internal constant V2_OUT = "teaching_gas_calibration_v2.csv";
+    string internal constant V2_FOLLOWUP_OUT = "teaching_followup_gas_calibration_v2.csv";
+
+    struct PathGas {
+        string path;
+        string category;
+        uint256 courseTypeGas;
+        uint256 researchSetupGas;
+        uint256 researchMutationGas;
+        uint256 lessonGas;
+        uint256 claimGas;
+        bool validLesson;
+        uint16 revenueWeightBps;
+    }
+
+    function testWriteTeachingGasCalibrationCsv() public pure override { }
+
+    function testWriteTeachingGasCalibrationV2Csv() public {
+        _clearOutput(V2_OUT);
+        VM.writeFile(
+            V2_OUT,
+            "path,category,course_type_gas,research_setup_gas,research_mutation_gas,lesson_gas,claim_gas,valid_lesson,revenue_weight_bps\n"
+        );
+
+        _recordPathV2(_noResearch("ORD_NR", "ordinary", false, false, false));
+        _recordPathV2(_zeroShare("ORD_ZS", "ordinary", false, false, false));
+        _recordPathV2(_researchBacked("ORD_RB", "ordinary", false, false, false));
+        _recordPathV2(_weightedMultiAsset("ORD_WM", "ordinary", false, false, false));
+        _recordPathV2(_multiLayer("ORD_ML", "ordinary", false, false, false));
+
+        _recordPathV2(_noResearch("FV_NR", "forced_valid", true, false, false));
+        _recordPathV2(_zeroShare("FV_ZS", "forced_valid", true, false, false));
+        _recordPathV2(_researchBacked("FV_RB", "forced_valid", true, false, false));
+        _recordPathV2(_weightedMultiAsset("FV_WM", "forced_valid", true, false, false));
+        _recordPathV2(_multiLayer("FV_ML", "forced_valid", true, false, false));
+
+        _recordPathV2(_noResearch("CF_NR", "customer_fault", false, true, false));
+        _recordPathV2(_zeroShare("CF_ZS", "customer_fault", false, true, false));
+        _recordPathV2(_researchBacked("CF_RB", "customer_fault", false, true, false));
+        _recordPathV2(_weightedMultiAsset("CF_WM", "customer_fault", false, true, false));
+        _recordPathV2(_multiLayer("CF_ML", "customer_fault", false, true, false));
+
+        _recordPathV2(_noResearch("TF_NR", "teacher_fault", false, false, true));
+        _recordPathV2(_zeroShare("TF_ZS", "teacher_fault", false, false, true));
+        _recordPathV2(_researchBacked("TF_RB", "teacher_fault", false, false, true));
+        _recordPathV2(_weightedMultiAsset("TF_WM", "teacher_fault", false, false, true));
+        _recordPathV2(_multiLayer("TF_ML", "teacher_fault", false, false, true));
+    }
+
+    function testWriteTeachingFollowupGasCalibrationV2Csv() public {
+        _clearOutput(V2_FOLLOWUP_OUT);
+        VM.writeFile(V2_FOLLOWUP_OUT, "path,category,gas\n");
+        _recordFollowupPrimitive(
+            "TF_REMEDIAL_WAGE_CLOSE", "remedial_wage", _teacherFaultRemedialWageClose()
+        );
+    }
+
+    function _recordPathV2(PathInput memory input) internal {
+        PathGas memory gasRow = _runPathV2(input);
+        _recordV2(gasRow);
+    }
+
+    function _runPathV2(PathInput memory input) internal returns (PathGas memory gasRow) {
+        uint64 courseTypeId;
+        uint256 gasUsed;
+
+        VM.prank(coordinator);
+        uint256 gasBefore = gasleft();
+        courseTypeId = registry.createTeachingCourseType(
+            input.path, 1_000_000, 400_000, input.researchShareBps
+        );
+        gasUsed = gasBefore - gasleft();
+        gasRow.courseTypeGas = gasUsed;
+
+        uint64 scheduledAt = uint64(block.timestamp + 7 days);
+        SparkDaoTypes.CreateTeachingSessionParams memory params =
+            SparkDaoTypes.CreateTeachingSessionParams({
+                courseTypeId: courseTypeId,
+                teacher: teacher,
+                customer: customer,
+                scheduledAt: scheduledAt,
+                customerDiscountBps: 8_000,
+                linkedResearchAssetIds: input.linkedAssetIds,
+                linkedResearchWeightBps: input.weights
+            });
+
+        VM.prank(coordinator);
+        gasBefore = gasleft();
+        uint64 teachingNftId = registry.createTeachingSession(params);
+        gasUsed = gasBefore - gasleft();
+        gasRow.lessonGas += gasUsed;
+
+        gasRow.lessonGas += _confirmSchedule(teachingNftId, true);
+        gasRow.lessonGas += _confirmSchedule(teachingNftId, false);
+        gasRow.lessonGas += _approveStable(teacher, 800_000);
+        gasRow.lessonGas += _lockCollateral(teachingNftId, true);
+        gasRow.lessonGas += _approveStable(customer, 800_000);
+        gasRow.lessonGas += _lockCollateral(teachingNftId, false);
+
+        if (input.mutateLayersBeforeResolution) {
+            VM.warp(block.timestamp + 8 days);
+            gasRow.researchMutationGas += _advancePreparedLayers(input);
+        }
+
+        if (input.forceValid) {
+            VM.warp(uint256(scheduledAt) + 31 days);
+            VM.prank(coordinator);
+            gasBefore = gasleft();
+            registry.coordinatorForceTeachingValid(teachingNftId, 3);
+            gasUsed = gasBefore - gasleft();
+            gasRow.lessonGas += gasUsed;
+            gasRow.lessonGas += _redeem(teachingNftId);
+            gasRow.validLesson = true;
+            gasRow.revenueWeightBps = 10_000;
+        } else if (input.customerFault) {
+            VM.warp(uint256(scheduledAt) + 31 days);
+            VM.prank(coordinator);
+            gasBefore = gasleft();
+            registry.coordinatorResolveCustomerFault(teachingNftId, 2);
+            gasUsed = gasBefore - gasleft();
+            gasRow.lessonGas += gasUsed;
+            gasRow.validLesson = false;
+            gasRow.revenueWeightBps = 5_000;
+        } else if (input.teacherFault) {
+            VM.warp(uint256(scheduledAt) + 31 days);
+            VM.prank(coordinator);
+            gasBefore = gasleft();
+            registry.coordinatorResolveTeacherFault(teachingNftId, 4);
+            gasUsed = gasBefore - gasleft();
+            gasRow.lessonGas += gasUsed;
+            gasRow.validLesson = false;
+            gasRow.revenueWeightBps = 5_000;
+        } else {
+            VM.warp(uint256(scheduledAt) + 8 days);
+            gasRow.lessonGas += _confirmCompletion(teachingNftId, true);
+            gasRow.lessonGas += _confirmCompletion(teachingNftId, false);
+            gasRow.lessonGas += _redeem(teachingNftId);
+            gasRow.validLesson = true;
+            gasRow.revenueWeightBps = 10_000;
+        }
+
+        gasRow.claimGas = _claimRewards(input, teachingNftId);
+
+        (uint8 status,,,,,) = registry.getTeachingSessionState(teachingNftId);
+        if (input.teacherFault) {
+            assert(status == 4);
+        } else if (input.customerFault) {
+            assert(status == 5);
+        } else {
+            assert(status == 7);
+        }
+
+        gasRow.path = input.path;
+        gasRow.category = input.category;
+        gasRow.researchSetupGas = input.setupGas;
+    }
+
+    function _teacherFaultRemedialWageClose() internal returns (uint256 gasUsed) {
+        VM.prank(coordinator);
+        uint64 courseTypeId =
+            registry.createTeachingCourseType("TF Remedial Wage", 1_000_000, 400_000, 0);
+
+        uint64 scheduledAt = uint64(block.timestamp + 7 days);
+        VM.prank(coordinator);
+        uint64 teachingNftId = registry.createTeachingSession(
+            SparkDaoTypes.CreateTeachingSessionParams({
+                courseTypeId: courseTypeId,
+                teacher: teacher,
+                customer: customer,
+                scheduledAt: scheduledAt,
+                customerDiscountBps: 8_000,
+                linkedResearchAssetIds: new uint64[](0),
+                linkedResearchWeightBps: new uint16[](0)
+            })
+        );
+
+        _prepareTeachingSession(teachingNftId);
+        VM.warp(uint256(scheduledAt) + 31 days);
+        VM.prank(coordinator);
+        registry.coordinatorResolveTeacherFault(teachingNftId, 4);
+
+        VM.prank(coordinator);
+        uint256 gasBefore = gasleft();
+        registry.coordinatorSettleTeacherFaultRemedialWage(teachingNftId);
+        gasUsed = gasBefore - gasleft();
+    }
+
+    function _recordV2(PathGas memory gasRow) internal {
+        VM.writeLine(
+            V2_OUT,
+            string.concat(
+                gasRow.path,
+                ",",
+                gasRow.category,
+                ",",
+                _u(gasRow.courseTypeGas),
+                ",",
+                _u(gasRow.researchSetupGas),
+                ",",
+                _u(gasRow.researchMutationGas),
+                ",",
+                _u(gasRow.lessonGas),
+                ",",
+                _u(gasRow.claimGas),
+                ",",
+                _b(gasRow.validLesson),
+                ",",
+                _u(gasRow.revenueWeightBps)
+            )
+        );
+    }
+
+    function _recordFollowupPrimitive(string memory path, string memory category, uint256 gasUsed)
+        internal
+    {
+        VM.writeLine(V2_FOLLOWUP_OUT, string.concat(path, ",", category, ",", _u(gasUsed)));
     }
 }

@@ -14,6 +14,7 @@
     "check:module-compatibility": "tsx client/scripts/checkModuleCompatibility.ts",
     "check:module-compatibility:example": "MODULE_COMPATIBILITY_VALIDATE_MANIFEST_ONLY=1 MODULE_COMPATIBILITY_MANIFEST=client/module-compatibility.example.json tsx client/scripts/checkModuleCompatibility.ts",
     "simulate:teaching-cost": "tsx client/scripts/simulateTeachingCost.ts",
+    "simulate:teaching-cost:v2": "tsx client/scripts/simulateTeachingCostV2.ts",
     "client:inspect": "tsx client/scripts/inspect.ts",
     "deploy:tokens": "forge script script/DeployTokens.s.sol:DeployTokens --rpc-url $BASE_RPC_URL --broadcast",
     "deploy:registry": "forge script script/DeployRegistry.s.sol:DeployRegistry --rpc-url $BASE_RPC_URL --broadcast",
@@ -26,7 +27,8 @@
     "viem": "^2.38.2"
   },
   "overrides": {
-    "ws": "^8.20.1"
+    "esbuild": "^0.28.1",
+    "ws": "^8.21.0"
   },
   "devDependencies": {
     "@types/node": "^22.19.19",

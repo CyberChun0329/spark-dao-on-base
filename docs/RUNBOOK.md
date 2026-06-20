@@ -49,7 +49,7 @@ npm run build
 npm run build:sizes
 npm run test
 npm run client:typecheck
-npm run simulate:teaching-cost
+npm run simulate:teaching-cost:v2
 ```
 
 Notes:
@@ -198,11 +198,17 @@ Gas and cost numbers are generated, not hand-filled:
 
 ```bash
 forge test --match-contract TeachingGasCalibrationTest
+forge test --match-contract TeachingGasCalibrationV2Test
 forge test --match-contract ResearchGasCalibrationTest
-npm run simulate:teaching-cost
+npm run simulate:teaching-cost:v2
 ```
 
-The calibration tests write `teaching_gas_calibration.csv`,
-`teaching_claim_gas_calibration.csv`, and `research_gas_calibration.csv`. The simulation
-script reads those CSVs plus `simulation_inputs/fee_assumptions.json` and rewrites
-`simulation_outputs/`.
+The current public cost model is V2. `TeachingGasCalibrationV2Test` writes
+`teaching_gas_calibration_v2.csv` and `teaching_followup_gas_calibration_v2.csv`.
+`ResearchGasCalibrationTest` writes `research_gas_calibration.csv`. The V2 simulation
+script reads those CSVs plus `simulation_inputs/fee_assumptions.json` and rewrites the V2
+files under `simulation_outputs/`.
+
+The V1 teaching calibration CSVs and `npm run simulate:teaching-cost` remain available
+only as a historical reproducibility baseline. Do not use them as the current public cost
+model.

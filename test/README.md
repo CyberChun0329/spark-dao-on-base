@@ -10,11 +10,12 @@ buyback, dust release, settlement scalability, multi-stable teaching reserves, f
 session stable assets, frozen fault quotes, paired registry admin-state initialisation,
 and locked token minters.
 
-`TeachingGasCalibration.t.sol` writes `teaching_gas_calibration.csv` and
-`teaching_claim_gas_calibration.csv`, the measured settlement and claim gas tables used
-by the cost simulation. It includes ordinary, forced-valid, customer-fault, and
+`TeachingGasCalibrationV2Test` writes `teaching_gas_calibration_v2.csv` and
+`teaching_followup_gas_calibration_v2.csv`, the current public teaching gas tables used
+by the V2 cost simulation. It includes ordinary, forced-valid, customer-fault, and
 teacher-fault paths across no-research, zero-share, research-backed, weighted multi-asset,
-and multi-layer settings.
+and multi-layer settings, plus the teacher-fault remedial wage follow-up primitive.
+`TeachingGasCalibrationTest` still writes the V1 teaching CSVs as a historical baseline.
 
 `ResearchRegistry.t.sol` covers research assets, positions, layer progression, revenue
 escrows, buybacks, per-stable reserves, minter locking, treasury rotation, stable-asset
@@ -31,5 +32,6 @@ Run the behavioural suite with:
 forge test -vv
 ```
 
-Run gas calibration tests only when the CSV outputs intentionally need to be refreshed;
-the TypeScript simulation reads those CSVs rather than hard-coded numbers.
+Run gas calibration tests only when the CSV outputs intentionally need to be refreshed.
+The current public TypeScript simulation is `npm run simulate:teaching-cost:v2`; it reads
+the generated V2 CSVs rather than hard-coded numbers.

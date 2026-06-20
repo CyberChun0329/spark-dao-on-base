@@ -1,0 +1,28 @@
+{
+  "calibrationSchemaVersion": 2,
+  "implementationRoot": ".",
+  "manifestMode": "public-safe",
+  "toolVersions": {
+    "node": "v24.12.0",
+    "npm": "11.6.2",
+    "forge": "forge Version: 1.5.1-stable\nCommit SHA: b0a9dd9ceda36f63e2326ce530c10e6916f4b8a2\nBuild Timestamp: 2025-12-22T11:41:09.812070000Z (1766403669)\nBuild Profile: maxperf"
+  },
+  "inputFiles": [
+    {
+      "path": "teaching_gas_calibration_v2.csv",
+      "sha256": "bf90e12c4ac429d43f66be047bbcc15b151040bbd4cd8bd2452cdf128786b4e7"
+    },
+    {
+      "path": "teaching_followup_gas_calibration_v2.csv",
+      "sha256": "7d787387b2ab923a3c53b1c24ac64c890596b0b4bb8f433f2affed662ca991cd"
+    },
+    {
+      "path": "research_gas_calibration.csv",
+      "sha256": "8e654a6a3cf92eff4d420db3389f58944c787d7a6e1512699860c95ba47097ef"
+    },
+    {
+      "path": "simulation_inputs/fee_assumptions.json",
+      "sha256": "e391a58918b019b2519fe1f9fdbac2d15dad97f6400a527ec6e89464ae21379a"
+    }
+  ]
+}
