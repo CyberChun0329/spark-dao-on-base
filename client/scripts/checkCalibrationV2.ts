@@ -32,6 +32,11 @@ const commands: Command[] = [
     ],
   },
   {
+    label: "Write research gas CSV",
+    command: "forge",
+    args: ["test", "--match-contract", "ResearchGasCalibrationTest", "-vv"],
+  },
+  {
     label: "Typecheck client scripts",
     command: "npm",
     args: ["run", "client:typecheck"],
@@ -70,18 +75,34 @@ function isInsideGitWorktree(): boolean {
   return result.status === 0 && result.stdout.trim() === "true";
 }
 
+function assertCleanGitWorktree() {
+  const result = spawnSync("git", ["status", "--porcelain"], {
+    cwd: process.cwd(),
+    encoding: "utf8",
+  });
+  if (result.error) {
+    throw result.error;
+  }
+  if (result.status !== 0) {
+    process.exit(result.status ?? 1);
+  }
+  const status = result.stdout.trim();
+  if (status) {
+    console.error("\nV2 calibration freeze check found Git worktree drift:");
+    console.error(status);
+    process.exit(1);
+  }
+}
+
 for (const command of commands) {
   run(command);
 }
 
 if (isInsideGitWorktree()) {
-  run({
-    label: "Check no unstaged calibration drift",
-    command: "git",
-    args: ["diff", "--exit-code"],
-  });
+  console.log("\n== Check clean Git worktree ==");
+  assertCleanGitWorktree();
 } else {
-  console.log("\n== Check no unstaged calibration drift ==");
+  console.log("\n== Check clean Git worktree ==");
   console.log("Skipped: not inside a Git worktree.");
 }
 

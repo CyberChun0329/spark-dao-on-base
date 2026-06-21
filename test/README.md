@@ -37,5 +37,6 @@ forge test -vv
 Run gas calibration tests only when the CSV outputs intentionally need to be refreshed.
 The current public TypeScript simulation is `npm run simulate:teaching-cost:v2`; it reads
 the generated V2 CSVs rather than hard-coded numbers.
-`npm run check:calibration:v2` reruns the V2 calibration writers, typecheck,
-reproducibility checks, V2 simulation, and a Git clean-diff check when available.
+`npm run check:calibration:v2` reruns the V2 teaching writers, the research gas writer,
+typecheck, reproducibility checks, V2 simulation, and a Git clean-worktree check when
+available.
