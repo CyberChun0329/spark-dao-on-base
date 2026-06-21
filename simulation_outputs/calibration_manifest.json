@@ -10,11 +10,11 @@
   "solcVersion": "0.8.26",
   "inputFiles": [
     {
-      "path": "teaching_gas_calibration_v2.csv",
+      "path": "teaching_gas_calibration.csv",
       "sha256": "bf90e12c4ac429d43f66be047bbcc15b151040bbd4cd8bd2452cdf128786b4e7"
     },
     {
-      "path": "teaching_followup_gas_calibration_v2.csv",
+      "path": "teaching_followup_gas_calibration.csv",
       "sha256": "cf31b1a53be6c37aa262a7b3e27254b4bdee949c0df14d0b7e5b6cf65d9a653a"
     },
     {
@@ -29,23 +29,23 @@
   "sourceFiles": [
     {
       "path": "test/TeachingGasCalibration.t.sol",
-      "sha256": "09514eaf1702ede233308e012720d3731e57ba95acd048e8a091978ea07bbeb4"
+      "sha256": "7b49d5284d96b0561aa1ed93e58dc648331a2f9f124d9dec9f98de1c98050948"
     },
     {
       "path": "test/ResearchGasCalibration.t.sol",
       "sha256": "6e8eba412528e4345f508803b1b92e6928a608b71ded745188fb7e37517823dc"
     },
     {
-      "path": "client/scripts/simulateTeachingCostV2.ts",
-      "sha256": "38a605e2d5b04178447b149722bd93a267234a0335549028734e7c861e4761f0"
+      "path": "client/scripts/simulateTeachingCost.ts",
+      "sha256": "91fcdad23a396aa8e7bd46b6e53f4278c79c2e94c80a88b5688234b536d2f021"
     },
     {
       "path": "foundry.toml",
-      "sha256": "03b6c59169e4d3d660b1a85e420b1ca9609c3c50a63c02ec1945ec07404673c9"
+      "sha256": "c205596ce02a92f74f76d1e3246b1dbd324db092bb76c04852e2d40dc7265173"
     },
     {
       "path": "package.json",
-      "sha256": "eecee1c8624830dc14d7d850da880465dfe0f768c04c66428ba3c1e88116cb16"
+      "sha256": "daa3a24f4535a4932ba46fb312aa6fdb613dc5a99e9cdef90d76a24ba072f6c9"
     },
     {
       "path": "package-lock.json",

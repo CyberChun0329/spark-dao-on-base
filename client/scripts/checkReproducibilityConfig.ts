@@ -75,12 +75,6 @@ if (packageJson.scripts?.["simulate:teaching-cost"] !== "tsx client/scripts/simu
   throw new Error("package.json is missing simulate:teaching-cost");
 }
 if (
-  packageJson.scripts?.["simulate:teaching-cost:v2"]
-  !== "tsx client/scripts/simulateTeachingCostV2.ts"
-) {
-  throw new Error("package.json is missing simulate:teaching-cost:v2");
-}
-if (
   packageJson.scripts?.["check:registry-admin-state"]
   !== "tsx client/scripts/checkRegistryAdminState.ts"
 ) {
@@ -98,11 +92,8 @@ if (
 ) {
   throw new Error("package.json is missing check:module-compatibility:example");
 }
-if (
-  packageJson.scripts?.["check:calibration:v2"]
-  !== "tsx client/scripts/checkCalibrationV2.ts"
-) {
-  throw new Error("package.json is missing check:calibration:v2");
+if (packageJson.scripts?.["check:calibration"] !== "tsx client/scripts/checkCalibration.ts") {
+  throw new Error("package.json is missing check:calibration");
 }
 
 assertIncludes(
@@ -114,9 +105,7 @@ assertIncludes(
 const foundryToml = requireText("foundry.toml");
 for (const outputPath of [
   "./teaching_gas_calibration.csv",
-  "./teaching_claim_gas_calibration.csv",
-  "./teaching_gas_calibration_v2.csv",
-  "./teaching_followup_gas_calibration_v2.csv",
+  "./teaching_followup_gas_calibration.csv",
   "./research_gas_calibration.csv",
 ]) {
   assertIncludes(foundryToml, outputPath, "foundry.toml");

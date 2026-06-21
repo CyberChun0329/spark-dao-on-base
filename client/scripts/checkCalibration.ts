@@ -8,26 +8,26 @@ type Command = {
 
 const commands: Command[] = [
   {
-    label: "Write V2 teaching gas CSV",
+    label: "Write teaching gas CSV",
     command: "forge",
     args: [
       "test",
       "--match-contract",
-      "TeachingGasCalibrationV2Test",
+      "TeachingGasCalibrationTest",
       "--match-test",
-      "testWriteTeachingGasCalibrationV2Csv",
+      "testWriteTeachingGasCalibrationCsv",
       "-vv",
     ],
   },
   {
-    label: "Write V2 follow-up gas CSV",
+    label: "Write teaching follow-up gas CSV",
     command: "forge",
     args: [
       "test",
       "--match-contract",
-      "TeachingGasCalibrationV2Test",
+      "TeachingGasCalibrationTest",
       "--match-test",
-      "testWriteTeachingFollowupGasCalibrationV2Csv",
+      "testWriteTeachingFollowupGasCalibrationCsv",
       "-vv",
     ],
   },
@@ -47,9 +47,9 @@ const commands: Command[] = [
     args: ["run", "check:reproducibility-config"],
   },
   {
-    label: "Regenerate V2 teaching cost simulation",
+    label: "Regenerate teaching cost simulation",
     command: "npm",
-    args: ["run", "simulate:teaching-cost:v2"],
+    args: ["run", "simulate:teaching-cost"],
   },
 ];
 
@@ -88,7 +88,7 @@ function assertCleanGitWorktree() {
   }
   const status = result.stdout.trim();
   if (status) {
-    console.error("\nV2 calibration freeze check found Git worktree drift:");
+    console.error("\nCalibration freeze check found Git worktree drift:");
     console.error(status);
     process.exit(1);
   }
@@ -106,4 +106,4 @@ if (isInsideGitWorktree()) {
   console.log("Skipped: not inside a Git worktree.");
 }
 
-console.log("\nV2 calibration freeze check passed.");
+console.log("\nCalibration freeze check passed.");

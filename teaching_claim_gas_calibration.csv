@@ -1,4 +1,0 @@
-path,category,claim_gas,claim_count,dust_release
-CLAIM_SINGLE_FULL,single_claim,82345,1,false
-CLAIM_BATCH_TWO,batch_claim,172002,2,false
-CLAIM_DUST_RELEASE,dust_release,44112,1,true
