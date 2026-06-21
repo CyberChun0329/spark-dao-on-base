@@ -212,11 +212,11 @@ function assertScenarioWeights() {
 
 function validateTeachingRows(rows: TeachingGasRow[]) {
   if (rows.length !== 20) {
-    throw new Error(`Expected 20 teaching schema-2 rows, got ${rows.length}`);
+    throw new Error(`Expected 20 teaching calibration rows, got ${rows.length}`);
   }
   const seen = new Set<string>();
   for (const row of rows) {
-    if (seen.has(row.path)) throw new Error(`Duplicate teaching schema-2 path: ${row.path}`);
+    if (seen.has(row.path)) throw new Error(`Duplicate teaching calibration path: ${row.path}`);
     seen.add(row.path);
     assertPositiveGas(row.course_type_gas, `${row.path}.course_type_gas`);
     assertPositiveGas(row.lesson_gas, `${row.path}.lesson_gas`);
@@ -235,14 +235,14 @@ function validateTeachingRows(rows: TeachingGasRow[]) {
   for (const prefix of ["ORD", "FV", "CF", "TF"]) {
     for (const kind of ["NR", "ZS", "RB", "WM", "ML"]) {
       const path = `${prefix}_${kind}`;
-      if (!seen.has(path)) throw new Error(`Missing teaching schema-2 path: ${path}`);
+      if (!seen.has(path)) throw new Error(`Missing teaching calibration path: ${path}`);
     }
   }
 }
 
 function validateFollowupRows(rows: FollowupGasRow[]) {
   if (rows.length !== 1) {
-    throw new Error(`Expected exactly 1 teaching schema-2 follow-up primitive, got ${rows.length}`);
+    throw new Error(`Expected exactly 1 teaching follow-up primitive, got ${rows.length}`);
   }
   const remedial = rows.find((row) => row.path === "TF_REMEDIAL_WAGE_CLOSE");
   if (!remedial) throw new Error("Missing TF_REMEDIAL_WAGE_CLOSE follow-up primitive");
@@ -324,7 +324,6 @@ function buildManifest(inputFiles: string[]) {
   return {
     calibrationSchemaVersion,
     implementationRoot: ".",
-    manifestMode: "public-safe",
     toolVersions: {
       node: process.version,
       npm: npmVersion,
@@ -844,7 +843,7 @@ const researchMaintenanceSummaries: ResearchMaintenanceSummary[] = [
 ];
 
 const researchMaintenanceTable = [
-  "| Teachers | Active students | Existing main research NFTs | New main research NFTs | Update cadence | Extra structure per update | Estimated research-maintenance cost / month | Estimated fixed-mix cost / month | Uplift vs fixed-mix lesson baseline |",
+  "| Teachers | Active students | Existing main research NFTs | New main research NFTs | Update cadence | Extra structure per update | Estimated research-maintenance cost / month | Estimated fixed-mix cost / month | Uplift vs fixed-mix lesson cost |",
   "|---:|---:|---:|---:|---|---|---:|---:|---:|",
   ...researchMaintenanceSummaries.map((row) =>
     [
@@ -915,13 +914,7 @@ measurementWindow = ${feeAssumptions.measurementWindow}
 unit = ${feeAssumptions.unit}
 \`\`\`
 
-Calibration schema version 2 separates one-time course-type creation, research setup, research mutation, lesson lifecycle, and distributor claim gas. Here, \`lesson_gas\` covers session creation, confirmations, approvals, collateral locks, resolution, and redeem. The recurring management coefficient remains \`lesson_gas + claim_gas\`. \`coupled_gas\` is reported as \`research_mutation_gas + lesson_gas + claim_gas\` for cases where the model wants to inspect cross-module research churn. The teacher-fault remedial wage close primitive is displayed separately and is not automatically included in teacher-fault scenario expectations.
-
-## Calibration Manifest
-
-\`\`\`json
-${JSON.stringify(manifest, null, 2)}
-\`\`\`
+Generated from calibration CSVs. Management gas is \`lesson_gas + claim_gas\`.
 
 ## Measured Contract Paths
 
@@ -933,7 +926,7 @@ ${followupTable.join("\n")}
 
 ## Coordinator-Extended Scenario Simulation
 
-These values use the reference fee coefficient at \`1x\`. Customer-fault and teacher-fault resolutions carry half-price revenue, so the denominator uses \`revenueWeight = 1 - 0.5 * (p(CF) + p(TF))\`.
+Values use the reference fee coefficient at \`1x\`.
 
 ${scenarioTable.join("\n")}
 
@@ -953,7 +946,7 @@ ${makeScaleTable("Synchronised", true).join("\n")}
 
 ### Research maintenance
 
-New main research NFTs in this table use the teaching-ready research asset primitive, meaning the asset has a current patch position and the current layer has been sealed.
+New main research NFTs use the teaching-ready research asset primitive.
 
 Research gas source:
 

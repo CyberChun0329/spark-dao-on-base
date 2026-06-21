@@ -88,7 +88,7 @@ function assertCleanGitWorktree() {
   }
   const status = result.stdout.trim();
   if (status) {
-    console.error("\nCalibration freeze check found Git worktree drift:");
+    console.error("\nCalibration check found Git worktree drift:");
     console.error(status);
     process.exit(1);
   }
@@ -106,4 +106,4 @@ if (isInsideGitWorktree()) {
   console.log("Skipped: not inside a Git worktree.");
 }
 
-console.log("\nCalibration freeze check passed.");
+console.log("\nCalibration check passed.");

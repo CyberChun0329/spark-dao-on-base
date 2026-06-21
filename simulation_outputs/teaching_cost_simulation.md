@@ -11,67 +11,7 @@ measurementWindow = trailing twelve months at calibration time
 unit = dollars per gas unit
 ```
 
-Calibration schema version 2 separates one-time course-type creation, research setup, research mutation, lesson lifecycle, and distributor claim gas. Here, `lesson_gas` covers session creation, confirmations, approvals, collateral locks, resolution, and redeem. The recurring management coefficient remains `lesson_gas + claim_gas`. `coupled_gas` is reported as `research_mutation_gas + lesson_gas + claim_gas` for cases where the model wants to inspect cross-module research churn. The teacher-fault remedial wage close primitive is displayed separately and is not automatically included in teacher-fault scenario expectations.
-
-## Calibration Manifest
-
-```json
-{
-  "calibrationSchemaVersion": 2,
-  "implementationRoot": ".",
-  "manifestMode": "public-safe",
-  "toolVersions": {
-    "node": "v24.12.0",
-    "npm": "11.6.2",
-    "forge": "forge Version: 1.5.1-stable\nCommit SHA: b0a9dd9ceda36f63e2326ce530c10e6916f4b8a2\nBuild Timestamp: 2025-12-22T11:41:09.812070000Z (1766403669)\nBuild Profile: maxperf"
-  },
-  "solcVersion": "0.8.26",
-  "inputFiles": [
-    {
-      "path": "teaching_gas_calibration.csv",
-      "sha256": "d940bbcdd60d1490a5e6b567812a0fc3748b72cd1c43988f4f9786c6ff6e3525"
-    },
-    {
-      "path": "teaching_followup_gas_calibration.csv",
-      "sha256": "b16af3f60757cba7bfcaf394a4c14e81ee355504f12cba106ba61877f9d31bb4"
-    },
-    {
-      "path": "research_gas_calibration.csv",
-      "sha256": "8e654a6a3cf92eff4d420db3389f58944c787d7a6e1512699860c95ba47097ef"
-    },
-    {
-      "path": "simulation_inputs/fee_assumptions.json",
-      "sha256": "e391a58918b019b2519fe1f9fdbac2d15dad97f6400a527ec6e89464ae21379a"
-    }
-  ],
-  "sourceFiles": [
-    {
-      "path": "test/TeachingGasCalibration.t.sol",
-      "sha256": "7b49d5284d96b0561aa1ed93e58dc648331a2f9f124d9dec9f98de1c98050948"
-    },
-    {
-      "path": "test/ResearchGasCalibration.t.sol",
-      "sha256": "6e8eba412528e4345f508803b1b92e6928a608b71ded745188fb7e37517823dc"
-    },
-    {
-      "path": "client/scripts/simulateTeachingCost.ts",
-      "sha256": "91fcdad23a396aa8e7bd46b6e53f4278c79c2e94c80a88b5688234b536d2f021"
-    },
-    {
-      "path": "foundry.toml",
-      "sha256": "c205596ce02a92f74f76d1e3246b1dbd324db092bb76c04852e2d40dc7265173"
-    },
-    {
-      "path": "package.json",
-      "sha256": "daa3a24f4535a4932ba46fb312aa6fdb613dc5a99e9cdef90d76a24ba072f6c9"
-    },
-    {
-      "path": "package-lock.json",
-      "sha256": "32650fa9dfe590e2ec8c23d1e92d98603b170d19c964c4697431af1cd68b1814"
-    }
-  ]
-}
-```
+Generated from calibration CSVs. Management gas is `lesson_gas + claim_gas`.
 
 ## Measured Contract Paths
 
@@ -106,7 +46,7 @@ Calibration schema version 2 separates one-time course-type creation, research s
 
 ## Coordinator-Extended Scenario Simulation
 
-These values use the reference fee coefficient at `1x`. Customer-fault and teacher-fault resolutions carry half-price revenue, so the denominator uses `revenueWeight = 1 - 0.5 * (p(CF) + p(TF))`.
+Values use the reference fee coefficient at `1x`.
 
 | Window | Coordinator case | p(FV) | p(CF) | p(TF) | Research mutation gas | Lesson gas | Claim gas | Management gas | Coupled gas | Revenue weight | Management cost / attempted lesson | Coupled cost / attempted lesson | Claim gas share | Share at $50 | Share at $100 | Share at $150 |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
@@ -151,7 +91,7 @@ These values use the reference fee coefficient at `1x`. Customer-fault and teach
 
 ### Research maintenance
 
-New main research NFTs in this table use the teaching-ready research asset primitive, meaning the asset has a current patch position and the current layer has been sealed.
+New main research NFTs use the teaching-ready research asset primitive.
 
 Research gas source:
 
@@ -162,7 +102,7 @@ Research gas source:
 | Periodic update bundle | 354,456 |
 | Extra prepared position | 259,467 |
 
-| Teachers | Active students | Existing main research NFTs | New main research NFTs | Update cadence | Extra structure per update | Estimated research-maintenance cost / month | Estimated fixed-mix cost / month | Uplift vs fixed-mix lesson baseline |
+| Teachers | Active students | Existing main research NFTs | New main research NFTs | Update cadence | Extra structure per update | Estimated research-maintenance cost / month | Estimated fixed-mix cost / month | Uplift vs fixed-mix lesson cost |
 |---:|---:|---:|---:|---|---|---:|---:|---:|
 | 120 | 600 | 60 | 0 | annual | none | $0.03 | $48.32 | 0.055% |
 | 120 | 600 | 60 | 0 | semiannual | none | $0.05 | $48.35 | 0.110% |

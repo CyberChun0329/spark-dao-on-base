@@ -31,14 +31,8 @@ The local demo scripts deploy their own temporary contracts:
   `TeachingFaultPolicyV1`, `ResearchRegistry`, `TeachingRegistry`, and
   `TeachingRewardDistributor`.
 
-The teaching demo wires the distributor into the registry and claims teaching rewards
-through the distributor. It sets `rewardUnlockSeconds` and `buybackWaitSeconds` to `0`
-so the full local claim and buyback path can run in a single pass.
-
-Do not reuse the demo timing values for production deployments. Production operators
-should choose non-zero reward and buyback waiting windows in the deployment environment;
-v1 treats those windows as configured deployment parameters rather than hard-coded
-protocol minimums.
+The teaching demo wires the distributor into the registry and runs a local claim path.
+Use environment timing values for non-demo deployments.
 
 ## 2. Protocol Regression Checks
 
@@ -55,16 +49,11 @@ npm run check:calibration
 
 Notes:
 
-- `build:sizes` uses `--skip script` so the size report focuses on deployable protocol
-  contracts rather than script contracts.
-- `check:registry-admin-state` requires a deployed environment. It compares research and
-  teaching registry authority, coordinator, treasury, stable asset, and timing defaults.
-- `check:module-compatibility` requires a deployed environment. It checks registry
-  module state, distributor immutables, policy version getters, and policy guard
-  validation results. When token addresses are configured in env or supplied by the
-  manifest, it also checks that both token minters have been locked.
+- `build:sizes` reports deployable protocol contract sizes.
+- `check:registry-admin-state` and `check:module-compatibility` require a deployed
+  environment.
 - `check:module-compatibility:example` validates the example manifest format without
-  requiring chain access.
+  chain access.
 
 ## 3. Deployment Order
 
@@ -83,46 +72,18 @@ npm run deploy:tokens
 npm run deploy:registry
 ```
 
-`DeployRegistry.s.sol` deploys `TeachingPolicyGuard`, `TeachingEconomicsPolicyV1`,
-`TeachingFaultPolicyV1`, `ResearchRegistry`, `TeachingRegistry`, and
-`TeachingRewardDistributor`. It then calls `ResearchRegistry.setTeachingRegistry` and
-`TeachingRegistry.setTeachingRewardDistributor`. The broadcast signer must be
-`DAO_AUTHORITY`, or otherwise be able to act as `DAO_AUTHORITY` for these one-time
-wiring calls.
+`DeployRegistry.s.sol` deploys the registries, policy modules, and distributor, then
+wires the registry/distributor addresses. The broadcast signer must be `DAO_AUTHORITY`.
 
-Stable asset and token inputs are validated as deployed contract addresses. If an EOA or
-undeployed address is supplied, deployment reverts before the registry stores it.
-Stable assets are expected to be standard ERC-20 tokens without transfer fees, rebasing
-balance changes, or transfer callbacks, because registry reserve accounting assumes the
-requested transfer amount is the amount that actually moves. Treat this as an active
-deployment risk acceptance: callback-capable stable tokens require a separate regression
-suite and guard design before configuration.
+Use deployed contract addresses for stable asset and token inputs.
 
-The registry/distributor handshake catches common address and deployment-order mistakes:
-the teaching registry checks the distributor's `TEACHING_REGISTRY()` and
-`RESEARCH_REGISTRY()` immutables, and the research registry checks that the teaching
-registry points back to the expected research registry. These checks do not prove that
-the deployed bytecode is benign; deployment operators must still use trusted artifacts.
+After deployment, record the registry, distributor, and policy addresses.
 
-After deployment, record:
-
-- `RESEARCH_REGISTRY`
-- `TEACHING_REGISTRY`
-- `TEACHING_REWARD_DISTRIBUTOR`
-- `TEACHING_POLICY_GUARD`
-- `TEACHING_ECONOMICS_POLICY`
-- `TEACHING_FAULT_POLICY`
-
-For bytecode-aware deployment review, copy `client/module-compatibility.example.json`,
-fill real addresses and optional `deployedBytecodeHash` values, set
-`MODULE_COMPATIBILITY_MANIFEST`, and run:
+For manifest-based deployment review:
 
 ```bash
 npm run check:module-compatibility
 ```
-
-Without recorded bytecode hashes, the manifest check verifies address and wiring
-consistency only.
 
 3. Set and lock token minters:
 
@@ -130,17 +91,9 @@ consistency only.
 npm run deploy:set-minters
 ```
 
-The research position token minter should be set to `ResearchRegistry`, the teaching NFT
-token minter should be set to `TeachingRegistry`, and both minters should then be locked.
-`check:module-compatibility` verifies those lock bits when token addresses are configured
-in env or supplied by the module compatibility manifest.
+Set registry minters for both token contracts, then lock them.
 
-Governance and liveness hardening remains intentionally separate from deployment wiring:
-two-step authority or coordinator rotation and timeout fallback for teacher-fault
-remedial wage closure should be handled in independent patches before production use.
-
-If research and teaching should stay under the same admin/default settings, run these
-checks after deployment and after later admin rotations:
+Run these checks after deployment:
 
 ```bash
 npm run check:registry-admin-state
@@ -167,15 +120,7 @@ Read-only chain inspection:
 npm run client:inspect
 ```
 
-Optional inspection variables:
-
-- `INSPECT_ASSET_ID`
-- `INSPECT_POSITION_ID`
-- `INSPECT_TEACHING_NFT_ID`
-
-If `INSPECT_TEACHING_NFT_ID`, `INSPECT_ASSET_ID`, and `INSPECT_POSITION_ID` are all set,
-the inspection script reads teaching reward preview state. That path requires
-`TEACHING_REWARD_DISTRIBUTOR`.
+Set inspection IDs in the environment when deeper state reads are needed.
 
 ## 5. Base Sepolia
 
@@ -186,15 +131,10 @@ For Base Sepolia:
 - set `DAO_TREASURY` to the intended treasury or multisig
 - use deployed contract addresses for `STABLE_ASSET`, `RESEARCH_POSITION_TOKEN`, and
   `TEACHING_NFT_TOKEN`
-- set `TEACHING_REWARD_DISTRIBUTOR` from the `DeployRegistry.s.sol` output
-- set `TEACHING_POLICY_GUARD` from the `DeployRegistry.s.sol` output
-- set `TEACHING_ECONOMICS_POLICY` from the `DeployRegistry.s.sol` output
-- set `TEACHING_FAULT_POLICY` from the `DeployRegistry.s.sol` output
+- set the distributor and policy addresses from the registry deployment output
 - set production values for `REWARD_UNLOCK_SECONDS` and `BUYBACK_WAIT_SECONDS`
 
-Do not use demo zero-delay parameters for production-like deployments. The local
-teaching demo uses a future `scheduledAt` and Foundry time controls only for fast local
-execution; it is not a production backfill model.
+Set deployment timing values explicitly for non-demo networks.
 
 Recommended order:
 
@@ -204,7 +144,7 @@ Recommended order:
 
 ## 6. Gas And Simulation Refresh
 
-Gas and cost numbers are generated, not hand-filled:
+Refresh generated gas and cost outputs:
 
 ```bash
 forge test --match-contract TeachingGasCalibrationTest
@@ -213,14 +153,5 @@ npm run simulate:teaching-cost
 npm run check:calibration
 ```
 
-The current cost model uses calibration schema version 2. `TeachingGasCalibrationTest`
-writes `teaching_gas_calibration.csv` and `teaching_followup_gas_calibration.csv`.
-`ResearchGasCalibrationTest` writes `research_gas_calibration.csv`. The simulation script
-reads those CSVs plus `simulation_inputs/fee_assumptions.json` and rewrites the current
-files under `simulation_outputs/`. The freeze check command reruns the teaching and
-research generators plus the simulation, then verifies that regeneration leaves a clean
-Git worktree when it is run inside a Git worktree.
-
-The old V1 calibration pipeline is historical and should be preserved by a public
-`calibration-v1-final` tag during the next public sync rather than kept active in this
-live source. Do not use V1 outputs as the current cost model.
+The calibration tests write the CSV inputs; the simulation rewrites
+`simulation_outputs/`.

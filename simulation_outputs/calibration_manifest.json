@@ -1,7 +1,6 @@
 {
   "calibrationSchemaVersion": 2,
   "implementationRoot": ".",
-  "manifestMode": "public-safe",
   "toolVersions": {
     "node": "v24.12.0",
     "npm": "11.6.2",
@@ -37,7 +36,7 @@
     },
     {
       "path": "client/scripts/simulateTeachingCost.ts",
-      "sha256": "91fcdad23a396aa8e7bd46b6e53f4278c79c2e94c80a88b5688234b536d2f021"
+      "sha256": "e5262812cf4484262ec710a79f01d3626c184aed44f7c2edb3d00d19c00575f9"
     },
     {
       "path": "foundry.toml",
