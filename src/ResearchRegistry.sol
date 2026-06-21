@@ -307,6 +307,8 @@ contract ResearchRegistry is SparkDaoConfig {
         emit LayerSealed(assetId, layerIndex);
     }
 
+    /// @notice Lets the current holder voluntarily roll a sealed current-layer
+    /// position forward with exactly one decay step before the timed decay gate.
     function approveEarlyDecay(uint64 assetId, uint64 positionId) external {
         SparkDaoTypes.ResearchAsset storage asset = _requireAsset(assetId);
         SparkDaoTypes.ResearchPosition storage position = _requirePosition(assetId, positionId);

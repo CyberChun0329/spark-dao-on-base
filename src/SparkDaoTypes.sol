@@ -7,6 +7,8 @@ library SparkDaoTypes {
     uint256 internal constant MAX_URI_LEN = 200;
     uint256 internal constant MAX_COURSE_TYPE_NAME_LEN = 48;
     uint256 internal constant MAX_TEACHING_RESEARCH_LINKS = 2;
+    /// @dev Absolute research-share cap. Teacher-fault solvency may impose a lower
+    /// course-specific cap based on the frozen teacher salary to lesson price ratio.
     uint16 internal constant MAX_TEACHING_RESEARCH_SHARE_BPS = 2_500;
     uint64 internal constant DAY_SECONDS = 86_400;
     uint64 internal constant YEAR_SECONDS = 365 * DAY_SECONDS;

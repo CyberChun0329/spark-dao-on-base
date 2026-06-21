@@ -3221,6 +3221,182 @@ contract TeachingRegistryTest {
         assertTrue(position.totalClaimedUnits == 80_000);
     }
 
+    function testAuthorityCanWithdrawCompletedTeachingIdleWithoutTouchingReservedClaims() public {
+        VM.startPrank(coordinator);
+        uint64 assetId =
+            researchRegistry.createResearchAsset("Teaching Idle Asset", "ipfs://teaching-idle");
+        uint64 positionId = researchRegistry.createPatchPosition(
+            SparkDaoTypes.CreatePatchPositionParams({
+                assetId: assetId,
+                layerIndex: 1,
+                layerShareBps: 10_000,
+                buybackFloor: 250_000,
+                decayWaitSeconds: 365 days,
+                decayPeriodSeconds: 365 days,
+                decayRateBps: 5_000,
+                beneficiary: contributorOne
+            })
+        );
+        researchRegistry.sealLayer(assetId, 1);
+        VM.stopPrank();
+
+        uint64 teachingNftId = _createResearchBackedTeachingSession(assetId, "Idle withdrawal");
+        _completeTeachingLifecycle(teachingNftId);
+
+        assertTrue(registry.getVaultReservedUnits(address(stable)) == 480_000);
+        assertTrue(stable.balanceOf(address(registry)) == 800_000);
+
+        uint256 authorityBefore = stable.balanceOf(authority);
+        VM.prank(authority);
+        registry.withdrawTeachingIdleFor(address(stable), 320_000);
+        assertTrue(stable.balanceOf(authority) == authorityBefore + 320_000);
+        assertTrue(registry.getVaultReservedUnits(address(stable)) == 480_000);
+        assertTrue(stable.balanceOf(address(registry)) == 480_000);
+
+        VM.expectRevert(SparkDaoErrors.VaultFundsReserved.selector);
+        VM.prank(authority);
+        registry.withdrawTeachingIdleFor(address(stable), 1);
+
+        VM.warp(block.timestamp + 91 days);
+        VM.prank(teacher);
+        registry.redeemTeachingPayout(teachingNftId);
+        VM.prank(contributorOne);
+        rewardDistributor.claimTeachingReward(teachingNftId, assetId, positionId);
+
+        assertTrue(registry.getVaultReservedUnits(address(stable)) == 0);
+        assertTrue(stable.balanceOf(address(registry)) == 0);
+    }
+
+    function testTeachingIdleWithdrawalRejectsInvalidCallerAssetAndAmount() public {
+        VM.prank(coordinator);
+        uint64 courseTypeId =
+            registry.createTeachingCourseType("Idle Negative", 1_000_000, 400_000, 0);
+        uint64 teachingNftId = _createNoResearchTeachingSession(courseTypeId);
+        _prepareFullPriceTeachingSession(teachingNftId);
+        _settlePreparedTeaching(teachingNftId);
+
+        VM.expectRevert(SparkDaoErrors.UnauthorizedAuthority.selector);
+        VM.prank(coordinator);
+        registry.withdrawTeachingIdleFor(address(stable), 1);
+
+        VM.expectRevert(SparkDaoErrors.ZeroAddress.selector);
+        VM.prank(authority);
+        registry.withdrawTeachingIdleFor(address(0), 1);
+
+        VM.expectRevert(SparkDaoErrors.InvalidContractAddress.selector);
+        VM.prank(authority);
+        registry.withdrawTeachingIdleFor(address(0xBEEF), 1);
+
+        VM.expectRevert(SparkDaoErrors.InvalidAmount.selector);
+        VM.prank(authority);
+        registry.withdrawTeachingIdleFor(address(stable), 0);
+
+        VM.expectRevert(SparkDaoErrors.VaultFundsReserved.selector);
+        VM.prank(authority);
+        registry.withdrawTeachingIdleFor(address(stable), 600_001);
+    }
+
+    function testTeachingIdleWithdrawalIsPerStableAsset() public {
+        VM.prank(coordinator);
+        uint64 usdcCourse = registry.createTeachingCourseType("USDC Idle", 1_000_000, 400_000, 0);
+        uint64 usdcTeaching = _createNoResearchTeachingSession(usdcCourse);
+
+        VM.prank(authority);
+        registry.updateStableAsset(address(eurc));
+        VM.prank(coordinator);
+        uint64 eurcCourse = registry.createTeachingCourseType("EURC Idle", 1_000_000, 400_000, 0);
+        uint64 eurcTeaching = _createNoResearchTeachingSession(eurcCourse);
+
+        _prepareFullPriceTeachingSessionWithStable(usdcTeaching, stable);
+        _prepareFullPriceTeachingSessionWithStable(eurcTeaching, eurc);
+        _settlePreparedTeaching(usdcTeaching);
+        _settlePreparedTeaching(eurcTeaching);
+
+        assertTrue(stable.balanceOf(address(registry)) == 1_000_000);
+        assertTrue(eurc.balanceOf(address(registry)) == 1_000_000);
+        assertTrue(registry.getVaultReservedUnits(address(stable)) == 400_000);
+        assertTrue(registry.getVaultReservedUnits(address(eurc)) == 400_000);
+
+        VM.prank(authority);
+        registry.withdrawTeachingIdleFor(address(stable), 600_000);
+
+        assertTrue(stable.balanceOf(address(registry)) == 400_000);
+        assertTrue(eurc.balanceOf(address(registry)) == 1_000_000);
+        assertTrue(registry.getVaultReservedUnits(address(stable)) == 400_000);
+        assertTrue(registry.getVaultReservedUnits(address(eurc)) == 400_000);
+    }
+
+    function testReleasedTeachingDustBecomesWithdrawableIdle() public {
+        VM.startPrank(coordinator);
+        uint64 assetId =
+            researchRegistry.createResearchAsset("Withdrawable Dust", "ipfs://withdrawable-dust");
+        uint64 positionA = researchRegistry.createPatchPosition(
+            SparkDaoTypes.CreatePatchPositionParams({
+                assetId: assetId,
+                layerIndex: 1,
+                layerShareBps: 9_000,
+                buybackFloor: 10,
+                decayWaitSeconds: 365 days,
+                decayPeriodSeconds: 365 days,
+                decayRateBps: 5_000,
+                beneficiary: contributorOne
+            })
+        );
+        uint64 positionB = researchRegistry.createPatchPosition(
+            SparkDaoTypes.CreatePatchPositionParams({
+                assetId: assetId,
+                layerIndex: 1,
+                layerShareBps: 1_000,
+                buybackFloor: 10,
+                decayWaitSeconds: 365 days,
+                decayPeriodSeconds: 365 days,
+                decayRateBps: 5_000,
+                beneficiary: contributorTwo
+            })
+        );
+        researchRegistry.sealLayer(assetId, 1);
+        uint64 courseTypeId = registry.createTeachingCourseType("Dust Idle", 12, 1, 2_500);
+        uint64[] memory linkedAssetIds = new uint64[](1);
+        linkedAssetIds[0] = assetId;
+        uint64 teachingNftId = registry.createTeachingSession(
+            SparkDaoTypes.CreateTeachingSessionParams({
+                courseTypeId: courseTypeId,
+                teacher: teacher,
+                customer: customer,
+                scheduledAt: uint64(block.timestamp + 7 days),
+                customerDiscountBps: 10_000,
+                linkedResearchAssetIds: linkedAssetIds,
+                linkedResearchWeightBps: new uint16[](0)
+            })
+        );
+        VM.stopPrank();
+
+        _completeTeachingLifecycle(teachingNftId);
+        (, uint64 unlockAt,) =
+            rewardDistributor.getTeachingRewardClaimable(teachingNftId, assetId, positionA);
+        VM.warp(unlockAt);
+
+        VM.prank(contributorOne);
+        rewardDistributor.claimTeachingReward(teachingNftId, assetId, positionA);
+        VM.prank(contributorTwo);
+        rewardDistributor.claimTeachingReward(teachingNftId, assetId, positionB);
+
+        assertTrue(registry.getVaultReservedUnits(address(stable)) == 1);
+        assertTrue(stable.balanceOf(address(registry)) == 10);
+
+        uint256 authorityBefore = stable.balanceOf(authority);
+        VM.prank(authority);
+        registry.withdrawTeachingIdleFor(address(stable), 9);
+        assertTrue(stable.balanceOf(authority) == authorityBefore + 9);
+        assertTrue(registry.getVaultReservedUnits(address(stable)) == 1);
+        assertTrue(stable.balanceOf(address(registry)) == 1);
+
+        VM.prank(teacher);
+        registry.redeemTeachingPayout(teachingNftId);
+        assertTrue(registry.getVaultReservedUnits(address(stable)) == 0);
+        assertTrue(stable.balanceOf(address(registry)) == 0);
+    }
+
     function testSettlementGasDoesNotScaleLinearlyWithResearchPositionCount() public {
         uint64 singleAsset = _createResearchAssetWithPositions(
             "Single settlement asset", 1, SparkDaoTypes.BASIS_POINTS_DENOMINATOR
@@ -3409,6 +3585,29 @@ contract TeachingRegistryTest {
 
         VM.startPrank(customer);
         stableAsset.approve(address(registry), 800_000);
+        registry.lockTeachingCollateral(teachingNftId, false);
+        VM.stopPrank();
+    }
+
+    function _prepareFullPriceTeachingSession(uint64 teachingNftId) internal {
+        _prepareFullPriceTeachingSessionWithStable(teachingNftId, stable);
+    }
+
+    function _prepareFullPriceTeachingSessionWithStable(uint64 teachingNftId, MockERC20 stableAsset)
+        internal
+    {
+        VM.prank(teacher);
+        registry.confirmTeachingSchedule(teachingNftId, true);
+        VM.prank(customer);
+        registry.confirmTeachingSchedule(teachingNftId, false);
+
+        VM.startPrank(teacher);
+        stableAsset.approve(address(registry), 800_000);
+        registry.lockTeachingCollateral(teachingNftId, true);
+        VM.stopPrank();
+
+        VM.startPrank(customer);
+        stableAsset.approve(address(registry), 1_000_000);
         registry.lockTeachingCollateral(teachingNftId, false);
         VM.stopPrank();
     }

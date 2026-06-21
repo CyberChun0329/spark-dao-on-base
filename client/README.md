@@ -13,7 +13,7 @@ It currently provides:
 - optional `TeachingPolicyGuard`, `TeachingEconomicsPolicyV1`, and
   `TeachingFaultPolicyV1` artifact bindings for deployed policy inspection
 - research-side multi-stable vault reserve reads and targeted fund/withdraw helpers
-- teaching-side DAO state and vault reserve read helpers
+- teaching-side DAO state, vault reserve read, and idle withdrawal helpers
 - teaching fault-settlement, remedial wage closure, and module wiring read helpers
 - unmatched teaching collateral withdrawal helper
 - a module compatibility checker for post-deployment registry/distributor/policy wiring
@@ -53,10 +53,12 @@ npm run check:module-compatibility
 `check:module-compatibility` reads `TeachingRegistry.getTeachingModuleState()`,
 `TeachingRewardDistributor.TEACHING_REGISTRY()`,
 `TeachingRewardDistributor.RESEARCH_REGISTRY()`, policy version getters, and
-`TeachingPolicyGuard` validation results. If `MODULE_COMPATIBILITY_MANIFEST` is provided
-and contains `deployedBytecodeHash`, the script also reads runtime bytecode and compares
-hashes. Without bytecode hashes, the manifest can only prove address, artifact-name, and
-expected-wiring consistency.
+`TeachingPolicyGuard` validation results. If token addresses are configured in env or
+provided by `MODULE_COMPATIBILITY_MANIFEST`, it also checks that the research position
+token and teaching NFT token minters are locked. If `MODULE_COMPATIBILITY_MANIFEST` is
+provided and contains `deployedBytecodeHash`, the script reads runtime bytecode at the
+manifest address and compares hashes. Without bytecode hashes, the manifest can only
+prove address, artifact-name, and expected-wiring consistency.
 
 Validate the example manifest format without chain access:
 

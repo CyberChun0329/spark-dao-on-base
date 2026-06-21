@@ -61,7 +61,8 @@ Notes:
   teaching registry authority, coordinator, treasury, stable asset, and timing defaults.
 - `check:module-compatibility` requires a deployed environment. It checks registry
   module state, distributor immutables, policy version getters, and policy guard
-  validation results.
+  validation results. When token addresses are configured in env or supplied by the
+  manifest, it also checks that both token minters have been locked.
 - `check:module-compatibility:example` validates the example manifest format without
   requiring chain access.
 
@@ -93,7 +94,9 @@ Stable asset and token inputs are validated as deployed contract addresses. If a
 undeployed address is supplied, deployment reverts before the registry stores it.
 Stable assets are expected to be standard ERC-20 tokens without transfer fees, rebasing
 balance changes, or transfer callbacks, because registry reserve accounting assumes the
-requested transfer amount is the amount that actually moves.
+requested transfer amount is the amount that actually moves. Treat this as an active
+deployment risk acceptance: callback-capable stable tokens require a separate regression
+suite and guard design before configuration.
 
 The registry/distributor handshake catches common address and deployment-order mistakes:
 the teaching registry checks the distributor's `TEACHING_REGISTRY()` and
@@ -129,6 +132,12 @@ npm run deploy:set-minters
 
 The research position token minter should be set to `ResearchRegistry`, the teaching NFT
 token minter should be set to `TeachingRegistry`, and both minters should then be locked.
+`check:module-compatibility` verifies those lock bits when token addresses are configured
+in env or supplied by the module compatibility manifest.
+
+Governance and liveness hardening remains intentionally separate from deployment wiring:
+two-step authority or coordinator rotation and timeout fallback for teacher-fault
+remedial wage closure should be handled in independent patches before production use.
 
 If research and teaching should stay under the same admin/default settings, run these
 checks after deployment and after later admin rotations:

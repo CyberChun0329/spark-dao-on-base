@@ -1,6 +1,7 @@
 import "dotenv/config";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 import type { Address, Hex } from "viem";
 import type { SparkDaoClientConfig } from "../src/config.js";
 import type {
@@ -11,7 +12,7 @@ import type {
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000" as Address;
 const MANIFEST_SCHEMA = "spark-dao-module-compatibility/v1";
 
-type ContractKey =
+export type ContractKey =
   | "researchRegistry"
   | "teachingRegistry"
   | "teachingRewardDistributor"
@@ -21,7 +22,7 @@ type ContractKey =
   | "researchPositionToken"
   | "teachingNftToken";
 
-type ManifestContract = {
+export type ManifestContract = {
   key: ContractKey;
   contractName: string;
   address: Address;
@@ -31,7 +32,7 @@ type ManifestContract = {
   immutableWiring?: Record<string, ContractKey | string>;
 };
 
-type ModuleCompatibilityManifest = {
+export type ModuleCompatibilityManifest = {
   schema: typeof MANIFEST_SCHEMA;
   chain: {
     name: string;
@@ -57,7 +58,8 @@ type ModuleCompatibilityManifest = {
   };
 };
 
-type ArtifactJson = {
+export type ArtifactJson = {
+  abi?: readonly unknown[];
   deployedBytecode?: {
     object?: string;
   };
@@ -109,6 +111,13 @@ function requireEnvNumber(name: string, fallback: number): number {
 
 function readJson(path: string): unknown {
   return JSON.parse(readFileSync(path, "utf8")) as unknown;
+}
+
+function manifestEntryByKey(
+  manifest: ModuleCompatibilityManifest | undefined,
+  key: ContractKey,
+): ManifestContract | undefined {
+  return manifest?.contracts.find((entry) => entry.key === key);
 }
 
 function loadManifest(): ModuleCompatibilityManifest | undefined {
@@ -225,6 +234,42 @@ function addressByKey(config: SparkDaoClientConfig, key: ContractKey): Address |
   return config.addresses[key];
 }
 
+export function expectedAddressByKey(
+  config: SparkDaoClientConfig,
+  manifest: ModuleCompatibilityManifest | undefined,
+  key: ContractKey,
+): Address | undefined {
+  return addressByKey(config, key) ?? manifestEntryByKey(manifest, key)?.address;
+}
+
+export function contractDescriptorFromArtifact(
+  entry: ManifestContract,
+  artifact: ArtifactJson,
+): SparkDaoContractDescriptor {
+  if (!Array.isArray(artifact.abi)) {
+    throw new Error(`Manifest contract ${entry.key} artifact has no ABI`);
+  }
+  return {
+    address: entry.address,
+    abi: artifact.abi,
+  };
+}
+
+function contractDescriptorFromManifestEntry(entry: ManifestContract): SparkDaoContractDescriptor {
+  return contractDescriptorFromArtifact(entry, readJson(resolve(entry.artifact)) as ArtifactJson);
+}
+
+function contractByKeyOrManifest(
+  client: SparkDaoClient,
+  manifest: ModuleCompatibilityManifest | undefined,
+  key: ContractKey,
+): SparkDaoContractDescriptor | undefined {
+  const configuredContract = contractByKey(client, key);
+  if (configuredContract) return configuredContract;
+  const manifestEntry = manifestEntryByKey(manifest, key);
+  return manifestEntry ? contractDescriptorFromManifestEntry(manifestEntry) : undefined;
+}
+
 function requireContract(
   client: SparkDaoClient,
   key: ContractKey,
@@ -261,6 +306,17 @@ async function readVersion(
       args,
     }),
   );
+}
+
+async function readBool(
+  client: SparkDaoClient,
+  contract: SparkDaoContractDescriptor,
+  functionName: string,
+): Promise<boolean> {
+  return (await client.publicClient.readContract({
+    ...contract,
+    functionName,
+  })) as boolean;
 }
 
 function expectedVersions(manifest?: ModuleCompatibilityManifest) {
@@ -322,11 +378,12 @@ async function checkOnchainCompatibility(
     moduleRewardDistributor,
     distributor.address,
   );
-  if (config.addresses.teachingNftToken) {
+  const expectedTeachingNftToken = expectedAddressByKey(config, manifest, "teachingNftToken");
+  if (expectedTeachingNftToken) {
     assertAddressMatch(
       "registry module teaching NFT token",
       moduleTeachingNftToken,
-      config.addresses.teachingNftToken,
+      expectedTeachingNftToken,
     );
   }
 
@@ -366,8 +423,25 @@ async function checkOnchainCompatibility(
   assertNumberMatch("policy guard fault validation version", guardFaultVersion, versions.fault);
   assertNumberMatch("registry module fault policy version", moduleFaultVersion, versions.fault);
 
+  await checkTokenMinterLocks(client, manifest, "researchPositionToken", "research position token");
+  await checkTokenMinterLocks(client, manifest, "teachingNftToken", "teaching NFT token");
+
   if (manifest) {
     await checkManifestAgainstChain(config, client, manifest);
+  }
+}
+
+async function checkTokenMinterLocks(
+  client: SparkDaoClient,
+  manifest: ModuleCompatibilityManifest | undefined,
+  key: "researchPositionToken" | "teachingNftToken",
+  label: string,
+): Promise<void> {
+  const token = contractByKeyOrManifest(client, manifest, key);
+  if (!token) return;
+  const minterLocked = await readBool(client, token, "minterLocked");
+  if (!minterLocked) {
+    throw new Error(`${label} minter is not locked`);
   }
 }
 
@@ -384,13 +458,10 @@ async function checkManifestAgainstChain(
       assertAddressMatch(`manifest ${entry.key} address`, entry.address, configuredAddress);
     }
 
-    const contract = contractByKey(client, entry.key);
-    if (!contract) continue;
-
     if (entry.deployedBytecodeHash) {
-      const bytecode = await client.publicClient.getBytecode({ address: contract.address });
+      const bytecode = await client.publicClient.getBytecode({ address: entry.address });
       if (!bytecode) {
-        throw new Error(`No deployed bytecode found for ${entry.key} at ${contract.address}`);
+        throw new Error(`No deployed bytecode found for ${entry.key} at ${entry.address}`);
       }
       const deployedHash = await hashBytecode(bytecode);
       assertHashMatch(`${entry.key} deployed bytecode hash`, deployedHash, entry.deployedBytecodeHash);
@@ -428,7 +499,10 @@ async function main(): Promise<void> {
   console.log("Module compatibility checks passed");
 }
 
-main().catch((error) => {
-  console.error(error);
-  process.exitCode = 1;
-});
+const executedPath = process.argv[1] ? pathToFileURL(resolve(process.argv[1])).href : undefined;
+if (import.meta.url === executedPath) {
+  main().catch((error) => {
+    console.error(error);
+    process.exitCode = 1;
+  });
+}

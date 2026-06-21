@@ -19,6 +19,9 @@ callback. It reads research readiness and snapshot values through
 Course types freeze the economics and fault policy addresses, sessions freeze the
 resulting economics values and fault quotes, and the registry executes those frozen
 values during settlement.
+`withdrawTeachingIdleFor` lets the authority withdraw only teaching vault balance that is
+not reserved for teacher redemption, reward claims, remedial wages, or other frozen
+obligations.
 
 Customer fault charges half of the locked lesson price, refunds the other half, returns
 the teacher bond, and pays the teacher half of the frozen lesson salary. Teacher fault
@@ -71,6 +74,12 @@ The V1 economics policy keeps the static research-share cap as an absolute upper
 not as a guarantee that every course can use that full value. Course and session creation
 also enforce the teacher-fault solvency rule against the frozen price and salary:
 `0.5W + 2 * researchShare * P <= 0.5P`.
+Equivalently, the effective teacher-fault-solvent share depends on the frozen `W/P`
+ratio and can be lower than the static cap.
+
+Research decay counts `decayStartAt` as the first decay step. `markPositionReady` requires
+the timed decay gate to have opened; `approveEarlyDecay` is a voluntary holder action that
+uses exactly one decay step before that timed gate.
 
 `ResearchPositionToken.sol` and `TeachingNftToken.sol` are minimal non-transferable
 ERC-721-like tokens. `ResearchRegistry` mints research position tokens, `TeachingRegistry`
@@ -82,4 +91,10 @@ Registry constructors and stable-asset admin paths require token and policy addr
 be deployed contracts, not just non-zero addresses, so mistaken EOA placeholders fail
 before they can silently break minting, transfers, or reserve accounting.
 Configured stable assets are expected to be standard ERC-20 tokens without transfer fees,
-rebasing balance changes, or transfer callbacks.
+rebasing balance changes, or transfer callbacks. This is an active deployment assumption,
+not a reentrancy guard; callback-capable tokens require a separate guard design before
+they are eligible stable assets.
+
+Two-step authority or coordinator rotation and timeout fallback for teacher-fault
+remedial wage closure remain separate hardening items because they change governance or
+liveness semantics.

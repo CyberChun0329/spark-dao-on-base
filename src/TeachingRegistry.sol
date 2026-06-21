@@ -177,6 +177,15 @@ contract TeachingRegistry is SparkDaoConfig {
         }
     }
 
+    function withdrawTeachingIdleFor(address stableAsset, uint256 amount) external onlyAuthority {
+        if (stableAsset == address(0)) revert SparkDaoErrors.ZeroAddress();
+        _assertContract(stableAsset);
+        if (amount == 0) revert SparkDaoErrors.InvalidAmount();
+        uint256 idleVaultUnits = _idleVaultUnits(stableAsset);
+        if (amount > idleVaultUnits) revert SparkDaoErrors.VaultFundsReserved();
+        _safeTransfer(stableAsset, msg.sender, amount);
+    }
+
     function getTeachingSessionState(uint64 teachingNftId)
         external
         view
@@ -551,19 +560,22 @@ contract TeachingRegistry is SparkDaoConfig {
         if (teacherSide) {
             if (session.teacher != msg.sender) revert SparkDaoErrors.UnauthorizedTeacher();
             if (session.teacherBondLocked) revert SparkDaoErrors.TeachingCollateralAlreadyLocked();
-            session.teacherBondLocked = true;
             amount = session.teacherBondUnits;
         } else {
             if (session.customer != msg.sender) revert SparkDaoErrors.UnauthorizedCustomer();
             if (session.customerPaymentLocked) {
                 revert SparkDaoErrors.TeachingCollateralAlreadyLocked();
             }
-            session.customerPaymentLocked = true;
             amount = session.lessonPriceUnits;
         }
 
         if (!session.firstRoundFrozen || session.status != TEACHING_STATUS_CONFIRMED) {
             revert SparkDaoErrors.InvalidTeachingStatus();
+        }
+        if (teacherSide) {
+            session.teacherBondLocked = true;
+        } else {
+            session.customerPaymentLocked = true;
         }
         _safeTransferFrom(session.stableAsset, msg.sender, address(this), amount);
 

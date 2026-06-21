@@ -184,6 +184,25 @@ export async function withdrawUnmatchedTeachingCollateral(
   });
 }
 
+export async function withdrawTeachingIdleFor(
+  config: SparkDaoClientConfig,
+  privateKey: Hex,
+  stableAsset: Address,
+  amount: bigint,
+) {
+  const client = createTeachingClient(config, privateKey);
+  if (!client.walletClient || !client.account) {
+    throw new Error("Wallet client not configured");
+  }
+  return client.walletClient.writeContract({
+    ...client.contracts.teachingRegistry,
+    account: client.account,
+    chain: config.chain,
+    functionName: "withdrawTeachingIdleFor",
+    args: [stableAsset, amount],
+  });
+}
+
 export async function coordinatorResolveCustomerFault(
   config: SparkDaoClientConfig,
   privateKey: Hex,

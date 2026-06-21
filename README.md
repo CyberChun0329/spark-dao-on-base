@@ -143,13 +143,18 @@ teaching sessions, revenue escrows, reward pools, and research position buyback 
 freeze their stable asset when created. Vault reserves are tracked per stable asset via
 `getVaultReservedUnits(stableAsset)`, with `fundDaoVaultFor` and `withdrawDaoVaultFor`
 available for explicit multi-stable funding.
+`withdrawTeachingIdleFor` lets the authority withdraw only teaching vault balance that
+is not reserved for teacher redemption, reward claims, remedial wages, or other frozen
+obligations.
 Stable asset addresses must point to deployed token contracts. The registries reject
 non-contract stable-token addresses at deployment, default-asset update, funding, and
 withdrawal time so misconfigured EOAs cannot be treated as ERC-20 reserves.
 Configured stable assets are expected to be standard ERC-20 tokens without transfer fees,
 rebasing balance changes, or transfer callbacks. The reserve accounting assumes the
 transferred amount equals the requested amount and that token transfers do not reenter the
-registry or distributor.
+registry or distributor. This is an active deployment assumption, not a reentrancy guard:
+non-standard callback tokens must not be configured as stable assets unless a separate
+token-callback regression suite and guard design have been added first.
 
 ## Token minters
 
@@ -201,6 +206,13 @@ The static 2,500 bps teaching-research-share ceiling is only an absolute upper b
 Course creation can reject lower shares when the frozen teacher wage is high relative to
 the frozen lesson price, because teacher-fault settlement must also reserve the remedial
 half-wage.
+
+## Hardening backlog
+
+Two governance/liveness hardening items are intentionally deferred to separate patches:
+two-step authority or coordinator rotation, and a timeout fallback for teacher-fault
+remedial wage closure. Both would change governance or liveness semantics and should be
+tested independently before production deployment.
 
 ## Deployment
 

@@ -38,6 +38,8 @@ library SparkMath {
             revert SparkDaoErrors.DecayNotStarted();
         }
 
+        // Decay starts with one elapsed step at decayStartAt. This matches the
+        // one-step voluntary early rollover path in approveEarlyDecay.
         uint64 steps = ((nowTs - decayStartAt) / decayPeriodSeconds) + 1;
         if (steps > SparkDaoTypes.MAX_DECAY_STEPS) return SparkDaoTypes.MAX_DECAY_STEPS;
         return steps;
