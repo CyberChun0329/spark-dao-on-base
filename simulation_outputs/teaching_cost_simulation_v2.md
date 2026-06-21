@@ -11,7 +11,7 @@ measurementWindow = trailing twelve months at calibration time
 unit = dollars per gas unit
 ```
 
-The V2 calibration schema separates one-time course-type creation, research setup, research mutation, settlement, and distributor claim gas. The recurring management coefficient remains `lesson_gas + claim_gas`. `coupled_gas` is reported as `research_mutation_gas + lesson_gas + claim_gas` for cases where the model wants to inspect cross-module research churn. The teacher-fault remedial wage close primitive is displayed separately and is not automatically included in teacher-fault scenario expectations.
+The V2 calibration schema separates one-time course-type creation, research setup, research mutation, lesson lifecycle, and distributor claim gas. Here, `lesson_gas` covers session creation, confirmations, approvals, collateral locks, resolution, and redeem. The recurring management coefficient remains `lesson_gas + claim_gas`. `coupled_gas` is reported as `research_mutation_gas + lesson_gas + claim_gas` for cases where the model wants to inspect cross-module research churn. The teacher-fault remedial wage close primitive is displayed separately and is not automatically included in teacher-fault scenario expectations.
 
 ## Calibration Manifest
 
@@ -25,6 +25,7 @@ The V2 calibration schema separates one-time course-type creation, research setu
     "npm": "11.6.2",
     "forge": "forge Version: 1.5.1-stable\nCommit SHA: b0a9dd9ceda36f63e2326ce530c10e6916f4b8a2\nBuild Timestamp: 2025-12-22T11:41:09.812070000Z (1766403669)\nBuild Profile: maxperf"
   },
+  "solcVersion": "0.8.26",
   "inputFiles": [
     {
       "path": "teaching_gas_calibration_v2.csv",
@@ -32,7 +33,7 @@ The V2 calibration schema separates one-time course-type creation, research setu
     },
     {
       "path": "teaching_followup_gas_calibration_v2.csv",
-      "sha256": "7d787387b2ab923a3c53b1c24ac64c890596b0b4bb8f433f2affed662ca991cd"
+      "sha256": "cf31b1a53be6c37aa262a7b3e27254b4bdee949c0df14d0b7e5b6cf65d9a653a"
     },
     {
       "path": "research_gas_calibration.csv",
@@ -42,13 +43,39 @@ The V2 calibration schema separates one-time course-type creation, research setu
       "path": "simulation_inputs/fee_assumptions.json",
       "sha256": "e391a58918b019b2519fe1f9fdbac2d15dad97f6400a527ec6e89464ae21379a"
     }
+  ],
+  "sourceFiles": [
+    {
+      "path": "test/TeachingGasCalibration.t.sol",
+      "sha256": "09514eaf1702ede233308e012720d3731e57ba95acd048e8a091978ea07bbeb4"
+    },
+    {
+      "path": "test/ResearchGasCalibration.t.sol",
+      "sha256": "6e8eba412528e4345f508803b1b92e6928a608b71ded745188fb7e37517823dc"
+    },
+    {
+      "path": "client/scripts/simulateTeachingCostV2.ts",
+      "sha256": "38a605e2d5b04178447b149722bd93a267234a0335549028734e7c861e4761f0"
+    },
+    {
+      "path": "foundry.toml",
+      "sha256": "03b6c59169e4d3d660b1a85e420b1ca9609c3c50a63c02ec1945ec07404673c9"
+    },
+    {
+      "path": "package.json",
+      "sha256": "eecee1c8624830dc14d7d850da880465dfe0f768c04c66428ba3c1e88116cb16"
+    },
+    {
+      "path": "package-lock.json",
+      "sha256": "32650fa9dfe590e2ec8c23d1e92d98603b170d19c964c4697431af1cd68b1814"
+    }
   ]
 }
 ```
 
 ## Measured Contract Paths
 
-| Path | Category | Course type gas | Research setup gas | Research mutation gas | Lesson settlement gas | Distributor claim gas | Management gas | Coupled gas | Full fixture gas | Revenue weight |
+| Path | Category | Course type gas | Research setup gas | Research mutation gas | Lesson lifecycle gas | Distributor claim gas | Management gas | Coupled gas | Full fixture gas | Revenue weight |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|---|
 | ORD_NR | ordinary | 198,872 | 0 | 0 | 708,103 | 0 | 708,103 | 708,103 | 906,975 | 100.000% |
 | ORD_ZS | ordinary | 174,074 | 521,575 | 0 | 678,937 | 0 | 678,937 | 678,937 | 1,374,586 | 100.000% |
@@ -73,9 +100,9 @@ The V2 calibration schema separates one-time course-type creation, research setu
 
 ## Measured Follow-Up Primitives
 
-| Follow-up path | Category | Gas | Included in scenario expectation |
-|---|---|---:|---|
-| TF_REMEDIAL_WAGE_CLOSE | remedial_wage | 9,792 | no |
+| Follow-up path | Category | Gas | Measurement context | Included in scenario expectation |
+|---|---|---:|---|---|
+| TF_REMEDIAL_WAGE_CLOSE | remedial_wage | 9,792 | same-test-warm-call | no |
 
 ## Coordinator-Extended Scenario Simulation
 
@@ -124,6 +151,8 @@ These values use the reference fee coefficient at `1x`. Customer-fault and teach
 
 ### Research maintenance
 
+New main research NFTs in this table use the teaching-ready research asset primitive, meaning the asset has a current patch position and the current layer has been sealed.
+
 Research gas source:
 
 | Component | Gas |
@@ -142,7 +171,7 @@ Research gas source:
 
 ### Cost share under lesson pricing
 
-| Revenue / lesson | Lesson settlement cost / lesson | Distributor claim cost / lesson | Management cost / lesson | Management cost share of revenue |
+| Revenue / lesson | Lesson lifecycle cost / lesson | Distributor claim cost / lesson | Management cost / lesson | Management cost share of revenue |
 |---:|---:|---:|---:|---:|
 | $50 | $0.0107-$0.0120 | $0.0003-$0.0014 | $0.0110-$0.0134 | 0.022%-0.027% |
 | $100 | $0.0107-$0.0120 | $0.0003-$0.0014 | $0.0110-$0.0134 | 0.011%-0.013% |

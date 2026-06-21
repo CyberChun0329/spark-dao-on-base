@@ -98,6 +98,12 @@ if (
 ) {
   throw new Error("package.json is missing check:module-compatibility:example");
 }
+if (
+  packageJson.scripts?.["check:calibration:v2"]
+  !== "tsx client/scripts/checkCalibrationV2.ts"
+) {
+  throw new Error("package.json is missing check:calibration:v2");
+}
 
 assertIncludes(
   requireText("client/module-compatibility.example.json"),

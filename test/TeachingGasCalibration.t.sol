@@ -998,9 +998,12 @@ contract TeachingGasCalibrationV2Test is TeachingGasCalibrationTest {
 
     function testWriteTeachingFollowupGasCalibrationV2Csv() public {
         _clearOutput(V2_FOLLOWUP_OUT);
-        VM.writeFile(V2_FOLLOWUP_OUT, "path,category,gas\n");
+        VM.writeFile(V2_FOLLOWUP_OUT, "path,category,gas,measurement_context\n");
         _recordFollowupPrimitive(
-            "TF_REMEDIAL_WAGE_CLOSE", "remedial_wage", _teacherFaultRemedialWageClose()
+            "TF_REMEDIAL_WAGE_CLOSE",
+            "remedial_wage",
+            _teacherFaultRemedialWageClose(),
+            "same-test-warm-call"
         );
     }
 
@@ -1159,9 +1162,15 @@ contract TeachingGasCalibrationV2Test is TeachingGasCalibrationTest {
         );
     }
 
-    function _recordFollowupPrimitive(string memory path, string memory category, uint256 gasUsed)
-        internal
-    {
-        VM.writeLine(V2_FOLLOWUP_OUT, string.concat(path, ",", category, ",", _u(gasUsed)));
+    function _recordFollowupPrimitive(
+        string memory path,
+        string memory category,
+        uint256 gasUsed,
+        string memory measurementContext
+    ) internal {
+        VM.writeLine(
+            V2_FOLLOWUP_OUT,
+            string.concat(path, ",", category, ",", _u(gasUsed), ",", measurementContext)
+        );
     }
 }

@@ -50,6 +50,7 @@ npm run build:sizes
 npm run test
 npm run client:typecheck
 npm run simulate:teaching-cost:v2
+npm run check:calibration:v2
 ```
 
 Notes:
@@ -201,13 +202,16 @@ forge test --match-contract TeachingGasCalibrationTest
 forge test --match-contract TeachingGasCalibrationV2Test
 forge test --match-contract ResearchGasCalibrationTest
 npm run simulate:teaching-cost:v2
+npm run check:calibration:v2
 ```
 
 The current public cost model is V2. `TeachingGasCalibrationV2Test` writes
 `teaching_gas_calibration_v2.csv` and `teaching_followup_gas_calibration_v2.csv`.
 `ResearchGasCalibrationTest` writes `research_gas_calibration.csv`. The V2 simulation
 script reads those CSVs plus `simulation_inputs/fee_assumptions.json` and rewrites the V2
-files under `simulation_outputs/`.
+files under `simulation_outputs/`. The freeze check command reruns the V2 generators and
+simulation, then verifies that regeneration leaves no unstaged output drift when it is run
+inside a Git worktree.
 
 The V1 teaching calibration CSVs and `npm run simulate:teaching-cost` remain available
 only as a historical reproducibility baseline. Do not use them as the current public cost

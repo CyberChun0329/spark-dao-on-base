@@ -21,6 +21,7 @@ type FollowupGasRow = {
   path: string;
   category: string;
   gas: number;
+  measurement_context: string;
 };
 
 type ResearchGasRow = {
@@ -72,7 +73,7 @@ type SummaryRow = {
   expectedManagementGas: number;
   expectedCoupledGas: number;
   revenueWeight: number;
-  lessonSettlementCostPerAttemptedLesson: number;
+  lessonLifecycleCostPerAttemptedLesson: number;
   claimCostPerAttemptedLesson: number;
   costPerAttemptedLesson: number;
   coupledCostPerAttemptedLesson: number;
@@ -86,6 +87,15 @@ const followupGasCsvPath = join(root, "teaching_followup_gas_calibration_v2.csv"
 const researchGasCsvPath = join(root, "research_gas_calibration.csv");
 const feeAssumptionsPath = join(root, "simulation_inputs", "fee_assumptions.json");
 const outDir = join(root, "simulation_outputs");
+const expectedRemedialWageContext = "same-test-warm-call";
+const sourceFilePaths = [
+  "test/TeachingGasCalibration.t.sol",
+  "test/ResearchGasCalibration.t.sol",
+  "client/scripts/simulateTeachingCostV2.ts",
+  "foundry.toml",
+  "package.json",
+  "package-lock.json",
+];
 
 const scenarios: Scenario[] = [
   {
@@ -160,6 +170,7 @@ function parseFollowupCsv(path: string): FollowupGasRow[] {
     path: row.path,
     category: row.category,
     gas: numberCell(row, "gas", row.path),
+    measurement_context: row.measurement_context,
   }));
 }
 
@@ -235,6 +246,11 @@ function validateFollowupRows(rows: FollowupGasRow[]) {
   if (!remedial) throw new Error("Missing TF_REMEDIAL_WAGE_CLOSE follow-up primitive");
   if (remedial.category !== "remedial_wage") {
     throw new Error("TF_REMEDIAL_WAGE_CLOSE category must be remedial_wage");
+  }
+  if (remedial.measurement_context !== expectedRemedialWageContext) {
+    throw new Error(
+      `TF_REMEDIAL_WAGE_CLOSE measurement_context must be ${expectedRemedialWageContext}`,
+    );
   }
   assertPositiveGas(remedial.gas, "TF_REMEDIAL_WAGE_CLOSE.gas");
 }
@@ -312,7 +328,12 @@ function buildManifest(inputFiles: string[]) {
       npm: npmVersion,
       forge: forgeVersion,
     },
+    solcVersion: "0.8.26",
     inputFiles: inputFiles.map((path) => ({
+      path,
+      sha256: sha256(join(root, path)),
+    })),
+    sourceFiles: sourceFilePaths.map((path) => ({
       path,
       sha256: sha256(join(root, path)),
     })),
@@ -357,7 +378,7 @@ const simulationRows: string[] = [
     "expected_management_gas_per_attempted_lesson",
     "expected_coupled_gas_per_attempted_lesson",
     "revenue_weight",
-    "lesson_settlement_cost_per_attempted_lesson",
+    "lesson_lifecycle_cost_per_attempted_lesson",
     "claim_cost_per_attempted_lesson",
     "claim_inclusive_cost_per_attempted_lesson",
     "coupled_cost_per_attempted_lesson",
@@ -431,7 +452,7 @@ for (const scenario of scenarios) {
     const revenueWeight = 1 - 0.5 * (coordinatorCase.pCF + coordinatorCase.pTF);
 
     for (const feeMultiplier of feeMultipliers) {
-      const lessonSettlementCostPerAttemptedLesson =
+      const lessonLifecycleCostPerAttemptedLesson =
         expectedLessonGas * referenceUsdPerGas * feeMultiplier;
       const claimCostPerAttemptedLesson =
         expectedClaimGas * referenceUsdPerGas * feeMultiplier;
@@ -471,7 +492,7 @@ for (const scenario of scenarios) {
         expectedManagementGas,
         expectedCoupledGas,
         revenueWeight,
-        lessonSettlementCostPerAttemptedLesson,
+        lessonLifecycleCostPerAttemptedLesson,
         claimCostPerAttemptedLesson,
         costPerAttemptedLesson,
         coupledCostPerAttemptedLesson,
@@ -505,7 +526,7 @@ for (const scenario of scenarios) {
           Math.round(expectedManagementGas),
           Math.round(expectedCoupledGas),
           revenueWeight.toFixed(3),
-          lessonSettlementCostPerAttemptedLesson.toFixed(8),
+          lessonLifecycleCostPerAttemptedLesson.toFixed(8),
           claimCostPerAttemptedLesson.toFixed(8),
           costPerAttemptedLesson.toFixed(8),
           coupledCostPerAttemptedLesson.toFixed(8),
@@ -522,7 +543,7 @@ for (const scenario of scenarios) {
 }
 
 const pathTable = [
-  "| Path | Category | Course type gas | Research setup gas | Research mutation gas | Lesson settlement gas | Distributor claim gas | Management gas | Coupled gas | Full fixture gas | Revenue weight |",
+  "| Path | Category | Course type gas | Research setup gas | Research mutation gas | Lesson lifecycle gas | Distributor claim gas | Management gas | Coupled gas | Full fixture gas | Revenue weight |",
   "|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---|",
   ...gasRows.map((row) => {
     const managementGas = row.lesson_gas + row.claim_gas;
@@ -545,13 +566,14 @@ const pathTable = [
 ];
 
 const followupTable = [
-  "| Follow-up path | Category | Gas | Included in scenario expectation |",
-  "|---|---|---:|---|",
+  "| Follow-up path | Category | Gas | Measurement context | Included in scenario expectation |",
+  "|---|---|---:|---|---|",
   ...followupGasRows.map((row) =>
     [
       row.path,
       row.category,
       fmtGas(row.gas),
+      row.measurement_context,
       row.path === "TF_REMEDIAL_WAGE_CLOSE" ? "no" : "unknown",
     ].join(" | "),
   ).map((line) => `| ${line} |`),
@@ -763,7 +785,7 @@ function researchMaintenanceSummary(params: {
 }): ResearchMaintenanceSummary {
   const monthlyMaintenanceGas =
     (params.existingMainResearchNfts * updateGas
-      + params.newMainResearchNftsPerCycle * researchAssetBootstrapGas
+      + params.newMainResearchNftsPerCycle * teachingReadyResearchAssetGas
       + params.extraPreparedPositionsPerCycle * extraPreparedPositionGas)
     / params.cadenceMonths;
   const monthlyMaintenanceCost = monthlyMaintenanceGas * referenceUsdPerGas;
@@ -841,10 +863,10 @@ const ordinaryNoCoordinatorRows = summaries.filter(
   (row) => row.coordinatorCase === "No coordinator" && row.feeMultiplier === 1,
 );
 const ordinaryMinLessonCost = Math.min(
-  ...ordinaryNoCoordinatorRows.map((row) => row.lessonSettlementCostPerAttemptedLesson),
+  ...ordinaryNoCoordinatorRows.map((row) => row.lessonLifecycleCostPerAttemptedLesson),
 );
 const ordinaryMaxLessonCost = Math.max(
-  ...ordinaryNoCoordinatorRows.map((row) => row.lessonSettlementCostPerAttemptedLesson),
+  ...ordinaryNoCoordinatorRows.map((row) => row.lessonLifecycleCostPerAttemptedLesson),
 );
 const ordinaryMinClaimCost = Math.min(
   ...ordinaryNoCoordinatorRows.map((row) => row.claimCostPerAttemptedLesson),
@@ -859,7 +881,7 @@ const ordinaryMaxCost = Math.max(
   ...ordinaryNoCoordinatorRows.map((row) => row.costPerAttemptedLesson),
 );
 const costShareTable = [
-  "| Revenue / lesson | Lesson settlement cost / lesson | Distributor claim cost / lesson | Management cost / lesson | Management cost share of revenue |",
+  "| Revenue / lesson | Lesson lifecycle cost / lesson | Distributor claim cost / lesson | Management cost / lesson | Management cost share of revenue |",
   "|---:|---:|---:|---:|---:|",
   ...revenues.map((revenue) =>
     `| $${revenue} | ${fmtMoney(ordinaryMinLessonCost)}-${fmtMoney(ordinaryMaxLessonCost)} | ${
@@ -891,7 +913,7 @@ measurementWindow = ${feeAssumptions.measurementWindow}
 unit = ${feeAssumptions.unit}
 \`\`\`
 
-The V2 calibration schema separates one-time course-type creation, research setup, research mutation, settlement, and distributor claim gas. The recurring management coefficient remains \`lesson_gas + claim_gas\`. \`coupled_gas\` is reported as \`research_mutation_gas + lesson_gas + claim_gas\` for cases where the model wants to inspect cross-module research churn. The teacher-fault remedial wage close primitive is displayed separately and is not automatically included in teacher-fault scenario expectations.
+The V2 calibration schema separates one-time course-type creation, research setup, research mutation, lesson lifecycle, and distributor claim gas. Here, \`lesson_gas\` covers session creation, confirmations, approvals, collateral locks, resolution, and redeem. The recurring management coefficient remains \`lesson_gas + claim_gas\`. \`coupled_gas\` is reported as \`research_mutation_gas + lesson_gas + claim_gas\` for cases where the model wants to inspect cross-module research churn. The teacher-fault remedial wage close primitive is displayed separately and is not automatically included in teacher-fault scenario expectations.
 
 ## Calibration Manifest
 
@@ -928,6 +950,8 @@ ${makeScaleTable("Supply-first", true).join("\n")}
 ${makeScaleTable("Synchronised", true).join("\n")}
 
 ### Research maintenance
+
+New main research NFTs in this table use the teaching-ready research asset primitive, meaning the asset has a current patch position and the current layer has been sealed.
 
 Research gas source:
 
