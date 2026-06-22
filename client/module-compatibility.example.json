@@ -17,7 +17,8 @@
       "address": "0x0000000000000000000000000000000000000000",
       "artifact": "out/TeachingRegistry.sol/TeachingRegistry.json",
       "immutableWiring": {
-        "RESEARCH_REGISTRY": "researchRegistry"
+        "RESEARCH_REGISTRY": "researchRegistry",
+        "TEACHING_NFT_TOKEN": "teachingNftToken"
       }
     },
     {
@@ -31,51 +32,34 @@
       }
     },
     {
-      "key": "teachingPolicyGuard",
-      "contractName": "TeachingPolicyGuard",
+      "key": "teachingPricingPolicy",
+      "contractName": "TeachingPricingPolicyV1",
       "address": "0x0000000000000000000000000000000000000000",
-      "artifact": "out/TeachingPolicyGuard.sol/TeachingPolicyGuard.json"
-    },
-    {
-      "key": "teachingEconomicsPolicy",
-      "contractName": "TeachingEconomicsPolicyV1",
-      "address": "0x0000000000000000000000000000000000000000",
-      "artifact": "out/TeachingEconomicsPolicyV1.sol/TeachingEconomicsPolicyV1.json"
-    },
-    {
-      "key": "teachingFaultPolicy",
-      "contractName": "TeachingFaultPolicyV1",
-      "address": "0x0000000000000000000000000000000000000000",
-      "artifact": "out/TeachingFaultPolicyV1.sol/TeachingFaultPolicyV1.json"
-    },
-    {
-      "key": "researchPositionToken",
-      "contractName": "ResearchPositionToken",
-      "address": "0x0000000000000000000000000000000000000000",
-      "artifact": "out/ResearchPositionToken.sol/ResearchPositionToken.json"
+      "artifact": "out/TeachingPricingPolicyV1.sol/TeachingPricingPolicyV1.json"
     },
     {
       "key": "teachingNftToken",
       "contractName": "TeachingNftToken",
       "address": "0x0000000000000000000000000000000000000000",
       "artifact": "out/TeachingNftToken.sol/TeachingNftToken.json"
+    },
+    {
+      "key": "researchPositionToken",
+      "contractName": "ResearchPositionToken",
+      "address": "0x0000000000000000000000000000000000000000",
+      "artifact": "out/ResearchPositionToken.sol/ResearchPositionToken.json"
     }
   ],
   "expectedRelationships": {
     "teachingRegistry": {
       "researchRegistry": "researchRegistry",
       "rewardDistributor": "teachingRewardDistributor",
-      "policyGuard": "teachingPolicyGuard",
-      "economicsPolicy": "teachingEconomicsPolicy",
-      "faultPolicy": "teachingFaultPolicy"
+      "pricingPolicy": "teachingPricingPolicy",
+      "teachingNftToken": "teachingNftToken"
     },
     "teachingRewardDistributor": {
       "teachingRegistry": "teachingRegistry",
       "researchRegistry": "researchRegistry"
-    },
-    "policyVersions": {
-      "economics": 1,
-      "fault": 1
     }
   }
 }

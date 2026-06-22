@@ -22,8 +22,8 @@ contract SetTokenMinters {
         VM.startBroadcast();
 
         ResearchPositionToken(researchPositionToken).setMinter(researchRegistry);
-        TeachingNftToken(teachingNftToken).setMinter(teachingRegistry);
         ResearchPositionToken(researchPositionToken).lockMinter();
+        TeachingNftToken(teachingNftToken).setMinter(teachingRegistry);
         TeachingNftToken(teachingNftToken).lockMinter();
 
         VM.stopBroadcast();

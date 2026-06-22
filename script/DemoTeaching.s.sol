@@ -1,15 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.26;
 
+import { TeachingPricingPolicyV1 } from "../src/TeachingPricingPolicyV1.sol";
 import { TeachingRegistry } from "../src/TeachingRegistry.sol";
-import { ResearchRegistry } from "../src/ResearchRegistry.sol";
 import { TeachingRewardDistributor } from "../src/TeachingRewardDistributor.sol";
-import { TeachingEconomicsPolicyV1 } from "../src/TeachingEconomicsPolicyV1.sol";
-import { TeachingFaultPolicyV1 } from "../src/TeachingFaultPolicyV1.sol";
-import { TeachingPolicyGuard } from "../src/TeachingPolicyGuard.sol";
-import { TeachingNftToken } from "../src/TeachingNftToken.sol";
 import { ResearchPositionToken } from "../src/ResearchPositionToken.sol";
+import { ResearchRegistry } from "../src/ResearchRegistry.sol";
+import { SparkTeachingTypes } from "../src/SparkTeachingTypes.sol";
 import { SparkDaoTypes } from "../src/SparkDaoTypes.sol";
+import { TeachingNftToken } from "../src/TeachingNftToken.sol";
 import { MockERC20 } from "../test/mocks/MockERC20.sol";
 
 interface Vm {
@@ -17,7 +16,6 @@ interface Vm {
     function addr(uint256 privateKey) external returns (address);
     function startBroadcast(uint256 privateKey) external;
     function stopBroadcast() external;
-    function warp(uint256) external;
 }
 
 contract DemoTeaching {
@@ -27,9 +25,7 @@ contract DemoTeaching {
         address stableAsset;
         address researchPositionToken;
         address teachingNftToken;
-        address policyGuard;
-        address economicsPolicy;
-        address faultPolicy;
+        address pricingPolicy;
         address researchRegistry;
         address teachingRegistry;
         address rewardDistributor;
@@ -61,13 +57,11 @@ contract DemoTeaching {
         );
         TeachingNftToken teachingToken =
             new TeachingNftToken(authority, "Spark Teaching NFT", "STN", "ipfs://demo-teaching/");
-        TeachingEconomicsPolicyV1 economicsPolicy = new TeachingEconomicsPolicyV1();
-        TeachingFaultPolicyV1 faultPolicy = new TeachingFaultPolicyV1();
-        TeachingPolicyGuard policyGuard = new TeachingPolicyGuard();
+        TeachingPricingPolicyV1 pricingPolicy = new TeachingPricingPolicyV1();
         ResearchRegistry researchRegistry = new ResearchRegistry(
             authority, coordinator, authority, address(stable), 0, 0, address(researchToken)
         );
-        TeachingRegistry registry = new TeachingRegistry(
+        TeachingRegistry teaching = new TeachingRegistry(
             authority,
             coordinator,
             authority,
@@ -75,27 +69,25 @@ contract DemoTeaching {
             0,
             0,
             address(researchRegistry),
-            address(teachingToken),
-            address(policyGuard),
-            address(economicsPolicy),
-            address(faultPolicy)
+            address(pricingPolicy),
+            address(teachingToken)
         );
         TeachingRewardDistributor rewardDistributor =
-            new TeachingRewardDistributor(address(registry), address(researchRegistry));
-        researchRegistry.setTeachingRegistry(address(registry));
-        registry.setTeachingRewardDistributor(address(rewardDistributor));
+            new TeachingRewardDistributor(address(teaching), address(researchRegistry));
+        researchRegistry.setTeachingRegistry(address(teaching));
+        teaching.setTeachingRewardDistributor(address(rewardDistributor));
         researchToken.setMinter(address(researchRegistry));
-        teachingToken.setMinter(address(registry));
+        teachingToken.setMinter(address(teaching));
         researchToken.lockMinter();
         teachingToken.lockMinter();
-        stable.mint(authority, 5_000_000_000);
         stable.mint(teacher, 5_000_000_000);
         stable.mint(customer, 5_000_000_000);
+        stable.mint(contributorTwo, 5_000_000_000);
         VM.stopBroadcast();
 
         VM.startBroadcast(coordinatorPk);
         uint64 assetId = researchRegistry.createResearchAsset(
-            "Demo Teaching Research", "ipfs://demo-teaching-research"
+            "Demo Teaching Research", "ipfs://demo-teaching"
         );
         uint64 positionOneId = researchRegistry.createPatchPosition(
             SparkDaoTypes.CreatePatchPositionParams({
@@ -124,50 +116,46 @@ contract DemoTeaching {
         researchRegistry.sealLayer(assetId, 1);
 
         uint64 courseTypeId =
-            registry.createTeachingCourseType("Demo Teaching Course", 1_000_000, 400_000, 1_000);
+            teaching.createTeachingCourseType("Demo Teaching", 1_000_000, 400_000, 1_000);
+        address[] memory students = new address[](2);
+        students[0] = customer;
+        students[1] = contributorTwo;
         uint64[] memory assetIds = new uint64[](1);
         assetIds[0] = assetId;
         uint16[] memory weights = new uint16[](1);
         weights[0] = 10_000;
-        uint64 teachingNftId = registry.createTeachingSession(
-            SparkDaoTypes.CreateTeachingSessionParams({
+        uint64 teachingNftId = teaching.createTeachingSession(
+            SparkTeachingTypes.CreateTeachingSessionParams({
                 courseTypeId: courseTypeId,
                 teacher: teacher,
-                customer: customer,
+                students: students,
                 scheduledAt: uint64(block.timestamp + 1),
-                customerDiscountBps: 8_000,
+                customerDiscountBps: 10_000,
                 linkedResearchAssetIds: assetIds,
                 linkedResearchWeightBps: weights
             })
         );
+        teaching.confirmTeachingSchedule(teachingNftId, false);
         VM.stopBroadcast();
 
         VM.startBroadcast(teacherPk);
-        registry.confirmTeachingSchedule(teachingNftId, true);
-        stable.approve(address(registry), type(uint256).max);
+        teaching.confirmTeachingSchedule(teachingNftId, true);
+        stable.approve(address(teaching), type(uint256).max);
+        teaching.lockTeachingTeacherBond(teachingNftId);
         VM.stopBroadcast();
 
         VM.startBroadcast(customerPk);
-        registry.confirmTeachingSchedule(teachingNftId, false);
-        stable.approve(address(registry), type(uint256).max);
+        stable.approve(address(teaching), type(uint256).max);
+        teaching.payTeachingSeat(teachingNftId, 0);
         VM.stopBroadcast();
 
-        VM.startBroadcast(teacherPk);
-        registry.lockTeachingCollateral(teachingNftId, true);
+        VM.startBroadcast(contributorTwoPk);
+        stable.approve(address(teaching), type(uint256).max);
+        teaching.payTeachingSeat(teachingNftId, 1);
         VM.stopBroadcast();
 
-        VM.startBroadcast(customerPk);
-        registry.lockTeachingCollateral(teachingNftId, false);
-        VM.stopBroadcast();
-
-        VM.warp(block.timestamp + 2);
-
-        VM.startBroadcast(teacherPk);
-        registry.acknowledgeTeachingCompletion(teachingNftId, true);
-        VM.stopBroadcast();
-
-        VM.startBroadcast(customerPk);
-        registry.confirmTeachingCompletion(teachingNftId, false);
+        VM.startBroadcast(coordinatorPk);
+        teaching.coordinatorCloseTeachingValid(teachingNftId, 1);
         VM.stopBroadcast();
 
         VM.startBroadcast(contributorOnePk);
@@ -182,11 +170,9 @@ contract DemoTeaching {
             stableAsset: address(stable),
             researchPositionToken: address(researchToken),
             teachingNftToken: address(teachingToken),
-            policyGuard: address(policyGuard),
-            economicsPolicy: address(economicsPolicy),
-            faultPolicy: address(faultPolicy),
+            pricingPolicy: address(pricingPolicy),
             researchRegistry: address(researchRegistry),
-            teachingRegistry: address(registry),
+            teachingRegistry: address(teaching),
             rewardDistributor: address(rewardDistributor),
             assetId: assetId,
             teachingNftId: teachingNftId,

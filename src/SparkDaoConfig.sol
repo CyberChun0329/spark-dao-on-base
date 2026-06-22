@@ -47,9 +47,7 @@ abstract contract SparkDaoConfig {
             stableAsset: stableAsset_,
             nextAssetId: 0,
             rewardUnlockSeconds: rewardUnlockSeconds_,
-            buybackWaitSeconds: buybackWaitSeconds_,
-            nextCourseTypeId: 0,
-            nextTeachingNftId: 0
+            buybackWaitSeconds: buybackWaitSeconds_
         });
 
         emit DaoInitialized(

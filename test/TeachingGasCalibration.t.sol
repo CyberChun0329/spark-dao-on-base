@@ -1,14 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.26;
 
+import { TeachingPricingPolicyV1 } from "../src/TeachingPricingPolicyV1.sol";
 import { TeachingRegistry } from "../src/TeachingRegistry.sol";
-import { ResearchRegistry } from "../src/ResearchRegistry.sol";
 import { TeachingRewardDistributor } from "../src/TeachingRewardDistributor.sol";
-import { TeachingEconomicsPolicyV1 } from "../src/TeachingEconomicsPolicyV1.sol";
-import { TeachingFaultPolicyV1 } from "../src/TeachingFaultPolicyV1.sol";
-import { TeachingPolicyGuard } from "../src/TeachingPolicyGuard.sol";
+import { ResearchRegistry } from "../src/ResearchRegistry.sol";
 import { TeachingNftToken } from "../src/TeachingNftToken.sol";
 import { ResearchPositionToken } from "../src/ResearchPositionToken.sol";
+import { SparkTeachingTypes } from "../src/SparkTeachingTypes.sol";
 import { SparkDaoTypes } from "../src/SparkDaoTypes.sol";
 import { MockERC20 } from "./mocks/MockERC20.sol";
 
@@ -31,9 +30,7 @@ abstract contract TeachingGasCalibrationHarness {
     TeachingRegistry internal registry;
     ResearchRegistry internal researchRegistry;
     TeachingRewardDistributor internal rewardDistributor;
-    TeachingEconomicsPolicyV1 internal economicsPolicy;
-    TeachingFaultPolicyV1 internal faultPolicy;
-    TeachingPolicyGuard internal policyGuard;
+    TeachingPricingPolicyV1 internal pricingPolicy;
     TeachingNftToken internal teachingToken;
     ResearchPositionToken internal researchToken;
     MockERC20 internal stable;
@@ -88,9 +85,7 @@ abstract contract TeachingGasCalibrationHarness {
         );
         teachingToken =
             new TeachingNftToken(authority, "Spark Teaching NFT", "STN", "ipfs://teaching/");
-        economicsPolicy = new TeachingEconomicsPolicyV1();
-        faultPolicy = new TeachingFaultPolicyV1();
-        policyGuard = new TeachingPolicyGuard();
+        pricingPolicy = new TeachingPricingPolicyV1();
         researchRegistry = new ResearchRegistry(
             authority,
             coordinator,
@@ -108,10 +103,8 @@ abstract contract TeachingGasCalibrationHarness {
             90 days,
             30 days,
             address(researchRegistry),
-            address(teachingToken),
-            address(policyGuard),
-            address(economicsPolicy),
-            address(faultPolicy)
+            address(pricingPolicy),
+            address(teachingToken)
         );
         rewardDistributor =
             new TeachingRewardDistributor(address(registry), address(researchRegistry));
@@ -447,7 +440,7 @@ abstract contract TeachingGasCalibrationHarness {
         internal
         returns (uint256 gasUsed)
     {
-        VM.prank(teacherSide ? teacher : customer);
+        VM.prank(teacherSide ? teacher : coordinator);
         uint256 gasBefore = gasleft();
         registry.confirmTeachingSchedule(teachingNftId, teacherSide);
         gasUsed = gasBefore - gasleft();
@@ -466,7 +459,11 @@ abstract contract TeachingGasCalibrationHarness {
     {
         VM.prank(teacherSide ? teacher : customer);
         uint256 gasBefore = gasleft();
-        registry.lockTeachingCollateral(teachingNftId, teacherSide);
+        if (teacherSide) {
+            registry.lockTeachingTeacherBond(teachingNftId);
+        } else {
+            registry.payTeachingSeat(teachingNftId, 0);
+        }
         gasUsed = gasBefore - gasleft();
     }
 
@@ -476,7 +473,11 @@ abstract contract TeachingGasCalibrationHarness {
     {
         VM.prank(teacherSide ? teacher : customer);
         uint256 gasBefore = gasleft();
-        registry.confirmTeachingCompletion(teachingNftId, teacherSide);
+        if (teacherSide) {
+            registry.confirmTeachingDelivery(teachingNftId);
+        } else {
+            registry.confirmTeachingAttendance(teachingNftId, 0);
+        }
         gasUsed = gasBefore - gasleft();
     }
 
@@ -484,7 +485,7 @@ abstract contract TeachingGasCalibrationHarness {
         VM.warp(block.timestamp + 31 days);
         VM.prank(teacher);
         uint256 gasBefore = gasleft();
-        registry.redeemTeachingPayout(teachingNftId);
+        registry.redeemTeachingTeacherPayout(teachingNftId);
         gasUsed = gasBefore - gasleft();
     }
 
@@ -573,17 +574,17 @@ abstract contract TeachingGasCalibrationHarness {
     function _prepareTeachingSession(uint64 teachingNftId) internal {
         VM.prank(teacher);
         registry.confirmTeachingSchedule(teachingNftId, true);
-        VM.prank(customer);
+        VM.prank(coordinator);
         registry.confirmTeachingSchedule(teachingNftId, false);
 
         VM.startPrank(teacher);
         stable.approve(address(registry), 800_000);
-        registry.lockTeachingCollateral(teachingNftId, true);
+        registry.lockTeachingTeacherBond(teachingNftId);
         VM.stopPrank();
 
         VM.startPrank(customer);
         stable.approve(address(registry), 800_000);
-        registry.lockTeachingCollateral(teachingNftId, false);
+        registry.payTeachingSeat(teachingNftId, 0);
         VM.stopPrank();
     }
 
@@ -687,11 +688,13 @@ contract TeachingGasCalibrationTest is TeachingGasCalibrationHarness {
         gasRow.courseTypeGas = gasUsed;
 
         uint64 scheduledAt = uint64(block.timestamp + 7 days);
-        SparkDaoTypes.CreateTeachingSessionParams memory params =
-            SparkDaoTypes.CreateTeachingSessionParams({
+        address[] memory students = new address[](1);
+        students[0] = customer;
+        SparkTeachingTypes.CreateTeachingSessionParams memory params =
+            SparkTeachingTypes.CreateTeachingSessionParams({
                 courseTypeId: courseTypeId,
                 teacher: teacher,
-                customer: customer,
+                students: students,
                 scheduledAt: scheduledAt,
                 customerDiscountBps: 8_000,
                 linkedResearchAssetIds: input.linkedAssetIds,
@@ -720,17 +723,22 @@ contract TeachingGasCalibrationTest is TeachingGasCalibrationHarness {
             VM.warp(uint256(scheduledAt) + 31 days);
             VM.prank(coordinator);
             gasBefore = gasleft();
-            registry.coordinatorForceTeachingValid(teachingNftId, 3);
+            registry.coordinatorCloseTeachingValid(teachingNftId, 3);
             gasUsed = gasBefore - gasleft();
             gasRow.lessonGas += gasUsed;
             gasRow.lessonGas += _redeem(teachingNftId);
             gasRow.validLesson = true;
             gasRow.revenueWeightBps = 10_000;
         } else if (input.customerFault) {
+            VM.prank(coordinator);
+            gasBefore = gasleft();
+            registry.markTeachingCustomerFault(teachingNftId, 0, 2);
+            gasUsed = gasBefore - gasleft();
+            gasRow.lessonGas += gasUsed;
             VM.warp(uint256(scheduledAt) + 31 days);
             VM.prank(coordinator);
             gasBefore = gasleft();
-            registry.coordinatorResolveCustomerFault(teachingNftId, 2);
+            registry.coordinatorCloseTeachingValid(teachingNftId, 1);
             gasUsed = gasBefore - gasleft();
             gasRow.lessonGas += gasUsed;
             gasRow.validLesson = false;
@@ -739,7 +747,7 @@ contract TeachingGasCalibrationTest is TeachingGasCalibrationHarness {
             VM.warp(uint256(scheduledAt) + 31 days);
             VM.prank(coordinator);
             gasBefore = gasleft();
-            registry.coordinatorResolveTeacherFault(teachingNftId, 4);
+            registry.coordinatorCloseTeachingTeacherFault(teachingNftId, 4);
             gasUsed = gasBefore - gasleft();
             gasRow.lessonGas += gasUsed;
             gasRow.validLesson = false;
@@ -755,13 +763,13 @@ contract TeachingGasCalibrationTest is TeachingGasCalibrationHarness {
 
         gasRow.claimGas = _claimRewards(input, teachingNftId);
 
-        (uint8 status,,,,,) = registry.getTeachingSessionState(teachingNftId);
+        (uint8 status,,,,,,,,,,,) = registry.getTeachingSessionState(teachingNftId);
         if (input.teacherFault) {
-            assert(status == 4);
+            assert(status == 2);
         } else if (input.customerFault) {
-            assert(status == 5);
+            assert(status == 1);
         } else {
-            assert(status == 7);
+            assert(status == 1);
         }
 
         gasRow.path = input.path;
@@ -775,12 +783,14 @@ contract TeachingGasCalibrationTest is TeachingGasCalibrationHarness {
             registry.createTeachingCourseType("TF Remedial Wage", 1_000_000, 400_000, 0);
 
         uint64 scheduledAt = uint64(block.timestamp + 7 days);
+        address[] memory students = new address[](1);
+        students[0] = customer;
         VM.prank(coordinator);
         uint64 teachingNftId = registry.createTeachingSession(
-            SparkDaoTypes.CreateTeachingSessionParams({
+            SparkTeachingTypes.CreateTeachingSessionParams({
                 courseTypeId: courseTypeId,
                 teacher: teacher,
-                customer: customer,
+                students: students,
                 scheduledAt: scheduledAt,
                 customerDiscountBps: 8_000,
                 linkedResearchAssetIds: new uint64[](0),
@@ -791,11 +801,11 @@ contract TeachingGasCalibrationTest is TeachingGasCalibrationHarness {
         _prepareTeachingSession(teachingNftId);
         VM.warp(uint256(scheduledAt) + 31 days);
         VM.prank(coordinator);
-        registry.coordinatorResolveTeacherFault(teachingNftId, 4);
+        registry.coordinatorCloseTeachingTeacherFault(teachingNftId, 4);
 
         VM.prank(coordinator);
         uint256 gasBefore = gasleft();
-        registry.coordinatorSettleTeacherFaultRemedialWage(teachingNftId);
+        registry.coordinatorSettleTeachingRemedialWage(teachingNftId);
         gasUsed = gasBefore - gasleft();
     }
 

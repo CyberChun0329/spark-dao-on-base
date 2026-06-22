@@ -9,6 +9,9 @@ import type { ModuleCompatibilityManifest } from "./checkModuleCompatibility.js"
 
 const RESEARCH_REGISTRY = "0x00000000000000000000000000000000000000a1" as Address;
 const TEACHING_REGISTRY = "0x00000000000000000000000000000000000000a2" as Address;
+const TEACHING_REWARD_DISTRIBUTOR =
+  "0x00000000000000000000000000000000000000a3" as Address;
+const TEACHING_PRICING_POLICY = "0x00000000000000000000000000000000000000a4" as Address;
 const MANIFEST_TOKEN = "0x00000000000000000000000000000000000000b1" as Address;
 const ENV_TOKEN = "0x00000000000000000000000000000000000000b2" as Address;
 
@@ -20,27 +23,21 @@ const manifest: ModuleCompatibilityManifest = {
   },
   contracts: [
     {
-      key: "teachingNftToken",
-      contractName: "TeachingNftToken",
+      key: "researchPositionToken",
+      contractName: "ResearchPositionToken",
       address: MANIFEST_TOKEN,
-      artifact: "out/TeachingNftToken.sol/TeachingNftToken.json",
+      artifact: "out/ResearchPositionToken.sol/ResearchPositionToken.json",
     },
   ],
   expectedRelationships: {
     teachingRegistry: {
       researchRegistry: "researchRegistry",
       rewardDistributor: "teachingRewardDistributor",
-      policyGuard: "teachingPolicyGuard",
-      economicsPolicy: "teachingEconomicsPolicy",
-      faultPolicy: "teachingFaultPolicy",
+      pricingPolicy: "teachingPricingPolicy",
     },
     teachingRewardDistributor: {
       teachingRegistry: "teachingRegistry",
       researchRegistry: "researchRegistry",
-    },
-    policyVersions: {
-      economics: 1,
-      fault: 1,
     },
   },
 };
@@ -52,10 +49,12 @@ test("manifest token address is used when env token address is omitted", () => {
     addresses: {
       researchRegistry: RESEARCH_REGISTRY,
       teachingRegistry: TEACHING_REGISTRY,
+      teachingRewardDistributor: TEACHING_REWARD_DISTRIBUTOR,
+      teachingPricingPolicy: TEACHING_PRICING_POLICY,
     },
   };
 
-  assert.equal(expectedAddressByKey(config, manifest, "teachingNftToken"), MANIFEST_TOKEN);
+  assert.equal(expectedAddressByKey(config, manifest, "researchPositionToken"), MANIFEST_TOKEN);
 });
 
 test("env token address remains authoritative when both env and manifest provide one", () => {
@@ -65,11 +64,13 @@ test("env token address remains authoritative when both env and manifest provide
     addresses: {
       researchRegistry: RESEARCH_REGISTRY,
       teachingRegistry: TEACHING_REGISTRY,
-      teachingNftToken: ENV_TOKEN,
+      teachingRewardDistributor: TEACHING_REWARD_DISTRIBUTOR,
+      teachingPricingPolicy: TEACHING_PRICING_POLICY,
+      researchPositionToken: ENV_TOKEN,
     },
   };
 
-  assert.equal(expectedAddressByKey(config, manifest, "teachingNftToken"), ENV_TOKEN);
+  assert.equal(expectedAddressByKey(config, manifest, "researchPositionToken"), ENV_TOKEN);
 });
 
 test("manifest entry and artifact ABI can construct a read descriptor", () => {

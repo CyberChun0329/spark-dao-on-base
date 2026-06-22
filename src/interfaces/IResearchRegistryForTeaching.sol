@@ -4,8 +4,6 @@ pragma solidity ^0.8.26;
 import { SparkDaoTypes } from "../SparkDaoTypes.sol";
 
 interface IResearchRegistryForTeaching {
-    function RESEARCH_POSITION_TOKEN() external view returns (address);
-
     function getResearchPosition(uint64 assetId, uint64 positionId)
         external
         view

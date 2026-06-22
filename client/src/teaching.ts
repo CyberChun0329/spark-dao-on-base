@@ -1,6 +1,20 @@
 import type { Address, Hex } from "viem";
+import type {
+  SparkDaoClient,
+  SparkDaoContractDescriptor,
+} from "./createSparkDaoClient.js";
 import type { SparkDaoClientConfig } from "./config.js";
 import { createSparkDaoClient } from "./createSparkDaoClient.js";
+
+export type CreateTeachingArgs = {
+  courseTypeId: bigint;
+  teacher: Address;
+  students: Address[];
+  scheduledAt: bigint;
+  customerDiscountBps?: number;
+  linkedResearchAssetIds: bigint[];
+  linkedResearchWeightBps: number[];
+};
 
 export function createTeachingClient(
   config: SparkDaoClientConfig,
@@ -14,23 +28,19 @@ export function createTeachingClient(
   });
 }
 
-export async function getTeachingDaoState(config: SparkDaoClientConfig) {
+export async function getTeachingModuleState(config: SparkDaoClientConfig) {
   const client = createTeachingClient(config);
   return client.publicClient.readContract({
-    ...client.contracts.teachingRegistry,
-    functionName: "getDaoState",
+    ...requireTeachingRegistry(client),
+    functionName: "getTeachingModuleState",
   });
 }
 
-export async function getTeachingVaultReservedUnits(
-  config: SparkDaoClientConfig,
-  stableAsset: Address,
-) {
+export async function getTeachingDaoState(config: SparkDaoClientConfig) {
   const client = createTeachingClient(config);
   return client.publicClient.readContract({
-    ...client.contracts.teachingRegistry,
-    functionName: "getVaultReservedUnits",
-    args: [stableAsset],
+    ...requireTeachingRegistry(client),
+    functionName: "getDaoState",
   });
 }
 
@@ -40,63 +50,226 @@ export async function getTeachingSessionState(
 ) {
   const client = createTeachingClient(config);
   return client.publicClient.readContract({
-    ...client.contracts.teachingRegistry,
+    ...requireTeachingRegistry(client),
     functionName: "getTeachingSessionState",
     args: [teachingNftId],
   });
 }
 
-export async function getTeachingSessionSettlementLayers(
+export async function getTeachingSeat(
+  config: SparkDaoClientConfig,
+  teachingNftId: bigint,
+  seatIndex: number,
+) {
+  const client = createTeachingClient(config);
+  return client.publicClient.readContract({
+    ...requireTeachingRegistry(client),
+    functionName: "getTeachingSeat",
+    args: [teachingNftId, seatIndex],
+  });
+}
+
+export async function getTeachingScheduleState(
   config: SparkDaoClientConfig,
   teachingNftId: bigint,
 ) {
   const client = createTeachingClient(config);
   return client.publicClient.readContract({
-    ...client.contracts.teachingRegistry,
-    functionName: "getTeachingSessionSettlementResearchLayers",
+    ...requireTeachingRegistry(client),
+    functionName: "getTeachingScheduleState",
     args: [teachingNftId],
   });
 }
 
-export async function getTeachingFaultSettlement(
+export async function createTeachingCourseType(
   config: SparkDaoClientConfig,
+  privateKey: Hex,
+  name: string,
+  baseSeatPriceUnits: bigint,
+  baseTeacherSalaryUnits: bigint,
+  researchShareBps: number,
+) {
+  const client = requireWallet(createTeachingClient(config, privateKey));
+  return client.walletClient.writeContract({
+    ...requireTeachingRegistry(client),
+    account: client.account,
+    chain: config.chain,
+    functionName: "createTeachingCourseType",
+    args: [name, baseSeatPriceUnits, baseTeacherSalaryUnits, researchShareBps],
+  });
+}
+
+export async function createTeachingSession(
+  config: SparkDaoClientConfig,
+  privateKey: Hex,
+  args: CreateTeachingArgs,
+) {
+  const client = requireWallet(createTeachingClient(config, privateKey));
+  return client.walletClient.writeContract({
+    ...requireTeachingRegistry(client),
+    account: client.account,
+    chain: config.chain,
+    functionName: "createTeachingSession",
+    args: [{ ...args, customerDiscountBps: args.customerDiscountBps ?? 10_000 }],
+  });
+}
+
+export async function confirmTeachingSchedule(
+  config: SparkDaoClientConfig,
+  privateKey: Hex,
+  teachingNftId: bigint,
+  teacherSide: boolean,
+) {
+  const client = requireWallet(createTeachingClient(config, privateKey));
+  return client.walletClient.writeContract({
+    ...requireTeachingRegistry(client),
+    account: client.account,
+    chain: config.chain,
+    functionName: "confirmTeachingSchedule",
+    args: [teachingNftId, teacherSide],
+  });
+}
+
+export async function payTeachingSeat(
+  config: SparkDaoClientConfig,
+  privateKey: Hex,
+  teachingNftId: bigint,
+  seatIndex: number,
+) {
+  const client = requireWallet(createTeachingClient(config, privateKey));
+  return client.walletClient.writeContract({
+    ...requireTeachingRegistry(client),
+    account: client.account,
+    chain: config.chain,
+    functionName: "payTeachingSeat",
+    args: [teachingNftId, seatIndex],
+  });
+}
+
+export async function withdrawUnmatchedTeachingSeatPayment(
+  config: SparkDaoClientConfig,
+  privateKey: Hex,
+  teachingNftId: bigint,
+  seatIndex: number,
+) {
+  const client = requireWallet(createTeachingClient(config, privateKey));
+  return client.walletClient.writeContract({
+    ...requireTeachingRegistry(client),
+    account: client.account,
+    chain: config.chain,
+    functionName: "withdrawUnmatchedTeachingSeatPayment",
+    args: [teachingNftId, seatIndex],
+  });
+}
+
+export async function withdrawUnmatchedTeachingTeacherBond(
+  config: SparkDaoClientConfig,
+  privateKey: Hex,
   teachingNftId: bigint,
 ) {
-  const client = createTeachingClient(config);
-  return client.publicClient.readContract({
-    ...client.contracts.teachingRegistry,
-    functionName: "getTeachingFaultSettlement",
+  const client = requireWallet(createTeachingClient(config, privateKey));
+  return client.walletClient.writeContract({
+    ...requireTeachingRegistry(client),
+    account: client.account,
+    chain: config.chain,
+    functionName: "withdrawUnmatchedTeachingTeacherBond",
     args: [teachingNftId],
   });
 }
 
-export async function getTeachingRemedialWageSettlement(
+export async function markTeachingCustomerFault(
   config: SparkDaoClientConfig,
+  privateKey: Hex,
+  teachingNftId: bigint,
+  seatIndex: number,
+  reasonCode = 2,
+) {
+  const client = requireWallet(createTeachingClient(config, privateKey));
+  return client.walletClient.writeContract({
+    ...requireTeachingRegistry(client),
+    account: client.account,
+    chain: config.chain,
+    functionName: "markTeachingCustomerFault",
+    args: [teachingNftId, seatIndex, reasonCode],
+  });
+}
+
+export async function closeTeachingValid(
+  config: SparkDaoClientConfig,
+  privateKey: Hex,
+  teachingNftId: bigint,
+  reasonCode = 1,
+) {
+  const client = requireWallet(createTeachingClient(config, privateKey));
+  return client.walletClient.writeContract({
+    ...requireTeachingRegistry(client),
+    account: client.account,
+    chain: config.chain,
+    functionName: "coordinatorCloseTeachingValid",
+    args: [teachingNftId, reasonCode],
+  });
+}
+
+export async function closeTeachingTeacherFault(
+  config: SparkDaoClientConfig,
+  privateKey: Hex,
+  teachingNftId: bigint,
+  reasonCode = 4,
+) {
+  const client = requireWallet(createTeachingClient(config, privateKey));
+  return client.walletClient.writeContract({
+    ...requireTeachingRegistry(client),
+    account: client.account,
+    chain: config.chain,
+    functionName: "coordinatorCloseTeachingTeacherFault",
+    args: [teachingNftId, reasonCode],
+  });
+}
+
+export async function claimTeachingSeatRefund(
+  config: SparkDaoClientConfig,
+  privateKey: Hex,
+  teachingNftId: bigint,
+  seatIndex: number,
+) {
+  const client = requireWallet(createTeachingClient(config, privateKey));
+  return client.walletClient.writeContract({
+    ...requireTeachingRegistry(client),
+    account: client.account,
+    chain: config.chain,
+    functionName: "claimTeachingSeatRefund",
+    args: [teachingNftId, seatIndex],
+  });
+}
+
+export async function redeemTeachingTeacherPayout(
+  config: SparkDaoClientConfig,
+  privateKey: Hex,
   teachingNftId: bigint,
 ) {
-  const client = createTeachingClient(config);
-  return client.publicClient.readContract({
-    ...client.contracts.teachingRegistry,
-    functionName: "getTeachingRemedialWageSettlement",
+  const client = requireWallet(createTeachingClient(config, privateKey));
+  return client.walletClient.writeContract({
+    ...requireTeachingRegistry(client),
+    account: client.account,
+    chain: config.chain,
+    functionName: "redeemTeachingTeacherPayout",
     args: [teachingNftId],
   });
 }
 
-export async function getTeachingModuleState(config: SparkDaoClientConfig) {
-  const client = createTeachingClient(config);
-  return client.publicClient.readContract({
-    ...client.contracts.teachingRegistry,
-    functionName: "getTeachingModuleState",
-  });
-}
-
-export async function getTeachingRewardClaimable(
+export async function settleTeachingRemedialWage(
   config: SparkDaoClientConfig,
+  privateKey: Hex,
   teachingNftId: bigint,
-  assetId: bigint,
-  positionId: bigint,
 ) {
-  return getTeachingRewardPreview(config, teachingNftId, assetId, positionId);
+  const client = requireWallet(createTeachingClient(config, privateKey));
+  return client.walletClient.writeContract({
+    ...requireTeachingRegistry(client),
+    account: client.account,
+    chain: config.chain,
+    functionName: "coordinatorSettleTeachingRemedialWage",
+    args: [teachingNftId],
+  });
 }
 
 export async function getTeachingRewardPreview(
@@ -106,12 +279,8 @@ export async function getTeachingRewardPreview(
   positionId: bigint,
 ) {
   const client = createTeachingClient(config);
-  const rewardContract = client.contracts.teachingRewardDistributor;
-  if (!rewardContract) {
-    throw new Error("Teaching reward distributor address is not configured");
-  }
   return client.publicClient.readContract({
-    ...rewardContract,
+    ...requireTeachingRewardDistributor(client),
     functionName: "getTeachingRewardClaimable",
     args: [teachingNftId, assetId, positionId],
   });
@@ -124,16 +293,9 @@ export async function claimTeachingReward(
   assetId: bigint,
   positionId: bigint,
 ) {
-  const client = createTeachingClient(config, privateKey);
-  if (!client.walletClient || !client.account) {
-    throw new Error("Wallet client not configured");
-  }
-  const rewardContract = client.contracts.teachingRewardDistributor;
-  if (!rewardContract) {
-    throw new Error("Teaching reward distributor address is not configured");
-  }
+  const client = requireWallet(createTeachingClient(config, privateKey));
   return client.walletClient.writeContract({
-    ...rewardContract,
+    ...requireTeachingRewardDistributor(client),
     account: client.account,
     chain: config.chain,
     functionName: "claimTeachingReward",
@@ -148,39 +310,13 @@ export async function claimTeachingRewardBatch(
   assetIds: bigint[],
   positionIds: bigint[],
 ) {
-  const client = createTeachingClient(config, privateKey);
-  if (!client.walletClient || !client.account) {
-    throw new Error("Wallet client not configured");
-  }
-  const rewardContract = client.contracts.teachingRewardDistributor;
-  if (!rewardContract) {
-    throw new Error("Teaching reward distributor address is not configured");
-  }
+  const client = requireWallet(createTeachingClient(config, privateKey));
   return client.walletClient.writeContract({
-    ...rewardContract,
+    ...requireTeachingRewardDistributor(client),
     account: client.account,
     chain: config.chain,
     functionName: "claimTeachingRewardBatch",
     args: [teachingNftIds, assetIds, positionIds],
-  });
-}
-
-export async function withdrawUnmatchedTeachingCollateral(
-  config: SparkDaoClientConfig,
-  privateKey: Hex,
-  teachingNftId: bigint,
-  teacherSide: boolean,
-) {
-  const client = createTeachingClient(config, privateKey);
-  if (!client.walletClient || !client.account) {
-    throw new Error("Wallet client not configured");
-  }
-  return client.walletClient.writeContract({
-    ...client.contracts.teachingRegistry,
-    account: client.account,
-    chain: config.chain,
-    functionName: "withdrawUnmatchedTeachingCollateral",
-    args: [teachingNftId, teacherSide],
   });
 }
 
@@ -190,12 +326,9 @@ export async function withdrawTeachingIdleFor(
   stableAsset: Address,
   amount: bigint,
 ) {
-  const client = createTeachingClient(config, privateKey);
-  if (!client.walletClient || !client.account) {
-    throw new Error("Wallet client not configured");
-  }
+  const client = requireWallet(createTeachingClient(config, privateKey));
   return client.walletClient.writeContract({
-    ...client.contracts.teachingRegistry,
+    ...requireTeachingRegistry(client),
     account: client.account,
     chain: config.chain,
     functionName: "withdrawTeachingIdleFor",
@@ -203,40 +336,32 @@ export async function withdrawTeachingIdleFor(
   });
 }
 
-export async function coordinatorResolveCustomerFault(
-  config: SparkDaoClientConfig,
-  privateKey: Hex,
-  teachingNftId: bigint,
-  reasonCode = 2,
-) {
-  const client = createTeachingClient(config, privateKey);
+function requireWallet(
+  client: SparkDaoClient,
+): SparkDaoClient & { walletClient: NonNullable<SparkDaoClient["walletClient"]>; account: Address } {
   if (!client.walletClient || !client.account) {
     throw new Error("Wallet client not configured");
   }
-  return client.walletClient.writeContract({
-    ...client.contracts.teachingRegistry,
-    account: client.account,
-    chain: config.chain,
-    functionName: "coordinatorResolveCustomerFault",
-    args: [teachingNftId, reasonCode],
-  });
+  return client as SparkDaoClient & {
+    walletClient: NonNullable<SparkDaoClient["walletClient"]>;
+    account: Address;
+  };
 }
 
-export async function coordinatorResolveTeacherFault(
-  config: SparkDaoClientConfig,
-  privateKey: Hex,
-  teachingNftId: bigint,
-  reasonCode = 4,
-) {
-  const client = createTeachingClient(config, privateKey);
-  if (!client.walletClient || !client.account) {
-    throw new Error("Wallet client not configured");
+function requireTeachingRegistry(
+  client: SparkDaoClient,
+): SparkDaoContractDescriptor {
+  const contract = client.contracts.teachingRegistry;
+  if (!contract) throw new Error("Teaching registry address is not configured");
+  return contract;
+}
+
+function requireTeachingRewardDistributor(
+  client: SparkDaoClient,
+): SparkDaoContractDescriptor {
+  const contract = client.contracts.teachingRewardDistributor;
+  if (!contract) {
+    throw new Error("Teaching reward distributor address is not configured");
   }
-  return client.walletClient.writeContract({
-    ...client.contracts.teachingRegistry,
-    account: client.account,
-    chain: config.chain,
-    functionName: "coordinatorResolveTeacherFault",
-    args: [teachingNftId, reasonCode],
-  });
+  return contract;
 }

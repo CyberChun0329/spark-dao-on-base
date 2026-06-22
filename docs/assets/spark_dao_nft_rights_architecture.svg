@@ -91,7 +91,7 @@
 
   <rect class="cardOff" x="65" y="370" width="300" height="126"/>
   <text class="boxTitle" x="88" y="408">Teachers</text>
-  <text class="body" x="88" y="444">Teaching responsibility</text>
+  <text class="body" x="88" y="444">Class delivery</text>
   <text class="body" x="88" y="474">Settlement outcome</text>
 
   <rect class="cardOff" x="65" y="572" width="300" height="126"/>
@@ -115,7 +115,7 @@
   <rect class="settlement" x="1070" y="252" width="380" height="156"/>
   <text class="settlementTitle" x="1095" y="294">Teaching settlement authority</text>
   <text class="settlementBody" x="1095" y="332">Recognised class state</text>
-  <text class="settlementBody" x="1095" y="362">Valid / learner / teacher fault</text>
+  <text class="settlementBody" x="1095" y="362">Valid / seat / teacher fault</text>
   <text class="settlementBody" x="1095" y="392">Fixed consequence</text>
 
   <!-- Research module cards -->

@@ -13,6 +13,7 @@
     "check:registry-admin-state": "tsx client/scripts/checkRegistryAdminState.ts",
     "check:module-compatibility": "tsx client/scripts/checkModuleCompatibility.ts",
     "check:module-compatibility:example": "MODULE_COMPATIBILITY_VALIDATE_MANIFEST_ONLY=1 MODULE_COMPATIBILITY_MANIFEST=client/module-compatibility.example.json tsx client/scripts/checkModuleCompatibility.ts",
+    "check:teaching-surface": "tsx client/scripts/checkTeachingSurface.ts",
     "check:calibration": "tsx client/scripts/checkCalibration.ts",
     "simulate:teaching-cost": "tsx client/scripts/simulateTeachingCost.ts",
     "client:inspect": "tsx client/scripts/inspect.ts",

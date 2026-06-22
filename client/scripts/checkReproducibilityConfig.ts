@@ -16,12 +16,9 @@ for (const key of [
   "RESEARCH_REGISTRY",
   "TEACHING_REGISTRY",
   "TEACHING_REWARD_DISTRIBUTOR",
-  "TEACHING_POLICY_GUARD",
-  "TEACHING_ECONOMICS_POLICY",
-  "TEACHING_FAULT_POLICY",
+  "TEACHING_PRICING_POLICY",
+  "TEACHING_NFT_TOKEN",
   "MODULE_COMPATIBILITY_MANIFEST",
-  "EXPECTED_TEACHING_ECONOMICS_POLICY_VERSION",
-  "EXPECTED_TEACHING_FAULT_POLICY_VERSION",
   "DAO_TREASURY",
 ]) {
   assertIncludes(envExample, `${key}=`, ".env.example");
@@ -38,13 +35,28 @@ assertIncludes(
   "DeployRegistry.s.sol",
 );
 assertIncludes(
-  requireText("src/TeachingRegistry.sol"),
-  "getTeachingModuleState",
-  "TeachingRegistry.sol",
+  requireText("src/ResearchRegistry.sol"),
+  "setTeachingRegistry",
+  "ResearchRegistry.sol",
+);
+assertIncludes(
+  requireText("src/ResearchRegistry.sol"),
+  "recordTeachingRewardClaim",
+  "ResearchRegistry.sol",
+);
+assertIncludes(
+  requireText("src/ResearchRegistry.sol"),
+  "getTeachingResearchSnapshot",
+  "ResearchRegistry.sol",
+);
+assertIncludes(
+  requireText("src/ResearchRegistry.sol"),
+  "requireTeachingResearchAssetReady",
+  "ResearchRegistry.sol",
 );
 assertIncludes(
   requireText("src/TeachingRegistry.sol"),
-  "coordinatorSettleTeacherFaultRemedialWage",
+  "coordinatorCloseTeachingTeacherFault",
   "TeachingRegistry.sol",
 );
 assertIncludes(
@@ -54,17 +66,22 @@ assertIncludes(
 );
 assertIncludes(
   requireText("script/DeployRegistry.s.sol"),
-  "TeachingEconomicsPolicyV1",
+  "TeachingRegistry",
   "DeployRegistry.s.sol",
 );
 assertIncludes(
   requireText("script/DeployRegistry.s.sol"),
-  "TeachingFaultPolicyV1",
+  "TeachingRewardDistributor",
   "DeployRegistry.s.sol",
 );
 assertIncludes(
   requireText("script/DeployRegistry.s.sol"),
-  "TeachingPolicyGuard",
+  "TeachingPricingPolicyV1",
+  "DeployRegistry.s.sol",
+);
+assertIncludes(
+  requireText("script/DeployRegistry.s.sol"),
+  "TEACHING_NFT_TOKEN",
   "DeployRegistry.s.sol",
 );
 
@@ -92,13 +109,40 @@ if (
 ) {
   throw new Error("package.json is missing check:module-compatibility:example");
 }
+if (
+  packageJson.scripts?.["check:teaching-surface"]
+  !== "tsx client/scripts/checkTeachingSurface.ts"
+) {
+  throw new Error("package.json is missing check:teaching-surface");
+}
 if (packageJson.scripts?.["check:calibration"] !== "tsx client/scripts/checkCalibration.ts") {
   throw new Error("package.json is missing check:calibration");
+}
+assertIncludes(
+  requireText("client/scripts/checkCalibration.ts"),
+  "TeachingGasCalibrationTest",
+  "checkCalibration.ts",
+);
+assertIncludes(
+  requireText("client/scripts/simulateTeachingCost.ts"),
+  "test/TeachingGasCalibration.t.sol",
+  "simulateTeachingCost.ts",
+);
+if (
+  packageJson.scripts?.["demo:teaching"]
+  !== "forge script script/DemoTeaching.s.sol:DemoTeaching --rpc-url $BASE_RPC_URL --broadcast"
+) {
+  throw new Error("package.json is missing demo:teaching");
 }
 
 assertIncludes(
   requireText("client/module-compatibility.example.json"),
   "spark-dao-module-compatibility/v1",
+  "client/module-compatibility.example.json",
+);
+assertIncludes(
+  requireText("client/module-compatibility.example.json"),
+  "teachingNftToken",
   "client/module-compatibility.example.json",
 );
 
@@ -118,12 +162,12 @@ assertIncludes(
 );
 assertIncludes(
   requireText("script/DemoTeaching.s.sol"),
-  "researchToken.lockMinter();",
+  "researchRegistry.setTeachingRegistry",
   "DemoTeaching.s.sol",
 );
 assertIncludes(
   requireText("script/DemoTeaching.s.sol"),
-  "teachingToken.lockMinter();",
+  "teaching.setTeachingRewardDistributor",
   "DemoTeaching.s.sol",
 );
 

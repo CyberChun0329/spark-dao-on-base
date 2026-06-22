@@ -5,8 +5,8 @@ import { SparkDaoConfig } from "./SparkDaoConfig.sol";
 import { SparkDaoErrors } from "./SparkDaoErrors.sol";
 import { SparkDaoTypes } from "./SparkDaoTypes.sol";
 import { SparkMath } from "./SparkMath.sol";
-import { IResearchPositionToken } from "./interfaces/IResearchPositionToken.sol";
 import { ITeachingRegistryForResearch } from "./interfaces/ITeachingRegistryForResearch.sol";
+import { IResearchPositionToken } from "./interfaces/IResearchPositionToken.sol";
 
 contract ResearchRegistry is SparkDaoConfig {
     address public immutable RESEARCH_POSITION_TOKEN;
@@ -97,7 +97,7 @@ contract ResearchRegistry is SparkDaoConfig {
             revert SparkDaoErrors.TeachingRegistryAlreadySet();
         }
         if (teachingRegistry_ == address(0) || teachingRegistry_.code.length == 0) {
-            revert SparkDaoErrors.InvalidResearchRegistry();
+            revert SparkDaoErrors.InvalidTeachingRegistry();
         }
         address configuredResearchRegistry;
         try ITeachingRegistryForResearch(teachingRegistry_).RESEARCH_REGISTRY() returns (
@@ -105,10 +105,10 @@ contract ResearchRegistry is SparkDaoConfig {
         ) {
             configuredResearchRegistry = value;
         } catch {
-            revert SparkDaoErrors.InvalidResearchRegistry();
+            revert SparkDaoErrors.InvalidTeachingRegistry();
         }
         if (configuredResearchRegistry != address(this)) {
-            revert SparkDaoErrors.InvalidResearchRegistry();
+            revert SparkDaoErrors.InvalidTeachingRegistry();
         }
         teachingRegistry = teachingRegistry_;
         emit TeachingRegistrySet(teachingRegistry_);
@@ -523,7 +523,9 @@ contract ResearchRegistry is SparkDaoConfig {
     function recordTeachingRewardClaim(uint64 assetId, uint64 positionId, uint256 claimAmount)
         external
     {
-        if (msg.sender != teachingRegistry) revert SparkDaoErrors.UnauthorizedTeachingRegistry();
+        if (msg.sender != teachingRegistry) {
+            revert SparkDaoErrors.UnauthorizedTeachingRegistry();
+        }
         SparkDaoTypes.ResearchPosition storage position = _requirePosition(assetId, positionId);
         if (claimAmount != 0) {
             position.totalClaimedUnits += claimAmount;

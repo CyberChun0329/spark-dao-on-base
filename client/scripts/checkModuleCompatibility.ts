@@ -16,11 +16,9 @@ export type ContractKey =
   | "researchRegistry"
   | "teachingRegistry"
   | "teachingRewardDistributor"
-  | "teachingPolicyGuard"
-  | "teachingEconomicsPolicy"
-  | "teachingFaultPolicy"
-  | "researchPositionToken"
-  | "teachingNftToken";
+  | "teachingPricingPolicy"
+  | "teachingNftToken"
+  | "researchPositionToken";
 
 export type ManifestContract = {
   key: ContractKey;
@@ -43,17 +41,12 @@ export type ModuleCompatibilityManifest = {
     teachingRegistry: {
       researchRegistry: ContractKey;
       rewardDistributor: ContractKey;
-      policyGuard: ContractKey;
-      economicsPolicy: ContractKey;
-      faultPolicy: ContractKey;
+      pricingPolicy: ContractKey;
+      teachingNftToken?: ContractKey;
     };
     teachingRewardDistributor: {
       teachingRegistry: ContractKey;
       researchRegistry: ContractKey;
-    };
-    policyVersions: {
-      economics: number;
-      fault: number;
     };
   };
 };
@@ -65,15 +58,7 @@ export type ArtifactJson = {
   };
 };
 
-type TeachingModuleState = readonly [
-  Address,
-  Address,
-  Address,
-  Address,
-  Address,
-  number,
-  Address,
-];
+type TeachingModuleState = readonly [Address, Address, Address];
 
 function normaliseAddress(value: Address): string {
   return value.toLowerCase();
@@ -97,16 +82,6 @@ function isAddress(value: string): value is Address {
 
 function isHex(value: string): value is Hex {
   return /^0x[a-fA-F0-9]*$/.test(value);
-}
-
-function requireEnvNumber(name: string, fallback: number): number {
-  const value = process.env[name];
-  if (!value) return fallback;
-  const parsed = Number(value);
-  if (!Number.isInteger(parsed) || parsed < 0 || parsed > 255) {
-    throw new Error(`${name} must be an integer between 0 and 255`);
-  }
-  return parsed;
 }
 
 function readJson(path: string): unknown {
@@ -171,11 +146,18 @@ async function validateManifest(
 
   requireManifestKey(manifest, manifest.expectedRelationships.teachingRegistry.researchRegistry);
   requireManifestKey(manifest, manifest.expectedRelationships.teachingRegistry.rewardDistributor);
-  requireManifestKey(manifest, manifest.expectedRelationships.teachingRegistry.policyGuard);
-  requireManifestKey(manifest, manifest.expectedRelationships.teachingRegistry.economicsPolicy);
-  requireManifestKey(manifest, manifest.expectedRelationships.teachingRegistry.faultPolicy);
-  requireManifestKey(manifest, manifest.expectedRelationships.teachingRewardDistributor.teachingRegistry);
-  requireManifestKey(manifest, manifest.expectedRelationships.teachingRewardDistributor.researchRegistry);
+  requireManifestKey(manifest, manifest.expectedRelationships.teachingRegistry.pricingPolicy);
+  if (manifest.expectedRelationships.teachingRegistry.teachingNftToken) {
+    requireManifestKey(manifest, manifest.expectedRelationships.teachingRegistry.teachingNftToken);
+  }
+  requireManifestKey(
+    manifest,
+    manifest.expectedRelationships.teachingRewardDistributor.teachingRegistry,
+  );
+  requireManifestKey(
+    manifest,
+    manifest.expectedRelationships.teachingRewardDistributor.researchRegistry,
+  );
 }
 
 async function validateArtifact(entry: ManifestContract): Promise<void> {
@@ -293,21 +275,6 @@ async function readAddress(
   })) as Address;
 }
 
-async function readVersion(
-  client: SparkDaoClient,
-  contract: SparkDaoContractDescriptor,
-  functionName: string,
-  args?: readonly unknown[],
-): Promise<number> {
-  return Number(
-    await client.publicClient.readContract({
-      ...contract,
-      functionName,
-      args,
-    }),
-  );
-}
-
 async function readBool(
   client: SparkDaoClient,
   contract: SparkDaoContractDescriptor,
@@ -317,17 +284,6 @@ async function readBool(
     ...contract,
     functionName,
   })) as boolean;
-}
-
-function expectedVersions(manifest?: ModuleCompatibilityManifest) {
-  return {
-    economics:
-      manifest?.expectedRelationships.policyVersions.economics
-      ?? requireEnvNumber("EXPECTED_TEACHING_ECONOMICS_POLICY_VERSION", 1),
-    fault:
-      manifest?.expectedRelationships.policyVersions.fault
-      ?? requireEnvNumber("EXPECTED_TEACHING_FAULT_POLICY_VERSION", 1),
-  };
 }
 
 async function checkOnchainCompatibility(
@@ -340,54 +296,59 @@ async function checkOnchainCompatibility(
     "teachingRewardDistributor",
     "TEACHING_REWARD_DISTRIBUTOR",
   );
-  const policyGuard = requireContract(client, "teachingPolicyGuard", "TEACHING_POLICY_GUARD");
-  const economicsPolicy = requireContract(
+  const pricingPolicy = requireContract(
     client,
-    "teachingEconomicsPolicy",
-    "TEACHING_ECONOMICS_POLICY",
+    "teachingPricingPolicy",
+    "TEACHING_PRICING_POLICY",
   );
-  const faultPolicy = requireContract(client, "teachingFaultPolicy", "TEACHING_FAULT_POLICY");
 
-  const [
-    moduleResearchRegistry,
-    moduleTeachingNftToken,
-    modulePolicyGuard,
-    moduleEconomicsPolicy,
-    moduleFaultPolicy,
-    moduleFaultVersion,
-    moduleRewardDistributor,
-  ] = (await client.publicClient.readContract({
-    ...client.contracts.teachingRegistry,
-    functionName: "getTeachingModuleState",
-  })) as TeachingModuleState;
+  const [moduleResearchRegistry, modulePricingPolicy, moduleRewardDistributor] =
+    (await client.publicClient.readContract({
+      ...client.contracts.teachingRegistry,
+      functionName: "getTeachingModuleState",
+    })) as TeachingModuleState;
+  const moduleTeachingNftToken = await readAddress(
+    client,
+    client.contracts.teachingRegistry,
+    "TEACHING_NFT_TOKEN",
+  );
 
   assertAddressMatch(
-    "registry module research registry",
+    "teaching module research registry",
     moduleResearchRegistry,
     config.addresses.researchRegistry,
   );
-  assertAddressMatch("registry module policy guard", modulePolicyGuard, policyGuard.address);
+  assertAddressMatch("teaching module pricing policy", modulePricingPolicy, pricingPolicy.address);
   assertAddressMatch(
-    "registry module economics policy",
-    moduleEconomicsPolicy,
-    economicsPolicy.address,
-  );
-  assertAddressMatch("registry module fault policy", moduleFaultPolicy, faultPolicy.address);
-  assertAddressMatch(
-    "registry module reward distributor",
+    "teaching module reward distributor",
     moduleRewardDistributor,
     distributor.address,
   );
   const expectedTeachingNftToken = expectedAddressByKey(config, manifest, "teachingNftToken");
   if (expectedTeachingNftToken) {
     assertAddressMatch(
-      "registry module teaching NFT token",
+      "teaching module teaching NFT token",
       moduleTeachingNftToken,
       expectedTeachingNftToken,
     );
   }
 
-  const distributorTeachingRegistry = await readAddress(client, distributor, "TEACHING_REGISTRY");
+  const researchTeachingRegistry = await readAddress(
+    client,
+    client.contracts.researchRegistry,
+    "teachingRegistry",
+  );
+  assertAddressMatch(
+    "research registry teachingRegistry",
+    researchTeachingRegistry,
+    config.addresses.teachingRegistry,
+  );
+
+  const distributorTeachingRegistry = await readAddress(
+    client,
+    distributor,
+    "TEACHING_REGISTRY",
+  );
   const distributorResearchRegistry = await readAddress(client, distributor, "RESEARCH_REGISTRY");
   assertAddressMatch(
     "distributor TEACHING_REGISTRY",
@@ -400,31 +361,18 @@ async function checkOnchainCompatibility(
     config.addresses.researchRegistry,
   );
 
-  const versions = expectedVersions(manifest);
-  const economicsVersion = await readVersion(
+  await checkTokenMinterLocks(
     client,
-    economicsPolicy,
-    "TEACHING_ECONOMICS_POLICY_VERSION",
+    manifest,
+    "researchPositionToken",
+    "research position token",
   );
-  const faultVersion = await readVersion(client, faultPolicy, "FAULT_POLICY_VERSION");
-  const guardEconomicsVersion = await readVersion(
+  await checkTokenMinterLocks(
     client,
-    policyGuard,
-    "validateEconomicsPolicy",
-    [economicsPolicy.address],
+    manifest,
+    "teachingNftToken",
+    "teaching NFT token",
   );
-  const guardFaultVersion = await readVersion(client, policyGuard, "validatePolicy", [
-    faultPolicy.address,
-  ]);
-
-  assertNumberMatch("economics policy version", economicsVersion, versions.economics);
-  assertNumberMatch("policy guard economics validation version", guardEconomicsVersion, versions.economics);
-  assertNumberMatch("fault policy version", faultVersion, versions.fault);
-  assertNumberMatch("policy guard fault validation version", guardFaultVersion, versions.fault);
-  assertNumberMatch("registry module fault policy version", moduleFaultVersion, versions.fault);
-
-  await checkTokenMinterLocks(client, manifest, "researchPositionToken", "research position token");
-  await checkTokenMinterLocks(client, manifest, "teachingNftToken", "teaching NFT token");
 
   if (manifest) {
     await checkManifestAgainstChain(config, client, manifest);

@@ -26,9 +26,7 @@ library SparkDaoTypes {
         uint64 rewardUnlockSeconds;
         address coordinator;
         uint64 buybackWaitSeconds;
-        uint64 nextCourseTypeId;
         address stableAsset;
-        uint64 nextTeachingNftId;
     }
 
     struct ResearchAsset {
@@ -101,89 +99,6 @@ library SparkDaoTypes {
         address beneficiary;
     }
 
-    struct TeachingCourseType {
-        address economicsPolicy;
-        address faultPolicy;
-        address stableAsset;
-        uint256 listPriceUnits;
-        uint256 teacherSalaryUnits;
-        uint64 courseTypeId;
-        uint16 researchShareBps;
-        uint8 faultPolicyVersion;
-        bool exists;
-        string name;
-    }
-
-    struct TeachingSession {
-        address faultPolicy;
-        address teacher;
-        address customer;
-        address stableAsset;
-        uint256 listPriceUnits;
-        uint256 lessonPriceUnits;
-        uint256 teacherSalaryUnits;
-        uint256 teacherBondUnits;
-        uint256 researchRewardUnits;
-        uint256 teacherFaultResearchRewardUnits;
-        uint256 serviceReserveUnits;
-        uint256 faultCustomerChargeUnits;
-        uint256 faultCustomerRefundUnits;
-        uint256 faultTeacherPayoutUnits;
-        uint256 faultRemedialTeacherPayoutUnits;
-        uint256 faultResearchRewardUnits;
-        uint256 faultServiceReserveUnits;
-        uint256 settlementResearchActiveLayersPacked;
-        uint64 teachingNftId;
-        uint64 courseTypeId;
-        uint64 scheduledAt;
-        uint64 secondRoundDeadlineAt;
-        uint64 redeemableAt;
-        uint64 resolvedAt;
-        uint64 teacherBondReleasedAt;
-        uint64 redeemedAt;
-        uint64 remedialWageSettledAt;
-        uint16 customerDiscountBps;
-        uint16 researchShareBps;
-        uint8 status;
-        uint8 faultPolicyVersion;
-        uint8 remedialLessonCount;
-        uint8 settlementResearchLayerCount;
-        bool exists;
-        bool teacherConfirmedSchedule;
-        bool customerConfirmedSchedule;
-        bool firstRoundFrozen;
-        bool teacherBondLocked;
-        bool customerPaymentLocked;
-        bool collateralLocked;
-        bool teacherConfirmedCompletion;
-        bool customerConfirmedCompletion;
-        uint80[] linkedResearchLinks;
-    }
-
-    struct TeachingFaultQuote {
-        uint256 customerChargeUnits;
-        uint256 customerRefundUnits;
-        uint256 teacherImmediatePayoutUnits;
-        uint256 remedialTeacherPayoutUnits;
-        uint256 researchRewardUnits;
-        uint256 serviceReserveUnits;
-        uint8 remedialLessonCount;
-    }
-
-    struct FrozenTeachingFaultQuotes {
-        TeachingFaultQuote customerFaultQuote;
-        TeachingFaultQuote teacherFaultQuote;
-    }
-
-    struct TeachingEconomicsQuote {
-        uint256 lessonPriceUnits;
-        uint256 teacherSalaryUnits;
-        uint256 teacherBondUnits;
-        uint256 researchRewardUnits;
-        uint256 teacherFaultResearchRewardUnits;
-        uint256 serviceReserveUnits;
-    }
-
     struct LayerCheckpoint {
         uint64 timestamp;
         uint16 activeLayer;
@@ -192,29 +107,5 @@ library SparkDaoTypes {
     struct ShareCheckpoint {
         uint64 timestamp;
         uint16 effectiveShareBps;
-    }
-
-    struct TeachingRewardPool {
-        address stableAsset;
-        uint256 assetPoolUnits;
-        uint256 distributedUnits;
-        uint256 claimedUnits;
-        uint64 snapshotAt;
-        uint64 unlockAt;
-        uint16 snapshotActiveLayer;
-        uint16 totalEffectiveShareBps;
-        uint16 claimedShareBps;
-        bool exists;
-        bool dustReleased;
-    }
-
-    struct CreateTeachingSessionParams {
-        uint64 courseTypeId;
-        address teacher;
-        address customer;
-        uint64 scheduledAt;
-        uint16 customerDiscountBps;
-        uint64[] linkedResearchAssetIds;
-        uint16[] linkedResearchWeightBps;
     }
 }

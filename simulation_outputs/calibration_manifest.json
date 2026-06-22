@@ -10,15 +10,15 @@
   "inputFiles": [
     {
       "path": "teaching_gas_calibration.csv",
-      "sha256": "d940bbcdd60d1490a5e6b567812a0fc3748b72cd1c43988f4f9786c6ff6e3525"
+      "sha256": "f40aad1b6bb92918179920e8350ab8bb1654a40033d002298528cd542201c0b3"
     },
     {
       "path": "teaching_followup_gas_calibration.csv",
-      "sha256": "b16af3f60757cba7bfcaf394a4c14e81ee355504f12cba106ba61877f9d31bb4"
+      "sha256": "abac2a38d78aebb9f5e4e420c25b6163023e1b5b38a1bbe6b29d345dd4f9369b"
     },
     {
       "path": "research_gas_calibration.csv",
-      "sha256": "8e654a6a3cf92eff4d420db3389f58944c787d7a6e1512699860c95ba47097ef"
+      "sha256": "b0ea4357e87327888ca26e4761cb208ac6820271378cfae9340452173f2378d4"
     },
     {
       "path": "simulation_inputs/fee_assumptions.json",
@@ -28,7 +28,7 @@
   "sourceFiles": [
     {
       "path": "test/TeachingGasCalibration.t.sol",
-      "sha256": "7b49d5284d96b0561aa1ed93e58dc648331a2f9f124d9dec9f98de1c98050948"
+      "sha256": "4a03a903c4dc5b94db3841f3ef499030d1152b09d3554d59567cd259eec0ab76"
     },
     {
       "path": "test/ResearchGasCalibration.t.sol",
@@ -36,7 +36,7 @@
     },
     {
       "path": "client/scripts/simulateTeachingCost.ts",
-      "sha256": "e5262812cf4484262ec710a79f01d3626c184aed44f7c2edb3d00d19c00575f9"
+      "sha256": "ee0b2498660e9365e6ab4836ced3ad7288e273eb5e963d60574e8e6373dc16d2"
     },
     {
       "path": "foundry.toml",
@@ -44,7 +44,7 @@
     },
     {
       "path": "package.json",
-      "sha256": "daa3a24f4535a4932ba46fb312aa6fdb613dc5a99e9cdef90d76a24ba072f6c9"
+      "sha256": "83e1221cc3331022631ca5a3b8b91c95db8e4738bf06c4e662a865b9933d8948"
     },
     {
       "path": "package-lock.json",

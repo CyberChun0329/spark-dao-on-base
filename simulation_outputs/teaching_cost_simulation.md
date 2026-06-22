@@ -1,6 +1,6 @@
 # Teaching Cost Simulation
 
-Generated from `teaching_gas_calibration.csv`, `teaching_followup_gas_calibration.csv`, and `research_gas_calibration.csv`.
+Generated from Teaching lifecycle calibration CSVs and `research_gas_calibration.csv`.
 
 Reference translation coefficient:
 
@@ -11,38 +11,38 @@ measurementWindow = trailing twelve months at calibration time
 unit = dollars per gas unit
 ```
 
-Generated from calibration CSVs. Management gas is `lesson_gas + claim_gas`.
+Generated from Teaching lifecycle calibration. Management gas is `lesson_gas + claim_gas`.
 
 ## Measured Contract Paths
 
 | Path | Category | Course type gas | Research setup gas | Research mutation gas | Lesson lifecycle gas | Distributor claim gas | Management gas | Coupled gas | Full fixture gas | Revenue weight |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|---|
-| ORD_NR | ordinary | 198,894 | 0 | 0 | 708,420 | 0 | 708,420 | 708,420 | 907,314 | 100.000% |
-| ORD_ZS | ordinary | 174,096 | 521,575 | 0 | 679,254 | 0 | 679,254 | 679,254 | 1,374,925 | 100.000% |
-| ORD_RB | ordinary | 174,099 | 761,375 | 0 | 866,430 | 194,378 | 1,060,808 | 1,060,808 | 1,996,282 | 100.000% |
-| ORD_WM | ordinary | 174,101 | 955,789 | 0 | 960,510 | 171,914 | 1,132,424 | 1,132,424 | 2,262,314 | 100.000% |
-| ORD_ML | ordinary | 174,104 | 1,478,491 | 177,426 | 962,510 | 170,938 | 1,133,448 | 1,310,874 | 2,963,469 | 100.000% |
-| FV_NR | forced_valid | 174,106 | 0 | 0 | 630,667 | 0 | 630,667 | 630,667 | 804,773 | 100.000% |
-| FV_ZS | forced_valid | 174,108 | 477,921 | 0 | 675,704 | 0 | 675,704 | 675,704 | 1,327,733 | 100.000% |
-| FV_RB | forced_valid | 174,111 | 739,526 | 0 | 855,580 | 148,578 | 1,004,158 | 1,004,158 | 1,917,795 | 100.000% |
-| FV_WM | forced_valid | 174,113 | 955,881 | 0 | 956,968 | 171,939 | 1,128,907 | 1,128,907 | 2,258,901 | 100.000% |
-| FV_ML | forced_valid | 174,116 | 1,434,825 | 177,426 | 958,967 | 170,938 | 1,129,905 | 1,307,331 | 2,916,272 | 100.000% |
-| CF_NR | customer_fault | 174,117 | 0 | 0 | 720,319 | 0 | 720,319 | 720,319 | 894,436 | 50.000% |
-| CF_ZS | customer_fault | 174,120 | 477,966 | 0 | 765,359 | 0 | 765,359 | 765,359 | 1,417,445 | 50.000% |
-| CF_RB | customer_fault | 174,122 | 739,623 | 0 | 825,203 | 0 | 825,203 | 825,203 | 1,738,948 | 50.000% |
-| CF_WM | customer_fault | 174,124 | 955,972 | 0 | 828,629 | 0 | 828,629 | 828,629 | 1,958,725 | 50.000% |
-| CF_ML | customer_fault | 174,127 | 1,434,955 | 177,426 | 828,636 | 0 | 828,636 | 1,006,062 | 2,615,144 | 50.000% |
-| TF_NR | teacher_fault | 174,128 | 0 | 0 | 723,493 | 0 | 723,493 | 723,493 | 897,621 | 50.000% |
-| TF_ZS | teacher_fault | 174,131 | 478,011 | 0 | 748,635 | 0 | 748,635 | 748,635 | 1,400,777 | 50.000% |
-| TF_RB | teacher_fault | 174,133 | 739,735 | 0 | 948,405 | 148,578 | 1,096,983 | 1,096,983 | 2,010,851 | 50.000% |
-| TF_WM | teacher_fault | 174,135 | 956,062 | 0 | 1,049,807 | 171,988 | 1,221,795 | 1,221,795 | 2,351,992 | 50.000% |
-| TF_ML | teacher_fault | 174,138 | 1,435,087 | 177,426 | 1,051,805 | 170,938 | 1,222,743 | 1,400,169 | 3,009,394 | 50.000% |
+| ORD_NR | ordinary | 157,006 | 0 | 0 | 595,521 | 0 | 595,521 | 595,521 | 752,527 | 100.000% |
+| ORD_ZS | ordinary | 141,208 | 519,587 | 0 | 547,194 | 0 | 547,194 | 547,194 | 1,207,989 | 100.000% |
+| ORD_RB | ordinary | 141,211 | 761,400 | 0 | 732,961 | 194,318 | 927,279 | 927,279 | 1,829,890 | 100.000% |
+| ORD_WM | ordinary | 141,213 | 955,816 | 0 | 829,221 | 171,855 | 1,001,076 | 1,001,076 | 2,098,105 | 100.000% |
+| ORD_ML | ordinary | 141,217 | 1,478,547 | 177,418 | 831,223 | 170,878 | 1,002,101 | 1,179,519 | 2,799,283 | 100.000% |
+| FV_NR | forced_valid | 141,219 | 0 | 0 | 497,348 | 0 | 497,348 | 497,348 | 638,567 | 100.000% |
+| FV_ZS | forced_valid | 141,221 | 477,937 | 0 | 542,323 | 0 | 542,323 | 542,323 | 1,161,481 | 100.000% |
+| FV_RB | forced_valid | 141,223 | 739,557 | 0 | 722,289 | 148,518 | 870,807 | 870,807 | 1,751,587 | 100.000% |
+| FV_WM | forced_valid | 141,226 | 955,915 | 0 | 823,856 | 171,882 | 995,738 | 995,738 | 2,092,879 | 100.000% |
+| FV_ML | forced_valid | 141,229 | 1,434,890 | 177,418 | 825,857 | 170,878 | 996,735 | 1,174,153 | 2,750,272 | 100.000% |
+| CF_NR | customer_fault | 141,230 | 0 | 0 | 534,782 | 0 | 534,782 | 534,782 | 676,012 | 50.000% |
+| CF_ZS | customer_fault | 141,233 | 477,985 | 0 | 559,860 | 0 | 559,860 | 559,860 | 1,179,078 | 50.000% |
+| CF_RB | customer_fault | 141,235 | 739,659 | 0 | 599,826 | 0 | 599,826 | 599,826 | 1,480,720 | 50.000% |
+| CF_WM | customer_fault | 141,238 | 956,013 | 0 | 603,191 | 0 | 603,191 | 603,191 | 1,700,442 | 50.000% |
+| CF_ML | customer_fault | 141,241 | 1,435,028 | 177,418 | 603,201 | 0 | 603,201 | 780,619 | 2,356,888 | 50.000% |
+| TF_NR | teacher_fault | 141,242 | 0 | 0 | 510,690 | 0 | 510,690 | 510,690 | 651,932 | 50.000% |
+| TF_ZS | teacher_fault | 141,245 | 478,033 | 0 | 555,671 | 0 | 555,671 | 555,671 | 1,174,949 | 50.000% |
+| TF_RB | teacher_fault | 141,248 | 739,774 | 0 | 735,636 | 148,518 | 884,154 | 884,154 | 1,765,176 | 50.000% |
+| TF_WM | teacher_fault | 141,250 | 956,109 | 0 | 837,218 | 171,935 | 1,009,153 | 1,009,153 | 2,106,512 | 50.000% |
+| TF_ML | teacher_fault | 141,253 | 1,435,169 | 177,418 | 839,220 | 170,878 | 1,010,098 | 1,187,516 | 2,763,938 | 50.000% |
 
 ## Measured Follow-Up Primitives
 
 | Follow-up path | Category | Gas | Measurement context | Included in scenario expectation |
 |---|---|---:|---|---|
-| TF_REMEDIAL_WAGE_CLOSE | remedial_wage | 9,814 | same-test-warm-call | no |
+| TF_REMEDIAL_WAGE_CLOSE | remedial_wage | 10,080 | same-test-warm-call | no |
 
 ## Coordinator-Extended Scenario Simulation
 
@@ -50,18 +50,18 @@ Values use the reference fee coefficient at `1x`.
 
 | Window | Coordinator case | p(FV) | p(CF) | p(TF) | Research mutation gas | Lesson gas | Claim gas | Management gas | Coupled gas | Revenue weight | Management cost / attempted lesson | Coupled cost / attempted lesson | Claim gas share | Share at $50 | Share at $100 | Share at $150 |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| Demand-first | No coordinator | 0.000% | 0.000% | 0.000% | 0 | 718,388 | 19,438 | 737,826 | 737,826 | 100.000% | $0.0110 | $0.0110 | 2.634% | 0.022% | 0.011% | 0.007% |
-| Demand-first | Low coordinator | 1.000% | 0.300% | 0.200% | 0 | 717,955 | 19,325 | 737,280 | 737,280 | 99.750% | $0.0110 | $0.0110 | 2.621% | 0.022% | 0.011% | 0.007% |
-| Demand-first | Elevated coordinator | 5.000% | 2.000% | 1.000% | 0 | 716,331 | 18,774 | 735,106 | 735,106 | 98.500% | $0.0110 | $0.0110 | 2.554% | 0.022% | 0.011% | 0.007% |
-| Demand-first | Coordinator stress | 10.000% | 5.000% | 3.000% | 0 | 714,816 | 17,871 | 732,686 | 732,686 | 96.000% | $0.0110 | $0.0110 | 2.439% | 0.023% | 0.011% | 0.008% |
-| Supply-first | No coordinator | 0.000% | 0.000% | 0.000% | 0 | 757,940 | 56,067 | 814,007 | 814,007 | 100.000% | $0.0122 | $0.0122 | 6.888% | 0.024% | 0.012% | 0.008% |
-| Supply-first | Low coordinator | 1.000% | 0.300% | 0.200% | 0 | 757,671 | 55,789 | 813,460 | 813,460 | 99.750% | $0.0122 | $0.0122 | 6.858% | 0.024% | 0.012% | 0.008% |
-| Supply-first | Elevated coordinator | 5.000% | 2.000% | 1.000% | 0 | 756,623 | 54,396 | 811,019 | 811,019 | 98.500% | $0.0121 | $0.0121 | 6.707% | 0.025% | 0.012% | 0.008% |
-| Supply-first | Coordinator stress | 10.000% | 5.000% | 3.000% | 0 | 755,855 | 52,073 | 807,929 | 807,929 | 96.000% | $0.0121 | $0.0121 | 6.445% | 0.025% | 0.013% | 0.008% |
-| Synchronised | No coordinator | 0.000% | 0.000% | 0.000% | 8,871 | 805,212 | 91,524 | 896,736 | 905,607 | 100.000% | $0.0134 | $0.0135 | 10.206% | 0.027% | 0.013% | 0.009% |
-| Synchronised | Low coordinator | 1.000% | 0.300% | 0.200% | 8,871 | 804,990 | 91,112 | 896,102 | 904,974 | 99.750% | $0.0134 | $0.0135 | 10.168% | 0.027% | 0.013% | 0.009% |
-| Synchronised | Elevated coordinator | 5.000% | 2.000% | 1.000% | 8,871 | 803,991 | 89,007 | 892,998 | 901,869 | 98.500% | $0.0134 | $0.0135 | 9.967% | 0.027% | 0.014% | 0.009% |
-| Synchronised | Coordinator stress | 10.000% | 5.000% | 3.000% | 8,871 | 803,156 | 85,460 | 888,616 | 897,487 | 96.000% | $0.0133 | $0.0134 | 9.617% | 0.028% | 0.014% | 0.009% |
+| Demand-first | No coordinator | 0.000% | 0.000% | 0.000% | 0 | 599,600 | 19,432 | 619,031 | 619,031 | 100.000% | $0.0093 | $0.0093 | 3.139% | 0.019% | 0.009% | 0.006% |
+| Demand-first | Low coordinator | 1.000% | 0.300% | 0.200% | 0 | 598,617 | 19,319 | 617,936 | 617,936 | 99.750% | $0.0092 | $0.0092 | 3.126% | 0.019% | 0.009% | 0.006% |
+| Demand-first | Elevated coordinator | 5.000% | 2.000% | 1.000% | 0 | 594,421 | 18,768 | 613,190 | 613,190 | 98.500% | $0.0092 | $0.0092 | 3.061% | 0.019% | 0.009% | 0.006% |
+| Demand-first | Coordinator stress | 10.000% | 5.000% | 3.000% | 0 | 588,136 | 17,865 | 606,001 | 606,001 | 96.000% | $0.0091 | $0.0091 | 2.948% | 0.019% | 0.009% | 0.006% |
+| Supply-first | No coordinator | 0.000% | 0.000% | 0.000% | 0 | 634,297 | 56,049 | 690,346 | 690,346 | 100.000% | $0.0103 | $0.0103 | 8.119% | 0.021% | 0.010% | 0.007% |
+| Supply-first | Low coordinator | 1.000% | 0.300% | 0.200% | 0 | 633,527 | 55,771 | 689,298 | 689,298 | 99.750% | $0.0103 | $0.0103 | 8.091% | 0.021% | 0.010% | 0.007% |
+| Supply-first | Elevated coordinator | 5.000% | 2.000% | 1.000% | 0 | 630,079 | 54,379 | 684,458 | 684,458 | 98.500% | $0.0102 | $0.0102 | 7.945% | 0.021% | 0.010% | 0.007% |
+| Supply-first | Coordinator stress | 10.000% | 5.000% | 3.000% | 0 | 624,779 | 52,056 | 676,836 | 676,836 | 96.000% | $0.0101 | $0.0101 | 7.691% | 0.021% | 0.011% | 0.007% |
+| Synchronised | No coordinator | 0.000% | 0.000% | 0.000% | 8,871 | 678,741 | 91,494 | 770,235 | 779,106 | 100.000% | $0.0115 | $0.0117 | 11.879% | 0.023% | 0.012% | 0.008% |
+| Synchronised | Low coordinator | 1.000% | 0.300% | 0.200% | 8,871 | 678,037 | 91,083 | 769,120 | 777,991 | 99.750% | $0.0115 | $0.0116 | 11.842% | 0.023% | 0.012% | 0.008% |
+| Synchronised | Elevated coordinator | 5.000% | 2.000% | 1.000% | 8,871 | 674,696 | 88,978 | 763,674 | 772,545 | 98.500% | $0.0114 | $0.0116 | 11.651% | 0.023% | 0.012% | 0.008% |
+| Synchronised | Coordinator stress | 10.000% | 5.000% | 3.000% | 8,871 | 669,386 | 85,432 | 754,818 | 763,689 | 96.000% | $0.0113 | $0.0114 | 11.318% | 0.024% | 0.012% | 0.008% |
 
 ## Chapter Scale Tables
 
@@ -69,25 +69,25 @@ Values use the reference fee coefficient at `1x`.
 
 | Teachers | Active students | Realised lessons / month | Throughput bottleneck | Estimated management cost / month |
 |---:|---:|---:|---|---:|
-| 100 | 480 | 2880 | demand side | $31.79 |
-| 110 | 545 | 3270 | demand side | $36.10 |
-| 125 | 620 | 3720 | demand side, near-balanced | $41.06 |
+| 100 | 480 | 2880 | demand side | $26.67 |
+| 110 | 545 | 3270 | demand side | $30.28 |
+| 125 | 620 | 3720 | demand side, near-balanced | $34.45 |
 
 ### Supply-first product expansion
 
 | Teachers | Active students | Main research NFTs | Realised lessons / month | Throughput bottleneck | Estimated management cost / month |
 |---:|---:|---:|---:|---|---:|
-| 100 | 500 | 50 | 3000 | balanced | $36.53 |
-| 120 | 540 | 80 | 3240 | student side | $39.46 |
-| 145 | 600 | 120 | 3600 | student side | $43.84 |
+| 100 | 500 | 50 | 3000 | balanced | $30.98 |
+| 120 | 540 | 80 | 3240 | student side | $33.46 |
+| 145 | 600 | 120 | 3600 | student side | $37.18 |
 
 ### Synchronised expansion
 
 | Teachers | Active students | Main research NFTs | Realised lessons / month | Throughput bottleneck | Estimated management cost / month |
 |---:|---:|---:|---:|---|---:|
-| 100 | 500 | 45 | 3000 | balanced | $40.25 |
-| 120 | 600 | 52 | 3600 | balanced | $48.30 |
-| 150 | 750 | 62 | 4500 | balanced | $60.37 |
+| 100 | 500 | 45 | 3000 | balanced | $34.57 |
+| 120 | 600 | 52 | 3600 | balanced | $41.48 |
+| 150 | 750 | 62 | 4500 | balanced | $51.85 |
 
 ### Research maintenance
 
@@ -97,22 +97,22 @@ Research gas source:
 
 | Component | Gas |
 |---|---:|
-| Research asset bootstrap | 516,870 |
-| Teaching-ready research asset | 520,829 |
-| Periodic update bundle | 354,456 |
-| Extra prepared position | 259,467 |
+| Research asset bootstrap | 514,882 |
+| Teaching-ready research asset | 518,841 |
+| Periodic update bundle | 354,468 |
+| Extra prepared position | 259,479 |
 
 | Teachers | Active students | Existing main research NFTs | New main research NFTs | Update cadence | Extra structure per update | Estimated research-maintenance cost / month | Estimated fixed-mix cost / month | Uplift vs fixed-mix lesson cost |
 |---:|---:|---:|---:|---|---|---:|---:|---:|
-| 120 | 600 | 60 | 0 | annual | none | $0.03 | $48.32 | 0.055% |
-| 120 | 600 | 60 | 0 | semiannual | none | $0.05 | $48.35 | 0.110% |
-| 120 | 600 | 60 | 0 | semiannual | +20 extra prepared positions across the catalogue per cycle | $0.07 | $48.36 | 0.137% |
-| 120 | 600 | 60 | 6 per 6 months | semiannual | none | $0.06 | $48.36 | 0.126% |
+| 120 | 600 | 60 | 0 | annual | none | $0.03 | $41.51 | 0.064% |
+| 120 | 600 | 60 | 0 | semiannual | none | $0.05 | $41.54 | 0.128% |
+| 120 | 600 | 60 | 0 | semiannual | +20 extra prepared positions across the catalogue per cycle | $0.07 | $41.55 | 0.159% |
+| 120 | 600 | 60 | 6 per 6 months | semiannual | none | $0.06 | $41.54 | 0.147% |
 
 ### Cost share under lesson pricing
 
 | Revenue / lesson | Lesson lifecycle cost / lesson | Distributor claim cost / lesson | Management cost / lesson | Management cost share of revenue |
 |---:|---:|---:|---:|---:|
-| $50 | $0.0107-$0.0120 | $0.0003-$0.0014 | $0.0110-$0.0134 | 0.022%-0.027% |
-| $100 | $0.0107-$0.0120 | $0.0003-$0.0014 | $0.0110-$0.0134 | 0.011%-0.013% |
-| $150 | $0.0107-$0.0120 | $0.0003-$0.0014 | $0.0110-$0.0134 | 0.0074%-0.0089% |
+| $50 | $0.0090-$0.0102 | $0.0003-$0.0014 | $0.0093-$0.0115 | 0.019%-0.023% |
+| $100 | $0.0090-$0.0102 | $0.0003-$0.0014 | $0.0093-$0.0115 | 0.0093%-0.012% |
+| $150 | $0.0090-$0.0102 | $0.0003-$0.0014 | $0.0093-$0.0115 | 0.0062%-0.0077% |

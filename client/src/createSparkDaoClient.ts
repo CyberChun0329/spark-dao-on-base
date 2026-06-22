@@ -8,14 +8,12 @@ import {
 } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import {
+  teachingPricingPolicyArtifact,
+  teachingRegistryArtifact,
+  teachingRewardDistributorArtifact,
   researchPositionTokenArtifact,
-  teachingEconomicsPolicyArtifact,
-  teachingFaultPolicyArtifact,
-  teachingPolicyGuardArtifact,
   researchRegistryArtifact,
   teachingNftTokenArtifact,
-  teachingRewardDistributorArtifact,
-  teachingRegistryArtifact,
 } from "./artifacts.js";
 import type { SparkDaoAddresses } from "./config.js";
 
@@ -46,12 +44,10 @@ export type SparkDaoWalletClient = {
 export type SparkDaoContracts = {
   researchRegistry: SparkDaoContractDescriptor;
   teachingRegistry: SparkDaoContractDescriptor;
-  teachingRewardDistributor?: SparkDaoContractDescriptor;
-  teachingPolicyGuard?: SparkDaoContractDescriptor;
-  teachingEconomicsPolicy?: SparkDaoContractDescriptor;
-  teachingFaultPolicy?: SparkDaoContractDescriptor;
-  researchPositionToken?: SparkDaoContractDescriptor;
+  teachingRewardDistributor: SparkDaoContractDescriptor;
+  teachingPricingPolicy: SparkDaoContractDescriptor;
   teachingNftToken?: SparkDaoContractDescriptor;
+  researchPositionToken?: SparkDaoContractDescriptor;
 };
 
 export type SparkDaoClient = {
@@ -98,33 +94,15 @@ export function createSparkDaoClient(
     abi: teachingRegistryArtifact.abi,
   };
 
-  const teachingRewardDistributor = params.addresses.teachingRewardDistributor
-    ? ({
-        address: params.addresses.teachingRewardDistributor,
-        abi: teachingRewardDistributorArtifact.abi,
-      } satisfies SparkDaoContractDescriptor)
-    : undefined;
+  const teachingRewardDistributor: SparkDaoContractDescriptor = {
+    address: params.addresses.teachingRewardDistributor,
+    abi: teachingRewardDistributorArtifact.abi,
+  };
 
-  const teachingEconomicsPolicy = params.addresses.teachingEconomicsPolicy
-    ? ({
-        address: params.addresses.teachingEconomicsPolicy,
-        abi: teachingEconomicsPolicyArtifact.abi,
-      } satisfies SparkDaoContractDescriptor)
-    : undefined;
-
-  const teachingFaultPolicy = params.addresses.teachingFaultPolicy
-    ? ({
-        address: params.addresses.teachingFaultPolicy,
-        abi: teachingFaultPolicyArtifact.abi,
-      } satisfies SparkDaoContractDescriptor)
-    : undefined;
-
-  const teachingPolicyGuard = params.addresses.teachingPolicyGuard
-    ? ({
-        address: params.addresses.teachingPolicyGuard,
-        abi: teachingPolicyGuardArtifact.abi,
-      } satisfies SparkDaoContractDescriptor)
-    : undefined;
+  const teachingPricingPolicy: SparkDaoContractDescriptor = {
+    address: params.addresses.teachingPricingPolicy,
+    abi: teachingPricingPolicyArtifact.abi,
+  };
 
   const researchPositionToken = params.addresses.researchPositionToken
     ? ({
@@ -132,7 +110,6 @@ export function createSparkDaoClient(
         abi: researchPositionTokenArtifact.abi,
       } satisfies SparkDaoContractDescriptor)
     : undefined;
-
   const teachingNftToken = params.addresses.teachingNftToken
     ? ({
         address: params.addresses.teachingNftToken,
@@ -148,11 +125,9 @@ export function createSparkDaoClient(
       researchRegistry,
       teachingRegistry,
       teachingRewardDistributor,
-      teachingPolicyGuard,
-      teachingEconomicsPolicy,
-      teachingFaultPolicy,
-      researchPositionToken,
+      teachingPricingPolicy,
       teachingNftToken,
+      researchPositionToken,
     },
   };
 }

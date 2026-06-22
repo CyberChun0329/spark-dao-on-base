@@ -903,7 +903,7 @@ const manifest = buildManifest(inputFiles);
 
 const markdown = `# Teaching Cost Simulation
 
-Generated from \`teaching_gas_calibration.csv\`, \`teaching_followup_gas_calibration.csv\`, and \`research_gas_calibration.csv\`.
+Generated from Teaching lifecycle calibration CSVs and \`research_gas_calibration.csv\`.
 
 Reference translation coefficient:
 
@@ -914,7 +914,7 @@ measurementWindow = ${feeAssumptions.measurementWindow}
 unit = ${feeAssumptions.unit}
 \`\`\`
 
-Generated from calibration CSVs. Management gas is \`lesson_gas + claim_gas\`.
+Generated from Teaching lifecycle calibration. Management gas is \`lesson_gas + claim_gas\`.
 
 ## Measured Contract Paths
 

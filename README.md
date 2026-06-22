@@ -2,113 +2,102 @@
 
 Base/Solidity implementation of the Spark DAO protocol.
 
-This repository contains the EVM-native implementation for research assets,
-teaching settlement, claim-pull rewards, multi-stable reserves, deployment scripts,
-Foundry tests, and gas simulation.
+This repository contains the EVM contracts, Foundry tests, deployment scripts,
+lightweight client helpers, and generated calibration outputs used by the Base
+implementation.
 
-## Scope
+## What It Contains
 
-- `src/`: core contracts
-- `test/`: Foundry test suites used for behavioural and gas validation
-- `script/`: deployment and demo scripts
-- `client/`: minimal `viem` client helpers and reproducibility checks
-- `simulation_inputs/` and `simulation_outputs/`: fee assumptions and generated cost outputs
+- Research assets and contribution-right positions
+- Teaching settlement with per-seat accounting
+- Claim-pull research rewards
+- Multi-stable reserve accounting
+- Local demo and deployment scripts
+- Reproducible gas and cost outputs
 
-The main contracts are:
-
-- `ResearchRegistry.sol`
-- `TeachingRegistry.sol`
-- `TeachingRewardDistributor.sol`
-- `TeachingPolicyGuard.sol`
-- `TeachingEconomicsPolicyV1.sol`
-- `TeachingFaultPolicyV1.sol`
-- `ResearchPositionToken.sol`
-- `TeachingNftToken.sol`
-
-## Architecture
-
-At a high level, Spark DAO converts off-chain teaching responsibility into recognised
-on-chain state, bounded settlement outcomes, and claimable research reward rights:
+## Module Map
 
 ![Spark DAO teaching and research contribution-rights architecture](docs/assets/spark_dao_nft_rights_architecture.svg)
 
-The figure is conceptual; detailed contract surfaces are documented under `src/`.
+The figure is conceptual. Contract interfaces, storage, and deployment wiring are defined
+by the Solidity sources.
 
-- `ResearchRegistry` records research assets, position ownership, revenue and buyback
-  flows, and per-stable reserve accounting.
-- `TeachingRegistry` records teaching sessions, frozen settlement inputs, teaching vault
-  reserves, and distributor callbacks.
-- `TeachingRewardDistributor` handles claim-pull teaching reward pools; policy modules
-  quote and validate teaching economics.
+Core contracts:
 
-## Reproducibility
+- `ResearchRegistry`: research assets, positions, direct revenue, buybacks, reward-claim
+  accounting, and research-side reserves.
+- `TeachingRegistry`: teaching sessions with `classSize`, per-seat payment, refund,
+  customer fault, session-level teacher fault, and reward callback. A single-learner
+  lesson uses one seat.
+- `TeachingRewardDistributor`: teaching reward pools and claim-pull distribution.
+- `TeachingPricingPolicyV1`: tiered teaching quote module for class sizes `1..100`.
+- `TeachingNftToken`: non-transferable teaching token minted for each teaching session.
+- `ResearchPositionToken`: non-transferable registry-minted research position token.
 
-Build and test with Foundry:
+## Settlement Surface
+
+Teaching rewards are pull-based. The teaching registry records a settled pool through
+the distributor, and the current research-position holder claims later.
+
+Teaching sessions are scheduled by teacher and coordinator confirmation. Valid sessions can
+close through coordinator fallback after the timeout, or automatically after `scheduledAt`
+when teacher delivery and paid attendance over half of `classSize` are recorded.
+
+On valid close, paid seats that are not marked customer-fault are treated as completed
+seats and receive no refund. Customer fault is coordinator-marked while the session is
+open and requires a paid seat.
+
+Research claim rights follow current holder state. If a position is bought back by the DAO,
+future claims route to the treasury holder.
+
+Stable assets are frozen when protocol objects are created. Reserves are tracked by stable
+asset, and authority withdrawals are limited to idle balance.
+
+Teaching pricing uses the tier table in `TeachingPricingPolicyV1`. A logarithmic
+class-size reference curve is not executable policy.
+
+## Commands
 
 ```bash
 forge build --sizes --skip script
 forge test -vv
 npm run client:typecheck
 npm run check:reproducibility-config
+npm run check:teaching-surface
 npm run simulate:teaching-cost
 npm run check:calibration
 ```
 
-Cost outputs are generated from calibration tests and fee inputs. Use
-`npm run check:calibration` before relying on reported numbers; do not edit generated
-outputs by hand.
+`npm run check:calibration` regenerates Teaching lifecycle calibration CSVs and cost
+outputs. Generated outputs should not be edited by hand.
 
-## Protocol Notes
+## Deployment And Demos
 
-- Teaching settlement is claim-pull. Research position holders claim through
-  `TeachingRewardDistributor`, and each teaching session can link at most two research
-  assets.
-- Claim rights follow the current research position holder. DAO buybacks route future
-  claims to the treasury holder.
-- Stable assets are frozen at object creation. Vault reserves are tracked per stable
-  asset, and idle teaching withdrawals cannot use reserved balance.
-- Token minters are registry-controlled and can be locked after deployment.
-- The teaching registry supports ordinary completion, customer-fault settlement, and
-  teacher-fault remediation.
+Deployment scripts:
 
-Configured stable assets are expected to be deployed standard ERC-20 tokens.
+- `DeployTokens.s.sol`
+- `DeployRegistry.s.sol`
+- `SetTokenMinters.s.sol`
 
-## Distributor wiring
-
-`TeachingRegistry.setTeachingRewardDistributor` is an authority-only, one-time wiring
-step. The registry and research registry perform reciprocal address checks before the
-module addresses are stored.
-
-## Deployment
-
-Deployment is split into three scripts:
-
-1. `DeployTokens.s.sol`
-2. `DeployRegistry.s.sol` deploys `TeachingPolicyGuard`, `TeachingEconomicsPolicyV1`,
-   `TeachingFaultPolicyV1`, `ResearchRegistry`, `TeachingRegistry`, and
-   `TeachingRewardDistributor`, then wires research, teaching, and distributor addresses
-3. `SetTokenMinters.s.sol` sets and locks the research token minter to `ResearchRegistry`
-   and the teaching NFT minter to `TeachingRegistry`
-
-`STABLE_ASSET`, `RESEARCH_POSITION_TOKEN`, `TEACHING_NFT_TOKEN`, and the teaching policy
-modules must be deployed contract addresses.
-
-Local end-to-end demos:
+Local demos:
 
 - `DemoResearch.s.sol`
 - `DemoTeaching.s.sol`
 
-## Configuration
+The registry deployment script wires the teaching stack. Use `classSize = 1`
+for a single-learner lesson.
 
-Environment variables are listed in `.env.example`.
-Project configuration is in `foundry.toml`.
+Environment variables are listed in `.env.example`. Runtime wiring can be checked with:
 
-For full teaching deployments, record the registry, distributor, and policy addresses
-emitted by the deployment scripts. Reward preview and claim helpers require
-`TEACHING_REWARD_DISTRIBUTOR`.
+```bash
+npm run check:registry-admin-state
+npm run check:module-compatibility
+```
 
-After deployment, use `npm run check:registry-admin-state` and
-`npm run check:module-compatibility` for runtime configuration checks.
+## Documentation
 
-Local demos are for end-to-end execution on a local chain. Non-demo networks should set
-deployment timing values through the environment.
+- `src/README.md`: contract responsibilities and wiring
+- `test/README.md`: test coverage and calibration writers
+- `script/README.md`: deployment and demo scripts
+- `client/README.md`: client helpers and address configuration
+- `docs/RUNBOOK.md`: local and deployment workflow

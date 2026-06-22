@@ -7,8 +7,9 @@ import {
 } from "../src/research.js";
 import {
   getTeachingDaoState,
+  getTeachingModuleState,
   getTeachingRewardPreview,
-  getTeachingSessionSettlementLayers,
+  getTeachingSeat,
   getTeachingSessionState,
 } from "../src/teaching.js";
 
@@ -24,9 +25,13 @@ async function main() {
   const teachingNftId = process.env.INSPECT_TEACHING_NFT_ID
     ? BigInt(process.env.INSPECT_TEACHING_NFT_ID)
     : undefined;
+  const seatIndex = process.env.INSPECT_SEAT_INDEX
+    ? Number(process.env.INSPECT_SEAT_INDEX)
+    : undefined;
 
   console.log("researchDaoState", await getResearchDaoState(config));
   console.log("teachingDaoState", await getTeachingDaoState(config));
+  console.log("teachingModuleState", await getTeachingModuleState(config));
 
   if (assetId !== undefined) {
     console.log("researchAsset", await getResearchAsset(config, assetId));
@@ -46,14 +51,10 @@ async function main() {
   }
 
   if (teachingNftId !== undefined) {
-    console.log(
-      "teachingSessionState",
-      await getTeachingSessionState(config, teachingNftId),
-    );
-    console.log(
-      "teachingSettlementLayers",
-      await getTeachingSessionSettlementLayers(config, teachingNftId),
-    );
+    console.log("teachingState", await getTeachingSessionState(config, teachingNftId));
+    if (seatIndex !== undefined) {
+      console.log("teachingSeat", await getTeachingSeat(config, teachingNftId, seatIndex));
+    }
   }
 }
 

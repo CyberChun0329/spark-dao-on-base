@@ -1,47 +1,55 @@
 # Client
 
-This directory contains the minimal `viem` client layer for the Base/Solidity
-implementation.
+Minimal `viem` helper layer for deployment checks, inspection, and reward claims.
 
-It provides ABI loading, environment-based address configuration, lightweight registry
-helpers, reward claim helpers, deployment checks, and read-only inspection scripts.
+## Configuration
 
-## Address Configuration
+Required for the teaching stack:
 
+- `BASE_RPC_URL`
+- `BASE_CHAIN`
 - `RESEARCH_REGISTRY`
 - `TEACHING_REGISTRY`
 - `TEACHING_REWARD_DISTRIBUTOR`
-- `TEACHING_POLICY_GUARD`
-- `TEACHING_ECONOMICS_POLICY`
-- `TEACHING_FAULT_POLICY`
+- `TEACHING_PRICING_POLICY`
+
+Optional module and token addresses:
+
 - `RESEARCH_POSITION_TOKEN`
 - `TEACHING_NFT_TOKEN`
-- `MODULE_COMPATIBILITY_MANIFEST`
-- `EXPECTED_TEACHING_ECONOMICS_POLICY_VERSION`
-- `EXPECTED_TEACHING_FAULT_POLICY_VERSION`
 
-## Post-Deployment Checks
+## Checks
 
 ```bash
+npm run client:typecheck
 npm run check:registry-admin-state
 npm run check:module-compatibility
 ```
 
-`check:module-compatibility` checks deployed registry, distributor, policy, and token
-wiring. A manifest can also include bytecode hashes.
-
-Validate the example manifest format without chain access:
+Validate the example manifest without chain access:
 
 ```bash
 npm run check:module-compatibility:example
 ```
 
-Recommended order: test, deploy or run a local demo, then run the registry and module
-checks.
+`check:module-compatibility` checks deployed wiring and optional bytecode hashes.
 
-This is a minimal SDK and script layer for deployment checks and inspection.
+## Helpers
 
-`npm run client:typecheck` checks the client scripts.
+- `research.ts`: research registry reads
+- `teaching.ts`: teaching reads, schedule confirmation, seat actions, settlement calls,
+  and claims
+- `inspect.ts`: read-only environment inspection
 
-Use `getResearchVaultReservedUnits` or `getTeachingVaultReservedUnits` when reading
-reserve state from scripts.
+## Teaching Compatibility
+
+- classSize = 1 preserves the single-seat economic, reserve, claim, dust, buyback, and stable-asset semantics.
+- Schedule confirmation is teacher + coordinator.
+- Fault refunds are per-seat claim-pull.
+- Customer-fault teacher half wage follows the teacher payout redeem delay.
+- Customer fault remains per-seat state inside a valid closed teaching session.
+- Clients should read teaching state through `getTeachingSessionState`, `getTeachingSeat`, and teaching reward distributor getters.
+- Teaching events are the teaching event surface for demos.
+
+The client layer is intentionally thin. Contract behaviour is defined by the Solidity
+sources and tests.

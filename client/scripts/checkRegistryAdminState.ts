@@ -1,8 +1,8 @@
 import "dotenv/config";
 import type { Address } from "viem";
 import { loadClientConfigFromEnv } from "../src/config.js";
-import { getResearchDaoState } from "../src/research.js";
 import { getTeachingDaoState, getTeachingModuleState } from "../src/teaching.js";
+import { getResearchDaoState } from "../src/research.js";
 
 type DaoState = {
   authority: Address;
@@ -54,21 +54,10 @@ async function main() {
     throw new Error(`Registry admin state drift detected:\n${details.join("\n")}`);
   }
 
-  const [
-    researchRegistry,
-    teachingNftToken,
-    teachingPolicyGuard,
-    teachingEconomicsPolicy,
-    teachingFaultPolicy,
-    ,
-    teachingRewardDistributor,
-  ] = (await getTeachingModuleState(config)) as unknown as readonly [
+  const [researchRegistry, teachingPricingPolicy, teachingRewardDistributor] =
+    (await getTeachingModuleState(config)) as unknown as readonly [
     Address,
     Address,
-    Address,
-    Address,
-    Address,
-    number,
     Address,
   ];
 
@@ -83,24 +72,9 @@ async function main() {
     config.addresses.teachingRewardDistributor,
   );
   assertAddressMatch(
-    "teaching policy guard",
-    teachingPolicyGuard,
-    config.addresses.teachingPolicyGuard,
-  );
-  assertAddressMatch(
-    "teaching economics policy",
-    teachingEconomicsPolicy,
-    config.addresses.teachingEconomicsPolicy,
-  );
-  assertAddressMatch(
-    "teaching fault policy",
-    teachingFaultPolicy,
-    config.addresses.teachingFaultPolicy,
-  );
-  assertAddressMatch(
-    "teaching NFT token",
-    teachingNftToken,
-    config.addresses.teachingNftToken,
+    "teaching pricing policy",
+    teachingPricingPolicy,
+    config.addresses.teachingPricingPolicy,
   );
 
   console.log("Registry admin state check passed");

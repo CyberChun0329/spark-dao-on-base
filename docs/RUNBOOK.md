@@ -1,63 +1,46 @@
 # Base Runbook
 
-This runbook covers two operating paths for the Base/Solidity implementation:
-local `anvil` execution and Base Sepolia deployment.
+Operational notes for the Base/Solidity implementation.
 
-## 1. Local Development Chain
+## Local Setup
 
-Start with `anvil` for local checks:
+Start a local chain:
 
 ```bash
 anvil
 ```
 
-Create a local environment file from `.env.example`. At minimum, set:
+Create a local `.env` from `.env.example` and set:
 
-- `BASE_RPC_URL=http://127.0.0.1:8545`
-- `BASE_CHAIN=base-sepolia` or `BASE_CHAIN=base`
-- demo private keys:
-  - `DEMO_AUTHORITY_PRIVATE_KEY`
-  - `DEMO_COORDINATOR_PRIVATE_KEY`
-  - `DEMO_CONTRIBUTOR_ONE_PRIVATE_KEY`
-  - `DEMO_CONTRIBUTOR_TWO_PRIVATE_KEY`
-  - `DEMO_TEACHER_PRIVATE_KEY`
-  - `DEMO_CUSTOMER_PRIVATE_KEY`
+- `BASE_RPC_URL`
+- `BASE_CHAIN`
+- demo private keys
+- deployed addresses when using a persistent environment
 
-The local demo scripts deploy their own temporary contracts:
+Local demo scripts deploy their own temporary contracts.
 
-- `DemoResearch.s.sol` deploys `MockERC20`, `ResearchPositionToken`, and `ResearchRegistry`.
-- `DemoTeaching.s.sol` deploys `MockERC20`, `ResearchPositionToken`,
-  `TeachingNftToken`, `TeachingPolicyGuard`, `TeachingEconomicsPolicyV1`,
-  `TeachingFaultPolicyV1`, `ResearchRegistry`, `TeachingRegistry`, and
-  `TeachingRewardDistributor`.
+## Regression Checks
 
-The teaching demo wires the distributor into the registry and runs a local claim path.
-Use environment timing values for non-demo deployments.
-
-## 2. Protocol Regression Checks
-
-Common checks:
+Run these before relying on a local build:
 
 ```bash
-npm run build
-npm run build:sizes
-npm run test
+forge build --sizes --skip script
+forge test -vv
 npm run client:typecheck
-npm run simulate:teaching-cost
+npm run check:reproducibility-config
+npm run check:teaching-surface
+```
+
+Refresh and verify teaching-cost outputs:
+
+```bash
 npm run check:calibration
 ```
 
-Notes:
+`check:calibration` rewrites the Teaching lifecycle calibration CSVs and
+`simulation_outputs/` from the current source.
 
-- `build:sizes` reports deployable protocol contract sizes.
-- `check:registry-admin-state` and `check:module-compatibility` require a deployed
-  environment.
-- `check:module-compatibility:example` validates the example manifest format without
-  chain access.
-
-## 3. Deployment Order
-
-Deployment is split into three steps.
+## Deployment Path
 
 1. Deploy tokens:
 
@@ -65,93 +48,72 @@ Deployment is split into three steps.
 npm run deploy:tokens
 ```
 
-2. Deploy the research registry, teaching registry, policy modules, and reward
-   distributor:
+2. Deploy the research and teaching stack:
 
 ```bash
 npm run deploy:registry
 ```
 
-`DeployRegistry.s.sol` deploys the registries, policy modules, and distributor, then
-wires the registry/distributor addresses. The broadcast signer must be `DAO_AUTHORITY`.
-
-Use deployed contract addresses for stable asset and token inputs.
-
-After deployment, record the registry, distributor, and policy addresses.
-
-For manifest-based deployment review:
-
-```bash
-npm run check:module-compatibility
-```
-
-3. Set and lock token minters:
+3. Set and lock registry minters:
 
 ```bash
 npm run deploy:set-minters
 ```
 
-Set registry minters for both token contracts, then lock them.
-
-Run these checks after deployment:
+Then run:
 
 ```bash
 npm run check:registry-admin-state
 npm run check:module-compatibility
 ```
 
-## 4. Local Demos
+## Local Demos
 
-Research flow:
+Research-only path:
 
 ```bash
 npm run demo:research
 ```
 
-Teaching plus research-linked reward flow:
+Teaching path:
 
 ```bash
 npm run demo:teaching
 ```
 
-Read-only chain inspection:
+Single-learner lessons use the teaching path with one seat.
+`TeachingRegistry` keeps the Teaching protocol surface while the session API supports
+`classSize` and per-seat accounting for fresh deployments.
+
+- classSize = 1 preserves the single-seat economic, reserve, claim, dust, buyback, and stable-asset semantics.
+- Schedule confirmation is teacher + coordinator.
+- Fault refunds are per-seat claim-pull.
+- Customer-fault teacher half wage follows the teacher payout redeem delay.
+- Valid close treats paid, unmarked, non-attending seats as completed seats with no refund.
+- Attendance auto-close requires paid attendance over half of total `classSize`.
+- Attendance auto-close has no upper time window after `scheduledAt`; coordinator fallback starts after the timeout.
+- Customer fault remains per-seat state inside a valid closed teaching session. It is coordinator-only, must be marked while the session is open, and requires a paid seat.
+- Clients should read teaching state through `getTeachingSessionState`, `getTeachingSeat`, and teaching reward distributor getters.
+- Teaching events are the teaching event surface for demos.
+
+Read-only inspection:
 
 ```bash
 npm run client:inspect
 ```
 
-Set inspection IDs in the environment when deeper state reads are needed.
+## Base Sepolia
 
-## 5. Base Sepolia
+For Base Sepolia, set:
 
-For Base Sepolia:
+- `BASE_RPC_URL`
+- `BASE_CHAIN=base-sepolia`
+- `DAO_AUTHORITY`
+- `DAO_COORDINATOR`
+- `DAO_TREASURY`
+- `STABLE_ASSET`
+- token addresses
+- timing values
 
-- set `BASE_RPC_URL` to a Sepolia RPC endpoint
-- set `DAO_AUTHORITY` and `DAO_COORDINATOR` to the intended deployment addresses
-- set `DAO_TREASURY` to the intended treasury or multisig
-- use deployed contract addresses for `STABLE_ASSET`, `RESEARCH_POSITION_TOKEN`, and
-  `TEACHING_NFT_TOKEN`
-- set the distributor and policy addresses from the registry deployment output
-- set production values for `REWARD_UNLOCK_SECONDS` and `BUYBACK_WAIT_SECONDS`
-
-Set deployment timing values explicitly for non-demo networks.
-
-Recommended order:
-
-1. Run the local `anvil` path.
-2. Deploy token and registry contracts to Base Sepolia.
-3. Run a minimal smoke test and the registry/module compatibility checks.
-
-## 6. Gas And Simulation Refresh
-
-Refresh generated gas and cost outputs:
-
-```bash
-forge test --match-contract TeachingGasCalibrationTest
-forge test --match-contract ResearchGasCalibrationTest
-npm run simulate:teaching-cost
-npm run check:calibration
-```
-
-The calibration tests write the CSV inputs; the simulation rewrites
-`simulation_outputs/`.
+Use deployed module addresses from the deployment output. Run the registry and module
+compatibility checks after deployment.

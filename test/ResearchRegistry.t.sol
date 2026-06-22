@@ -243,6 +243,71 @@ contract ResearchRegistryTest {
         assertTrue(researchToken.ownerOf(_tokenId(assetId, positionId)) == contributorTwo);
     }
 
+    function testSetTeachingRegistryRequiresAuthorityValidHandshakeAndOneTime() public {
+        MockTeachingRegistryForResearch teaching =
+            new MockTeachingRegistryForResearch(address(registry));
+
+        VM.expectRevert(SparkDaoErrors.UnauthorizedAuthority.selector);
+        VM.prank(coordinator);
+        registry.setTeachingRegistry(address(teaching));
+
+        VM.expectRevert(SparkDaoErrors.InvalidTeachingRegistry.selector);
+        VM.prank(authority);
+        registry.setTeachingRegistry(address(0));
+
+        VM.expectRevert(SparkDaoErrors.InvalidTeachingRegistry.selector);
+        VM.prank(authority);
+        registry.setTeachingRegistry(address(0xBEEF));
+
+        MockTeachingRegistryForResearch mismatched =
+            new MockTeachingRegistryForResearch(address(0xCAFE));
+        VM.expectRevert(SparkDaoErrors.InvalidTeachingRegistry.selector);
+        VM.prank(authority);
+        registry.setTeachingRegistry(address(mismatched));
+
+        VM.prank(authority);
+        registry.setTeachingRegistry(address(teaching));
+
+        MockTeachingRegistryForResearch second =
+            new MockTeachingRegistryForResearch(address(registry));
+        VM.expectRevert(SparkDaoErrors.TeachingRegistryAlreadySet.selector);
+        VM.prank(authority);
+        registry.setTeachingRegistry(address(second));
+    }
+
+    function testTeachingClaimAccountingIsTeachingRegistryOnly() public {
+        MockTeachingRegistryForResearch teaching =
+            new MockTeachingRegistryForResearch(address(registry));
+        VM.prank(authority);
+        registry.setTeachingRegistry(address(teaching));
+
+        VM.startPrank(coordinator);
+        uint64 assetId = registry.createResearchAsset("Teaching Claim", "ipfs://teaching-claim");
+        uint64 positionId = registry.createPatchPosition(
+            SparkDaoTypes.CreatePatchPositionParams({
+                assetId: assetId,
+                layerIndex: 1,
+                layerShareBps: 10_000,
+                buybackFloor: 100 ether,
+                decayWaitSeconds: 365 days,
+                decayPeriodSeconds: 365 days,
+                decayRateBps: 5_000,
+                beneficiary: contributorOne
+            })
+        );
+        VM.stopPrank();
+
+        VM.expectRevert(SparkDaoErrors.UnauthorizedTeachingRegistry.selector);
+        registry.recordTeachingRewardClaim(assetId, positionId, 321);
+
+        VM.prank(address(teaching));
+        registry.recordTeachingRewardClaim(assetId, positionId, 321);
+
+        SparkDaoTypes.ResearchPosition memory position =
+            registry.getResearchPosition(assetId, positionId);
+        assertTrue(position.totalClaimedUnits == 321);
+    }
+
     function testCreateAndClaimRevenueEscrow() public {
         VM.prank(coordinator);
         uint64 assetId = registry.createResearchAsset("Chemistry", "ipfs://chem");
@@ -732,5 +797,13 @@ contract ResearchRegistryTest {
 
     function _tokenId(uint64 assetId, uint64 positionId) internal pure returns (uint256) {
         return (uint256(assetId) << 64) | uint256(positionId);
+    }
+}
+
+contract MockTeachingRegistryForResearch {
+    address public immutable RESEARCH_REGISTRY;
+
+    constructor(address researchRegistry_) {
+        RESEARCH_REGISTRY = researchRegistry_;
     }
 }

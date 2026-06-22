@@ -1,29 +1,27 @@
 # Scripts
 
-Deployment and demo scripts for the Base version of Spark DAO.
+Deployment and demo scripts for the Base implementation.
 
-## Deployment scripts
+## Deployment
 
-- `DeployTokens.s.sol`
-- `DeployRegistry.s.sol`
-- `SetTokenMinters.s.sol`
+Main deployment is split into three scripts.
 
-`DeployTokens.s.sol` expects:
+1. `DeployTokens.s.sol`
+
+Deploys the research position token and teaching token.
+
+Required environment:
 
 - `DAO_AUTHORITY`
 - `RESEARCH_BASE_URI`
 - `TEACHING_BASE_URI`
 
-Usage:
+2. `DeployRegistry.s.sol`
 
-```bash
-forge script script/DeployTokens.s.sol:DeployTokens --rpc-url <BASE_RPC> --broadcast
-```
+Deploys the research registry, teaching registry, teaching reward distributor, and
+teaching pricing policy. The broadcaster must be `DAO_AUTHORITY`.
 
-`DeployRegistry.s.sol` deploys the registries, policy modules, and distributor, then
-wires them. The broadcast signer must be `DAO_AUTHORITY`.
-
-It expects:
+Required environment:
 
 - `DAO_AUTHORITY`
 - `DAO_COORDINATOR`
@@ -34,51 +32,40 @@ It expects:
 - `REWARD_UNLOCK_SECONDS`
 - `BUYBACK_WAIT_SECONDS`
 
-`STABLE_ASSET`, `RESEARCH_POSITION_TOKEN`, and `TEACHING_NFT_TOKEN` must be deployed
-contract addresses.
+3. `SetTokenMinters.s.sol`
 
-Usage:
+Sets and locks token minters.
 
-```bash
-forge script script/DeployRegistry.s.sol:DeployRegistry --rpc-url <BASE_RPC> --broadcast
-```
-
-After this script, record the emitted registry, distributor, and policy addresses.
-
-After deployment, run `npm run check:registry-admin-state` and
-`npm run check:module-compatibility`.
-
-`SetTokenMinters.s.sol` expects:
+Required environment:
 
 - `RESEARCH_REGISTRY`
 - `TEACHING_REGISTRY`
 - `RESEARCH_POSITION_TOKEN`
 - `TEACHING_NFT_TOKEN`
 
-Usage:
+Run deployment checks after these scripts:
 
 ```bash
-forge script script/SetTokenMinters.s.sol:SetTokenMinters --rpc-url <BASE_RPC> --broadcast
+npm run check:registry-admin-state
+npm run check:module-compatibility
 ```
 
-## Demo scripts
+## Demos
 
-- `DemoResearch.s.sol`
-- `DemoTeaching.s.sol`
+- `DemoResearch.s.sol`: local research registry path
+- `DemoTeaching.s.sol`: local teaching and reward claim path
 
-`DemoResearch.s.sol` deploys its own `MockERC20`, `ResearchPositionToken`, and
-`ResearchRegistry`.
+Demo scripts deploy temporary mock stable assets and local protocol contracts. They are
+for local execution, not production deployment.
 
-`DemoTeaching.s.sol` deploys a local teaching/research stack and runs a reward claim path.
+The teaching demo uses the teaching-session path. A single-learner lesson is represented as a
+teaching class with one seat.
 
-Demo scripts use local timing values. Set deployment timing values through the
-environment for non-demo networks.
-
-Additional environment variables:
+Required demo keys:
 
 - `DEMO_AUTHORITY_PRIVATE_KEY`
 - `DEMO_COORDINATOR_PRIVATE_KEY`
 - `DEMO_CONTRIBUTOR_ONE_PRIVATE_KEY`
 - `DEMO_CONTRIBUTOR_TWO_PRIVATE_KEY`
-- `DEMO_TEACHER_PRIVATE_KEY` for the teaching demo
-- `DEMO_CUSTOMER_PRIVATE_KEY` for the teaching demo
+- `DEMO_TEACHER_PRIVATE_KEY`
+- `DEMO_CUSTOMER_PRIVATE_KEY`

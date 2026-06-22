@@ -4,12 +4,10 @@ import { base, baseSepolia } from "viem/chains";
 export type SparkDaoAddresses = {
   researchRegistry: Address;
   teachingRegistry: Address;
-  teachingRewardDistributor?: Address;
-  teachingPolicyGuard?: Address;
-  teachingEconomicsPolicy?: Address;
-  teachingFaultPolicy?: Address;
-  researchPositionToken?: Address;
+  teachingRewardDistributor: Address;
+  teachingPricingPolicy: Address;
   teachingNftToken?: Address;
+  researchPositionToken?: Address;
 };
 
 export type SparkDaoClientConfig = {
@@ -45,12 +43,10 @@ export function loadClientConfigFromEnv(): SparkDaoClientConfig {
     addresses: {
       researchRegistry: requireEnv("RESEARCH_REGISTRY") as Address,
       teachingRegistry: requireEnv("TEACHING_REGISTRY") as Address,
-      teachingRewardDistributor: optionalAddress("TEACHING_REWARD_DISTRIBUTOR"),
-      teachingPolicyGuard: optionalAddress("TEACHING_POLICY_GUARD"),
-      teachingEconomicsPolicy: optionalAddress("TEACHING_ECONOMICS_POLICY"),
-      teachingFaultPolicy: optionalAddress("TEACHING_FAULT_POLICY"),
-      researchPositionToken: optionalAddress("RESEARCH_POSITION_TOKEN"),
+      teachingRewardDistributor: requireEnv("TEACHING_REWARD_DISTRIBUTOR") as Address,
+      teachingPricingPolicy: requireEnv("TEACHING_PRICING_POLICY") as Address,
       teachingNftToken: optionalAddress("TEACHING_NFT_TOKEN"),
+      researchPositionToken: optionalAddress("RESEARCH_POSITION_TOKEN"),
     },
   };
 }

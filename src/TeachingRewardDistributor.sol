@@ -1,17 +1,18 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.26;
 
+import { SparkTeachingTypes } from "./SparkTeachingTypes.sol";
 import { SparkDaoErrors } from "./SparkDaoErrors.sol";
 import { SparkDaoTypes } from "./SparkDaoTypes.sol";
-import { IResearchRegistryForTeaching } from "./interfaces/IResearchRegistryForTeaching.sol";
 import { ITeachingRewardSource } from "./interfaces/ITeachingRewardSource.sol";
+import { IResearchRegistryForTeaching } from "./interfaces/IResearchRegistryForTeaching.sol";
 
 contract TeachingRewardDistributor {
     address public immutable TEACHING_REGISTRY;
     address public immutable RESEARCH_REGISTRY;
 
     mapping(
-        uint64 teachingNftId => mapping(uint64 assetId => SparkDaoTypes.TeachingRewardPool)
+        uint64 teachingNftId => mapping(uint64 assetId => SparkTeachingTypes.TeachingRewardPool)
     ) internal teachingRewardPools;
     mapping(
         uint64 teachingNftId => mapping(uint64 assetId => mapping(uint64 positionId => bool))
@@ -56,7 +57,8 @@ contract TeachingRewardDistributor {
         uint16 snapshotActiveLayer,
         uint16 totalEffectiveShareBps
     ) external onlyTeachingRegistry {
-        SparkDaoTypes.TeachingRewardPool storage pool = teachingRewardPools[teachingNftId][assetId];
+        SparkTeachingTypes.TeachingRewardPool storage pool =
+            teachingRewardPools[teachingNftId][assetId];
         if (pool.exists) revert SparkDaoErrors.InvalidTeachingRewardPool();
 
         pool.exists = true;
@@ -78,7 +80,7 @@ contract TeachingRewardDistributor {
         view
         returns (uint256 amount, uint64 unlockAt, bool claimed)
     {
-        SparkDaoTypes.TeachingRewardPool storage pool =
+        SparkTeachingTypes.TeachingRewardPool storage pool =
             _requireTeachingRewardPool(teachingNftId, assetId);
         SparkDaoTypes.ResearchPosition memory position = IResearchRegistryForTeaching(
                 RESEARCH_REGISTRY
@@ -98,7 +100,17 @@ contract TeachingRewardDistributor {
         uint64[] calldata assetIds,
         uint64[] calldata positionIds
     ) external {
-        _claimTeachingRewardBatch(msg.sender, teachingNftIds, assetIds, positionIds);
+        uint256 claimCount = teachingNftIds.length;
+        if (claimCount == 0 || claimCount != assetIds.length || claimCount != positionIds.length) {
+            revert SparkDaoErrors.InvalidAmount();
+        }
+
+        for (uint256 i = 0; i < claimCount;) {
+            _claimTeachingReward(msg.sender, teachingNftIds[i], assetIds[i], positionIds[i]);
+            unchecked {
+                ++i;
+            }
+        }
     }
 
     function _claimTeachingReward(
@@ -112,7 +124,7 @@ contract TeachingRewardDistributor {
             ).getResearchPosition(assetId, positionId);
         if (position.currentHolder != claimant) revert SparkDaoErrors.UnauthorizedHolder();
 
-        SparkDaoTypes.TeachingRewardPool storage pool =
+        SparkTeachingTypes.TeachingRewardPool storage pool =
             _requireTeachingRewardPool(teachingNftId, assetId);
         if (block.timestamp < pool.unlockAt) revert SparkDaoErrors.RevenueStillLocked();
         mapping(uint64 => bool) storage claimedByPosition =
@@ -143,25 +155,6 @@ contract TeachingRewardDistributor {
         emit TeachingRewardClaimed(teachingNftId, assetId, positionId, claimant, claimAmount);
     }
 
-    function _claimTeachingRewardBatch(
-        address claimant,
-        uint64[] calldata teachingNftIds,
-        uint64[] calldata assetIds,
-        uint64[] calldata positionIds
-    ) internal {
-        uint256 claimCount = teachingNftIds.length;
-        if (claimCount == 0 || claimCount != assetIds.length || claimCount != positionIds.length) {
-            revert SparkDaoErrors.InvalidAmount();
-        }
-
-        for (uint256 i = 0; i < claimCount;) {
-            _claimTeachingReward(claimant, teachingNftIds[i], assetIds[i], positionIds[i]);
-            unchecked {
-                ++i;
-            }
-        }
-    }
-
     function _onlyTeachingRegistry() internal view {
         if (msg.sender != TEACHING_REGISTRY) {
             revert SparkDaoErrors.UnauthorizedTeachingRewardDistributor();
@@ -171,16 +164,15 @@ contract TeachingRewardDistributor {
     function _requireTeachingRewardPool(uint64 teachingNftId, uint64 assetId)
         internal
         view
-        returns (SparkDaoTypes.TeachingRewardPool storage pool)
+        returns (SparkTeachingTypes.TeachingRewardPool storage pool)
     {
         pool = teachingRewardPools[teachingNftId][assetId];
         if (!pool.exists) revert SparkDaoErrors.InvalidTeachingRewardPool();
     }
 
-    function _releaseTeachingRewardDustIfComplete(SparkDaoTypes.TeachingRewardPool storage pool)
-        internal
-        returns (uint256 dustUnits)
-    {
+    function _releaseTeachingRewardDustIfComplete(
+        SparkTeachingTypes.TeachingRewardPool storage pool
+    ) internal returns (uint256 dustUnits) {
         if (pool.dustReleased) return 0;
         if (pool.claimedShareBps < pool.totalEffectiveShareBps) return 0;
 
@@ -194,7 +186,7 @@ contract TeachingRewardDistributor {
     }
 
     function _effectiveClaimShareBps(
-        SparkDaoTypes.TeachingRewardPool storage pool,
+        SparkTeachingTypes.TeachingRewardPool storage pool,
         SparkDaoTypes.ResearchPosition memory position
     ) internal view returns (uint16) {
         return _computeEffectiveTeachingShareBps(

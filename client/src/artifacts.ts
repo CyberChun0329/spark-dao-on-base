@@ -22,18 +22,12 @@ export const teachingRegistryArtifact = readArtifact(
 export const teachingRewardDistributorArtifact = readArtifact(
   "out/TeachingRewardDistributor.sol/TeachingRewardDistributor.json",
 );
-export const teachingEconomicsPolicyArtifact = readArtifact(
-  "out/TeachingEconomicsPolicyV1.sol/TeachingEconomicsPolicyV1.json",
-);
-export const teachingFaultPolicyArtifact = readArtifact(
-  "out/TeachingFaultPolicyV1.sol/TeachingFaultPolicyV1.json",
-);
-export const teachingPolicyGuardArtifact = readArtifact(
-  "out/TeachingPolicyGuard.sol/TeachingPolicyGuard.json",
-);
-export const researchPositionTokenArtifact = readArtifact(
-  "out/ResearchPositionToken.sol/ResearchPositionToken.json",
+export const teachingPricingPolicyArtifact = readArtifact(
+  "out/TeachingPricingPolicyV1.sol/TeachingPricingPolicyV1.json",
 );
 export const teachingNftTokenArtifact = readArtifact(
   "out/TeachingNftToken.sol/TeachingNftToken.json",
+);
+export const researchPositionTokenArtifact = readArtifact(
+  "out/ResearchPositionToken.sol/ResearchPositionToken.json",
 );
