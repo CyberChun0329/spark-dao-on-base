@@ -56,9 +56,9 @@ library SparkDaoTypes {
         address beneficiary;
         address currentHolder;
         address stableAsset;
-        uint256 buybackFloor;
-        uint256 totalClaimedUnits;
-        uint256 boughtBackPrice;
+        uint128 buybackFloor;
+        uint128 totalClaimedUnits;
+        uint128 boughtBackPrice;
         uint64 positionId;
         uint64 buybackWaitSeconds;
         uint64 buybackUnlockAt;
@@ -83,9 +83,9 @@ library SparkDaoTypes {
 
     struct RevenueEscrow {
         address stableAsset;
-        uint256 amount;
         uint64 unlockAt;
         bool claimed;
+        uint128 amount;
     }
 
     struct CreatePatchPositionParams {

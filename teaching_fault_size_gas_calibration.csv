@@ -1,0 +1,13 @@
+path,scenario,class_size,paid_seats,customer_fault_seats,close_gas
+CF_VALID_CS1,customer_fault_valid_close,1,1,1,79578
+TF_CS1,teacher_fault,1,1,0,79104
+CF_VALID_CS2,customer_fault_valid_close,2,2,1,79524
+TF_CS2,teacher_fault,2,2,0,100406
+CF_VALID_CS5,customer_fault_valid_close,5,5,1,79524
+TF_CS5,teacher_fault,5,5,0,164312
+CF_VALID_CS20,customer_fault_valid_close,20,20,1,79807
+TF_CS20,teacher_fault,20,20,0,484125
+CF_VALID_CS50,customer_fault_valid_close,50,50,1,79807
+TF_CS50,teacher_fault,50,50,0,1123185
+CF_VALID_CS100,customer_fault_valid_close,100,100,1,80090
+TF_CS100,teacher_fault,100,100,0,2188559

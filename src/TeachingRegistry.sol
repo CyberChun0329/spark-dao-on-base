@@ -156,6 +156,8 @@ contract TeachingRegistry is SparkDaoConfig {
         {
             revert SparkDaoErrors.InvalidCourseTypeName();
         }
+        uint128 packedBaseSeatPriceUnits = _toUint128(baseSeatPriceUnits);
+        uint128 packedBaseTeacherSalaryUnits = _toUint128(baseTeacherSalaryUnits);
         ITeachingPricingPolicy(TEACHING_PRICING_POLICY)
             .quoteTeachingSession(
                 baseSeatPriceUnits, baseTeacherSalaryUnits, researchShareBps, 1, 10_000
@@ -169,8 +171,8 @@ contract TeachingRegistry is SparkDaoConfig {
         courseType.courseTypeId = courseTypeId;
         courseType.pricingPolicy = TEACHING_PRICING_POLICY;
         courseType.stableAsset = daoState.stableAsset;
-        courseType.baseSeatPriceUnits = baseSeatPriceUnits;
-        courseType.baseTeacherSalaryUnits = baseTeacherSalaryUnits;
+        courseType.baseSeatPriceUnits = packedBaseSeatPriceUnits;
+        courseType.baseTeacherSalaryUnits = packedBaseTeacherSalaryUnits;
         courseType.researchShareBps = researchShareBps;
         courseType.name = name;
 
@@ -207,6 +209,7 @@ contract TeachingRegistry is SparkDaoConfig {
                 uint16(classSize),
                 params.customerDiscountBps
             );
+        _assertTeachingQuoteFitsPackedStorage(quote);
         uint16[] memory normalizedWeights = _normalizeResearchWeights(
             params.linkedResearchAssetIds, params.linkedResearchWeightBps
         );
@@ -224,13 +227,14 @@ contract TeachingRegistry is SparkDaoConfig {
         session.teacher = params.teacher;
         session.stableAsset = courseType.stableAsset;
         session.scheduledAt = params.scheduledAt;
-        session.seatPriceUnits = quote.seatPriceUnits;
-        session.classTeacherSalaryUnits = quote.classTeacherSalaryUnits;
-        session.seatTeacherSalaryUnits = quote.seatTeacherSalaryUnits;
-        session.teacherBondUnits = quote.teacherBondUnits;
-        session.seatResearchRewardUnits = quote.seatResearchRewardUnits;
-        session.seatTeacherFaultResearchRewardUnits = quote.seatTeacherFaultResearchRewardUnits;
-        session.seatServiceReserveUnits = quote.seatServiceReserveUnits;
+        session.seatPriceUnits = _toUint128(quote.seatPriceUnits);
+        session.classTeacherSalaryUnits = _toUint128(quote.classTeacherSalaryUnits);
+        session.seatTeacherSalaryUnits = _toUint128(quote.seatTeacherSalaryUnits);
+        session.teacherBondUnits = _toUint128(quote.teacherBondUnits);
+        session.seatResearchRewardUnits = _toUint128(quote.seatResearchRewardUnits);
+        session.seatTeacherFaultResearchRewardUnits =
+            _toUint128(quote.seatTeacherFaultResearchRewardUnits);
+        session.seatServiceReserveUnits = _toUint128(quote.seatServiceReserveUnits);
         session.classSize = quote.classSize;
         session.researchShareBps = courseType.researchShareBps;
         session.customerDiscountBps = params.customerDiscountBps;
@@ -242,11 +246,11 @@ contract TeachingRegistry is SparkDaoConfig {
                 .push(
                     SparkTeachingTypes.TeachingSeat({
                         student: params.students[i],
-                        refundOwedUnits: 0,
                         paid: false,
                         attendanceConfirmed: false,
                         customerFault: false,
-                        refundClaimed: false
+                        refundClaimed: false,
+                        refundOwedUnits: 0
                     })
                 );
             unchecked {
@@ -391,6 +395,7 @@ contract TeachingRegistry is SparkDaoConfig {
         if (seat.paid) revert SparkDaoErrors.TeachingSeatAlreadyPaid();
 
         seat.paid = true;
+        session.paidSeatCount += 1;
         _safeTransferFrom(session.stableAsset, msg.sender, address(this), session.seatPriceUnits);
         _reserveVaultUnits(session.stableAsset, session.seatPriceUnits);
 
@@ -425,6 +430,10 @@ contract TeachingRegistry is SparkDaoConfig {
 
         uint256 amount = session.seatPriceUnits;
         seat.paid = false;
+        session.paidSeatCount -= 1;
+        if (seat.attendanceConfirmed) {
+            session.paidAttendanceCount -= 1;
+        }
         seat.attendanceConfirmed = false;
         _releaseVaultUnits(session.stableAsset, amount);
         _safeTransfer(session.stableAsset, msg.sender, amount);
@@ -453,7 +462,12 @@ contract TeachingRegistry is SparkDaoConfig {
         SparkTeachingTypes.TeachingSeat storage seat = _requireSeat(session, seatIndex);
         if (seat.student != msg.sender) revert SparkDaoErrors.UnauthorizedCustomer();
         if (!seat.paid) revert SparkDaoErrors.TeachingSeatNotPaid();
-        seat.attendanceConfirmed = true;
+        if (!seat.attendanceConfirmed) {
+            seat.attendanceConfirmed = true;
+            if (!seat.customerFault) {
+                session.paidAttendanceCount += 1;
+            }
+        }
         _autoCloseTeachingValidIfReady(session);
     }
 
@@ -476,6 +490,10 @@ contract TeachingRegistry is SparkDaoConfig {
         if (!seat.paid) revert SparkDaoErrors.TeachingSeatNotPaid();
         if (seat.customerFault) revert SparkDaoErrors.TeachingSeatAlreadyMarked();
         seat.customerFault = true;
+        session.customerFaultSeatIndexes.push(seatIndex);
+        if (seat.attendanceConfirmed) {
+            session.paidAttendanceCount -= 1;
+        }
         emit TeachingSeatCustomerFault(teachingNftId, seatIndex);
     }
 
@@ -598,68 +616,99 @@ contract TeachingRegistry is SparkDaoConfig {
             revert SparkDaoErrors.TeachingCompletionTooEarly();
         }
 
-        uint256 paidSeatCount;
+        uint256 paidSeatCount = session.paidSeatCount;
+        if (paidSeatCount == 0) revert SparkDaoErrors.InvalidAmount();
+
+        uint256 seatPriceUnits = session.seatPriceUnits;
+        uint256 seatTeacherSalaryUnits = session.seatTeacherSalaryUnits;
+        uint256 seatTeacherFaultResearchRewardUnits = session.seatTeacherFaultResearchRewardUnits;
+        uint256 seatResearchRewardUnits = session.seatResearchRewardUnits;
+        uint256 seatServiceReserveUnits = session.seatServiceReserveUnits;
+        uint256 teacherBondUnits = session.teacherBondUnits;
+        address stableAsset = session.stableAsset;
+        uint64 teachingNftId = session.teachingNftId;
+
         uint256 teacherPayoutUnits;
         uint256 remedialWageUnits;
         uint256 refundUnits;
         uint256 requestedResearchUnits;
         uint256 serviceReserveUnits;
-        uint256 seatCount = session.seats.length;
-        for (uint256 i = 0; i < seatCount;) {
-            SparkTeachingTypes.TeachingSeat storage seat = session.seats[i];
-            if (seat.paid) {
-                paidSeatCount += 1;
-                if (seat.customerFault) {
-                    (uint256 refund, uint256 teacherPayout, uint256 serviceReserve) =
-                        _settleCustomerFaultSeat(session, seat);
-                    refundUnits += refund;
-                    teacherPayoutUnits += teacherPayout;
-                    serviceReserveUnits += serviceReserve;
-                } else if (finalStatus == TEACHING_STATUS_CLOSED_TEACHER_FAULT) {
-                    (
-                        uint256 refund,
-                        uint256 remedialWage,
-                        uint256 researchReward,
-                        uint256 serviceReserve
-                    ) = _settleTeacherFaultSeat(session, seat);
-                    refundUnits += refund;
-                    remedialWageUnits += remedialWage;
-                    requestedResearchUnits += researchReward;
-                    serviceReserveUnits += serviceReserve;
-                } else {
-                    teacherPayoutUnits += session.seatTeacherSalaryUnits;
-                    requestedResearchUnits += session.seatResearchRewardUnits;
-                    serviceReserveUnits += session.seatServiceReserveUnits;
+
+        if (finalStatus == TEACHING_STATUS_CLOSED_TEACHER_FAULT) {
+            uint256 seatCount = session.seats.length;
+            for (uint256 i = 0; i < seatCount;) {
+                SparkTeachingTypes.TeachingSeat storage seat = session.seats[i];
+                if (seat.paid) {
+                    if (seat.customerFault) {
+                        (uint256 refund, uint256 teacherPayout, uint256 serviceReserve) =
+                            _settleCustomerFaultSeat(seat, seatPriceUnits, seatTeacherSalaryUnits);
+                        refundUnits += refund;
+                        teacherPayoutUnits += teacherPayout;
+                        serviceReserveUnits += serviceReserve;
+                    } else {
+                        (
+                            uint256 refund,
+                            uint256 remedialWage,
+                            uint256 researchReward,
+                            uint256 serviceReserve
+                        ) = _settleTeacherFaultSeat(
+                            seat,
+                            seatPriceUnits,
+                            seatTeacherSalaryUnits,
+                            seatTeacherFaultResearchRewardUnits
+                        );
+                        refundUnits += refund;
+                        remedialWageUnits += remedialWage;
+                        requestedResearchUnits += researchReward;
+                        serviceReserveUnits += serviceReserve;
+                    }
+                }
+                unchecked {
+                    ++i;
                 }
             }
-            unchecked {
-                ++i;
+        } else {
+            uint256 faultIndexCount = session.customerFaultSeatIndexes.length;
+            uint256 nonFaultPaidSeatCount = paidSeatCount - faultIndexCount;
+            for (uint256 i = 0; i < faultIndexCount;) {
+                SparkTeachingTypes.TeachingSeat storage seat =
+                    session.seats[session.customerFaultSeatIndexes[i]];
+                (uint256 refund, uint256 teacherPayout, uint256 serviceReserve) =
+                    _settleCustomerFaultSeat(seat, seatPriceUnits, seatTeacherSalaryUnits);
+                refundUnits += refund;
+                teacherPayoutUnits += teacherPayout;
+                serviceReserveUnits += serviceReserve;
+                unchecked {
+                    ++i;
+                }
             }
+
+            teacherPayoutUnits += nonFaultPaidSeatCount * seatTeacherSalaryUnits;
+            requestedResearchUnits += nonFaultPaidSeatCount * seatResearchRewardUnits;
+            serviceReserveUnits += nonFaultPaidSeatCount * seatServiceReserveUnits;
         }
-        if (paidSeatCount == 0) revert SparkDaoErrors.InvalidAmount();
 
         uint256 distributedResearchUnits =
             _recordTeachingRewardsWithPool(session, requestedResearchUnits);
         serviceReserveUnits += requestedResearchUnits - distributedResearchUnits;
-        uint256 reservedBeforeSettlement =
-            (paidSeatCount * session.seatPriceUnits) + session.teacherBondUnits;
+        uint256 reservedBeforeSettlement = (paidSeatCount * seatPriceUnits) + teacherBondUnits;
         uint256 owedUnits =
             refundUnits + teacherPayoutUnits + remedialWageUnits + distributedResearchUnits;
         uint256 releaseUnits = reservedBeforeSettlement - owedUnits;
-        uint256 releasedServiceReserveUnits = releaseUnits - session.teacherBondUnits;
+        uint256 releasedServiceReserveUnits = releaseUnits - teacherBondUnits;
 
         session.status = finalStatus;
         session.closedAt = uint64(block.timestamp);
-        session.teacherPayoutOwedUnits = teacherPayoutUnits;
-        session.remedialWageOwedUnits = remedialWageUnits;
-        session.refundOwedUnits = refundUnits;
-        session.researchRewardUnits = distributedResearchUnits;
-        session.serviceReserveUnits = releasedServiceReserveUnits;
-        _releaseVaultUnits(session.stableAsset, releaseUnits);
-        _safeTransfer(session.stableAsset, session.teacher, session.teacherBondUnits);
+        session.teacherPayoutOwedUnits = _toUint128(teacherPayoutUnits);
+        session.remedialWageOwedUnits = _toUint128(remedialWageUnits);
+        session.refundOwedUnits = _toUint128(refundUnits);
+        session.researchRewardUnits = _toUint128(distributedResearchUnits);
+        session.serviceReserveUnits = _toUint128(releasedServiceReserveUnits);
+        _releaseVaultUnits(stableAsset, releaseUnits);
+        _safeTransfer(stableAsset, session.teacher, teacherBondUnits);
 
         emit TeachingResolved(
-            session.teachingNftId,
+            teachingNftId,
             finalStatus,
             reasonCode,
             teacherPayoutUnits,
@@ -747,19 +796,7 @@ contract TeachingRegistry is SparkDaoConfig {
         view
         returns (bool)
     {
-        uint256 confirmedPaidSeats;
-        uint256 seatCount = session.seats.length;
-        for (uint256 i = 0; i < seatCount;) {
-            SparkTeachingTypes.TeachingSeat storage seat = session.seats[i];
-            if (seat.paid && seat.attendanceConfirmed && !seat.customerFault) {
-                confirmedPaidSeats += 1;
-                if (confirmedPaidSeats * 2 > session.classSize) return true;
-            }
-            unchecked {
-                ++i;
-            }
-        }
-        return false;
+        return uint256(session.paidAttendanceCount) * 2 > session.classSize;
     }
 
     function _hasPaidSeat(SparkTeachingTypes.TeachingSession storage session)
@@ -767,14 +804,7 @@ contract TeachingRegistry is SparkDaoConfig {
         view
         returns (bool)
     {
-        uint256 seatCount = session.seats.length;
-        for (uint256 i = 0; i < seatCount;) {
-            if (session.seats[i].paid) return true;
-            unchecked {
-                ++i;
-            }
-        }
-        return false;
+        return session.paidSeatCount != 0;
     }
 
     function _assertValidTeachingResolutionCode(uint8 reasonCode) internal pure {
@@ -801,18 +831,21 @@ contract TeachingRegistry is SparkDaoConfig {
     }
 
     function _settleCustomerFaultSeat(
-        SparkTeachingTypes.TeachingSession storage session,
-        SparkTeachingTypes.TeachingSeat storage seat
+        SparkTeachingTypes.TeachingSeat storage seat,
+        uint256 seatPriceUnits,
+        uint256 seatTeacherSalaryUnits
     ) internal returns (uint256 refund, uint256 teacherPayout, uint256 serviceReserve) {
-        refund = session.seatPriceUnits - session.seatPriceUnits / 2;
-        teacherPayout = session.seatTeacherSalaryUnits / 2;
-        seat.refundOwedUnits = refund;
-        serviceReserve = session.seatPriceUnits - refund - teacherPayout;
+        refund = seatPriceUnits - seatPriceUnits / 2;
+        teacherPayout = seatTeacherSalaryUnits / 2;
+        seat.refundOwedUnits = _toUint128(refund);
+        serviceReserve = seatPriceUnits - refund - teacherPayout;
     }
 
     function _settleTeacherFaultSeat(
-        SparkTeachingTypes.TeachingSession storage session,
-        SparkTeachingTypes.TeachingSeat storage seat
+        SparkTeachingTypes.TeachingSeat storage seat,
+        uint256 seatPriceUnits,
+        uint256 seatTeacherSalaryUnits,
+        uint256 seatTeacherFaultResearchRewardUnits
     )
         internal
         returns (
@@ -822,11 +855,11 @@ contract TeachingRegistry is SparkDaoConfig {
             uint256 serviceReserve
         )
     {
-        refund = session.seatPriceUnits - session.seatPriceUnits / 2;
-        remedialWage = session.seatTeacherSalaryUnits / 2;
-        researchReward = session.seatTeacherFaultResearchRewardUnits;
-        seat.refundOwedUnits = refund;
-        serviceReserve = session.seatPriceUnits - refund - remedialWage - researchReward;
+        refund = seatPriceUnits - seatPriceUnits / 2;
+        remedialWage = seatTeacherSalaryUnits / 2;
+        researchReward = seatTeacherFaultResearchRewardUnits;
+        seat.refundOwedUnits = _toUint128(refund);
+        serviceReserve = seatPriceUnits - refund - remedialWage - researchReward;
     }
 
     function _recordTeachingRewardsWithPool(
@@ -1035,7 +1068,10 @@ contract TeachingRegistry is SparkDaoConfig {
         uint16 snapshotActiveLayer
     ) internal {
         uint256 index = session.settlementResearchLayerCount;
-        session.settlementResearchActiveLayersPacked |= uint256(snapshotActiveLayer) << (index * 16);
+        uint256 packed = uint256(session.settlementResearchActiveLayersPacked)
+            | (uint256(snapshotActiveLayer) << (index * 16));
+        // forge-lint: disable-next-line(unsafe-typecast)
+        session.settlementResearchActiveLayersPacked = uint32(packed);
         session.settlementResearchLayerCount += 1;
     }
 
@@ -1056,6 +1092,26 @@ contract TeachingRegistry is SparkDaoConfig {
         returns (uint256)
     {
         return (baseAmount * weightBps) / SparkDaoTypes.BASIS_POINTS_DENOMINATOR;
+    }
+
+    function _assertTeachingQuoteFitsPackedStorage(SparkTeachingTypes.TeachingQuote memory quote)
+        internal
+        pure
+    {
+        uint256 classSize = quote.classSize;
+        _toUint128(quote.seatPriceUnits * classSize);
+        _toUint128(quote.classTeacherSalaryUnits);
+        _toUint128(quote.seatTeacherSalaryUnits * classSize);
+        _toUint128(quote.teacherBondUnits);
+        _toUint128(quote.seatResearchRewardUnits * classSize);
+        _toUint128(quote.seatTeacherFaultResearchRewardUnits * classSize);
+        _toUint128(quote.seatServiceReserveUnits * classSize);
+    }
+
+    function _toUint128(uint256 value) internal pure returns (uint128) {
+        if (value > type(uint128).max) revert SparkDaoErrors.InvalidAmount();
+        // forge-lint: disable-next-line(unsafe-typecast)
+        return uint128(value);
     }
 
     function _requireTeachingCourseType(uint64 courseTypeId)

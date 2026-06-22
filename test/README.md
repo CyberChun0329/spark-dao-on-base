@@ -34,6 +34,7 @@ forge test -vv
 - `TeachingGasCalibration.t.sol` writes the Teaching lifecycle cost inputs:
   - `teaching_gas_calibration.csv`
   - `teaching_followup_gas_calibration.csv`
+  - `teaching_class_size_gas_calibration.csv`
 - `ResearchGasCalibration.t.sol` writes:
   - `research_gas_calibration.csv`
 

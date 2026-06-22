@@ -37,8 +37,8 @@ Refresh and verify teaching-cost outputs:
 npm run check:calibration
 ```
 
-`check:calibration` rewrites the Teaching lifecycle calibration CSVs and
-`simulation_outputs/` from the current source.
+`check:calibration` rewrites the Teaching lifecycle, class-size, and
+`simulation_outputs/` files from the current source.
 
 ## Deployment Path
 

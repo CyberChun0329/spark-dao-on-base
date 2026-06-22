@@ -20,14 +20,35 @@ contract TeachingPricingPolicyTest {
 
     function testTierBoundariesFreezeSeatPriceAndClassSalary() public view {
         _assertQuote(1, 1_000_000, 400_000, 400_000);
-        _assertQuote(2, 600_000, 600_000, 300_000);
-        _assertQuote(5, 600_000, 600_000, 120_000);
-        _assertQuote(6, 350_000, 800_000, 133_333);
-        _assertQuote(20, 350_000, 800_000, 40_000);
-        _assertQuote(21, 220_000, 1_000_000, 47_619);
-        _assertQuote(50, 220_000, 1_000_000, 20_000);
-        _assertQuote(51, 150_000, 1_200_000, 23_529);
-        _assertQuote(100, 150_000, 1_200_000, 12_000);
+        _assertQuote(2, 800_000, 500_000, 250_000);
+        _assertQuote(3, 625_000, 640_000, 213_333);
+        _assertQuote(5, 625_000, 640_000, 128_000);
+        _assertQuote(6, 444_400, 900_000, 150_000);
+        _assertQuote(10, 444_400, 900_000, 90_000);
+        _assertQuote(11, 351_000, 1_140_000, 103_636);
+        _assertQuote(20, 351_000, 1_140_000, 57_000);
+        _assertQuote(21, 286_000, 1_400_000, 66_666);
+        _assertQuote(35, 286_000, 1_400_000, 40_000);
+        _assertQuote(36, 222_200, 1_800_000, 50_000);
+        _assertQuote(50, 222_200, 1_800_000, 36_000);
+        _assertQuote(51, 200_000, 2_000_000, 39_215);
+        _assertQuote(100, 200_000, 2_000_000, 20_000);
+    }
+
+    function testTeacherSalaryGrowthDoesNotExceedGrossRevenueGrowth() public view {
+        for (uint16 classSize = 1; classSize <= 100;) {
+            SparkTeachingTypes.TeachingQuote memory quote =
+                policy.quoteTeachingSession(1_000_000, 400_000, 0, classSize, 10_000);
+
+            uint256 grossRevenueUnits = quote.seatPriceUnits * classSize;
+            uint256 teacherSalaryGrowthBps = (quote.classTeacherSalaryUnits * 10_000) / 400_000;
+            uint256 grossRevenueGrowthBps = (grossRevenueUnits * 10_000) / 1_000_000;
+            assert(teacherSalaryGrowthBps <= grossRevenueGrowthBps);
+
+            unchecked {
+                ++classSize;
+            }
+        }
     }
 
     function testRejectsClassSizeOutsideOneToOneHundred() public {

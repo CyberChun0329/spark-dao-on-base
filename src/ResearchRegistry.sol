@@ -134,6 +134,29 @@ contract ResearchRegistry is SparkDaoConfig {
         return position;
     }
 
+    function getTeachingRewardPosition(uint64 assetId, uint64 positionId)
+        external
+        view
+        returns (
+            address currentHolder,
+            uint64 activatedAt,
+            uint64 readyAt,
+            uint16 layerIndex,
+            uint16 layerShareBps,
+            uint16 retainedShareBps,
+            bool rolloverReady
+        )
+    {
+        SparkDaoTypes.ResearchPosition storage position = _requirePosition(assetId, positionId);
+        currentHolder = position.currentHolder;
+        activatedAt = position.activatedAt;
+        readyAt = position.readyAt;
+        layerIndex = position.layerIndex;
+        layerShareBps = position.layerShareBps;
+        retainedShareBps = position.retainedShareBps;
+        rolloverReady = position.rolloverReady;
+    }
+
     function createResearchAsset(string calldata title, string calldata metadataUri)
         external
         onlyCoordinator
@@ -207,7 +230,7 @@ contract ResearchRegistry is SparkDaoConfig {
         position.stableAsset = daoState.stableAsset;
         position.layerIndex = params.layerIndex;
         position.layerShareBps = params.layerShareBps;
-        position.buybackFloor = params.buybackFloor;
+        position.buybackFloor = _toUint128(params.buybackFloor);
         position.buybackWaitSeconds = daoState.buybackWaitSeconds;
         position.decayWaitSeconds = params.decayWaitSeconds;
         position.decayPeriodSeconds = params.decayPeriodSeconds;
@@ -453,6 +476,7 @@ contract ResearchRegistry is SparkDaoConfig {
         returns (uint64 revenueId)
     {
         if (amount == 0) revert SparkDaoErrors.InvalidAmount();
+        uint128 packedAmount = _toUint128(amount);
 
         SparkDaoTypes.ResearchAsset storage asset = _requireAsset(assetId);
         SparkDaoTypes.ResearchPosition storage position = _requirePosition(assetId, positionId);
@@ -474,7 +498,7 @@ contract ResearchRegistry is SparkDaoConfig {
         uint64 unlockAt = uint64(block.timestamp) + daoState.rewardUnlockSeconds;
         SparkDaoTypes.RevenueEscrow storage escrow = revenueEscrows[assetId][positionId][revenueId];
         escrow.stableAsset = stableAsset;
-        escrow.amount = amount;
+        escrow.amount = packedAmount;
         escrow.unlockAt = unlockAt;
 
         _reserveVaultUnits(stableAsset, amount);
@@ -492,7 +516,7 @@ contract ResearchRegistry is SparkDaoConfig {
         if (block.timestamp < escrow.unlockAt) revert SparkDaoErrors.RevenueStillLocked();
 
         escrow.claimed = true;
-        position.totalClaimedUnits += escrow.amount;
+        position.totalClaimedUnits = _toUint128(uint256(position.totalClaimedUnits) + escrow.amount);
         _releaseVaultUnits(escrow.stableAsset, escrow.amount);
 
         _safeTransfer(escrow.stableAsset, msg.sender, escrow.amount);
@@ -528,7 +552,8 @@ contract ResearchRegistry is SparkDaoConfig {
         }
         SparkDaoTypes.ResearchPosition storage position = _requirePosition(assetId, positionId);
         if (claimAmount != 0) {
-            position.totalClaimedUnits += claimAmount;
+            position.totalClaimedUnits =
+                _toUint128(uint256(position.totalClaimedUnits) + claimAmount);
         }
     }
 
@@ -681,5 +706,11 @@ contract ResearchRegistry is SparkDaoConfig {
                 timestamp: timestamp, effectiveShareBps: effectiveShareBps
             })
         );
+    }
+
+    function _toUint128(uint256 value) internal pure returns (uint128) {
+        if (value > type(uint128).max) revert SparkDaoErrors.InvalidAmount();
+        // forge-lint: disable-next-line(unsafe-typecast)
+        return uint128(value);
     }
 }

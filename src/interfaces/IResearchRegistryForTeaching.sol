@@ -9,6 +9,19 @@ interface IResearchRegistryForTeaching {
         view
         returns (SparkDaoTypes.ResearchPosition memory);
 
+    function getTeachingRewardPosition(uint64 assetId, uint64 positionId)
+        external
+        view
+        returns (
+            address currentHolder,
+            uint64 activatedAt,
+            uint64 readyAt,
+            uint16 layerIndex,
+            uint16 layerShareBps,
+            uint16 retainedShareBps,
+            bool rolloverReady
+        );
+
     function requireTeachingResearchAssetReady(uint64 assetId, uint16 researchShareBps)
         external
         view;

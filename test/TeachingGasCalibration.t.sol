@@ -481,6 +481,26 @@ abstract contract TeachingGasCalibrationHarness {
         gasUsed = gasBefore - gasleft();
     }
 
+    function _payTeachingSeat(uint64 teachingNftId, uint16 seatIndex, address student)
+        internal
+        returns (uint256 gasUsed)
+    {
+        VM.prank(student);
+        uint256 gasBefore = gasleft();
+        registry.payTeachingSeat(teachingNftId, seatIndex);
+        gasUsed = gasBefore - gasleft();
+    }
+
+    function _confirmTeachingAttendance(uint64 teachingNftId, uint16 seatIndex, address student)
+        internal
+        returns (uint256 gasUsed)
+    {
+        VM.prank(student);
+        uint256 gasBefore = gasleft();
+        registry.confirmTeachingAttendance(teachingNftId, seatIndex);
+        gasUsed = gasBefore - gasleft();
+    }
+
     function _redeem(uint64 teachingNftId) internal returns (uint256 gasUsed) {
         VM.warp(block.timestamp + 31 days);
         VM.prank(teacher);
@@ -609,10 +629,16 @@ abstract contract TeachingGasCalibrationHarness {
     function _b(bool value) internal pure returns (string memory) {
         return value ? "true" : "false";
     }
+
+    function _classSizeStudent(uint16 classSize, uint16 seatIndex) internal pure returns (address) {
+        return address(uint160(0x9000 + uint256(classSize) * 1_000 + uint256(seatIndex)));
+    }
 }
 
 contract TeachingGasCalibrationTest is TeachingGasCalibrationHarness {
     string internal constant OUT = "teaching_gas_calibration.csv";
+    string internal constant CLASS_SIZE_OUT = "teaching_class_size_gas_calibration.csv";
+    string internal constant FAULT_SIZE_OUT = "teaching_fault_size_gas_calibration.csv";
     string internal constant FOLLOWUP_OUT = "teaching_followup_gas_calibration.csv";
 
     struct PathGas {
@@ -625,6 +651,23 @@ contract TeachingGasCalibrationTest is TeachingGasCalibrationHarness {
         uint256 claimGas;
         bool validLesson;
         uint16 revenueWeightBps;
+    }
+
+    struct ClassSizeGas {
+        uint16 classSize;
+        uint16 paidSeats;
+        uint16 attendanceConfirmations;
+        uint256 courseTypeGas;
+        uint256 sessionGas;
+    }
+
+    struct FaultSizeGas {
+        string path;
+        string scenario;
+        uint16 classSize;
+        uint16 paidSeats;
+        uint16 customerFaultSeats;
+        uint256 closeGas;
     }
 
     function testWriteTeachingGasCalibrationCsv() public {
@@ -659,6 +702,41 @@ contract TeachingGasCalibrationTest is TeachingGasCalibrationHarness {
         _recordPath(_multiLayer("TF_ML", "teacher_fault", false, false, true));
     }
 
+    function testWriteTeachingSizeGasCalibrationCsv() public {
+        _clearOutput(CLASS_SIZE_OUT);
+        VM.writeFile(
+            CLASS_SIZE_OUT,
+            "class_size,paid_seats,attendance_confirmations,course_type_gas,session_gas\n"
+        );
+
+        _recordClassSize(1);
+        _recordClassSize(2);
+        _recordClassSize(5);
+        _recordClassSize(20);
+        _recordClassSize(50);
+        _recordClassSize(100);
+    }
+
+    function testWriteTeachingFaultSizeGasCalibrationCsv() public {
+        _clearOutput(FAULT_SIZE_OUT);
+        VM.writeFile(
+            FAULT_SIZE_OUT, "path,scenario,class_size,paid_seats,customer_fault_seats,close_gas\n"
+        );
+
+        _recordFaultSize(1, false);
+        _recordFaultSize(1, true);
+        _recordFaultSize(2, false);
+        _recordFaultSize(2, true);
+        _recordFaultSize(5, false);
+        _recordFaultSize(5, true);
+        _recordFaultSize(20, false);
+        _recordFaultSize(20, true);
+        _recordFaultSize(50, false);
+        _recordFaultSize(50, true);
+        _recordFaultSize(100, false);
+        _recordFaultSize(100, true);
+    }
+
     function testWriteTeachingFollowupGasCalibrationCsv() public {
         _clearOutput(FOLLOWUP_OUT);
         VM.writeFile(FOLLOWUP_OUT, "path,category,gas,measurement_context\n");
@@ -670,9 +748,198 @@ contract TeachingGasCalibrationTest is TeachingGasCalibrationHarness {
         );
     }
 
+    function _recordFaultSize(uint16 classSize, bool teacherFault) internal {
+        FaultSizeGas memory gasRow = _runFaultSize(classSize, teacherFault);
+        VM.writeLine(
+            FAULT_SIZE_OUT,
+            string.concat(
+                gasRow.path,
+                ",",
+                gasRow.scenario,
+                ",",
+                _u(gasRow.classSize),
+                ",",
+                _u(gasRow.paidSeats),
+                ",",
+                _u(gasRow.customerFaultSeats),
+                ",",
+                _u(gasRow.closeGas)
+            )
+        );
+    }
+
+    function _runFaultSize(uint16 classSize, bool teacherFault)
+        internal
+        returns (FaultSizeGas memory gasRow)
+    {
+        VM.prank(coordinator);
+        uint64 courseTypeId = registry.createTeachingCourseType(
+            string.concat(teacherFault ? "TFS_" : "CFS_", _u(classSize)), 1_000_000, 400_000, 0
+        );
+
+        address[] memory students = new address[](classSize);
+        for (uint16 i = 0; i < classSize;) {
+            students[i] = _faultSizeStudent(classSize, i, teacherFault);
+            stable.mint(students[i], 1_000_000_000);
+            unchecked {
+                ++i;
+            }
+        }
+
+        uint64 scheduledAt = uint64(
+            block.timestamp + (teacherFault ? uint256(200 days) : uint256(300 days))
+                + uint256(classSize) * 1 days
+        );
+        VM.prank(coordinator);
+        uint64 teachingNftId = registry.createTeachingSession(
+            SparkTeachingTypes.CreateTeachingSessionParams({
+                courseTypeId: courseTypeId,
+                teacher: teacher,
+                students: students,
+                scheduledAt: scheduledAt,
+                customerDiscountBps: 8_000,
+                linkedResearchAssetIds: new uint64[](0),
+                linkedResearchWeightBps: new uint16[](0)
+            })
+        );
+
+        _confirmSchedule(teachingNftId, true);
+        _confirmSchedule(teachingNftId, false);
+        _approveStable(teacher, 5_000_000);
+        _lockCollateral(teachingNftId, true);
+
+        for (uint16 i = 0; i < classSize;) {
+            _approveStable(students[i], 1_000_000);
+            _payTeachingSeat(teachingNftId, i, students[i]);
+            unchecked {
+                ++i;
+            }
+        }
+
+        if (!teacherFault) {
+            VM.prank(coordinator);
+            registry.markTeachingCustomerFault(teachingNftId, 0, 2);
+            gasRow.customerFaultSeats = 1;
+        }
+
+        VM.warp(uint256(scheduledAt) + 31 days);
+        VM.prank(coordinator);
+        uint256 gasBefore = gasleft();
+        if (teacherFault) {
+            registry.coordinatorCloseTeachingTeacherFault(teachingNftId, 4);
+            gasRow.path = string.concat("TF_CS", _u(classSize));
+            gasRow.scenario = "teacher_fault";
+        } else {
+            registry.coordinatorCloseTeachingValid(teachingNftId, 1);
+            gasRow.path = string.concat("CF_VALID_CS", _u(classSize));
+            gasRow.scenario = "customer_fault_valid_close";
+        }
+        gasRow.closeGas = gasBefore - gasleft();
+
+        gasRow.classSize = classSize;
+        gasRow.paidSeats = classSize;
+    }
+
     function _recordPath(PathInput memory input) internal {
         PathGas memory gasRow = _runPath(input);
         _record(gasRow);
+    }
+
+    function _recordClassSize(uint16 classSize) internal {
+        ClassSizeGas memory gasRow = _runClassSize(classSize);
+        VM.writeLine(
+            CLASS_SIZE_OUT,
+            string.concat(
+                _u(gasRow.classSize),
+                ",",
+                _u(gasRow.paidSeats),
+                ",",
+                _u(gasRow.attendanceConfirmations),
+                ",",
+                _u(gasRow.courseTypeGas),
+                ",",
+                _u(gasRow.sessionGas)
+            )
+        );
+    }
+
+    function _runClassSize(uint16 classSize) internal returns (ClassSizeGas memory gasRow) {
+        uint256 gasBefore;
+
+        VM.prank(coordinator);
+        gasBefore = gasleft();
+        uint64 courseTypeId = registry.createTeachingCourseType(
+            string.concat("CS_", _u(classSize)), 1_000_000, 400_000, 0
+        );
+        gasRow.courseTypeGas = gasBefore - gasleft();
+
+        address[] memory students = new address[](classSize);
+        for (uint16 i = 0; i < classSize;) {
+            students[i] = _classSizeStudent(classSize, i);
+            stable.mint(students[i], 1_000_000_000);
+            unchecked {
+                ++i;
+            }
+        }
+
+        uint64 scheduledAt = uint64((uint256(classSize) + 1) * 100 days);
+        VM.prank(coordinator);
+        gasBefore = gasleft();
+        uint64 teachingNftId = registry.createTeachingSession(
+            SparkTeachingTypes.CreateTeachingSessionParams({
+                courseTypeId: courseTypeId,
+                teacher: teacher,
+                students: students,
+                scheduledAt: scheduledAt,
+                customerDiscountBps: 8_000,
+                linkedResearchAssetIds: new uint64[](0),
+                linkedResearchWeightBps: new uint16[](0)
+            })
+        );
+        gasRow.sessionGas += gasBefore - gasleft();
+
+        gasRow.sessionGas += _confirmSchedule(teachingNftId, true);
+        gasRow.sessionGas += _confirmSchedule(teachingNftId, false);
+        gasRow.sessionGas += _approveStable(teacher, 5_000_000);
+        gasRow.sessionGas += _lockCollateral(teachingNftId, true);
+
+        for (uint16 i = 0; i < classSize;) {
+            gasRow.sessionGas += _approveStable(students[i], 1_000_000);
+            gasRow.sessionGas += _payTeachingSeat(teachingNftId, i, students[i]);
+            unchecked {
+                ++i;
+            }
+        }
+
+        VM.warp(uint256(scheduledAt) + 8 days);
+        gasRow.sessionGas += _confirmCompletion(teachingNftId, true);
+
+        uint16 attendanceConfirmations = classSize / 2 + 1;
+        for (uint16 i = 0; i < attendanceConfirmations;) {
+            gasRow.sessionGas += _confirmTeachingAttendance(teachingNftId, i, students[i]);
+            unchecked {
+                ++i;
+            }
+        }
+
+        gasRow.sessionGas += _redeem(teachingNftId);
+
+        (uint8 status,,,,,,,,,,,) = registry.getTeachingSessionState(teachingNftId);
+        assert(status == 1);
+
+        gasRow.classSize = classSize;
+        gasRow.paidSeats = classSize;
+        gasRow.attendanceConfirmations = attendanceConfirmations;
+    }
+
+    function _faultSizeStudent(uint16 classSize, uint16 seatIndex, bool teacherFault)
+        internal
+        pure
+        returns (address)
+    {
+        uint256 scenarioOffset = teacherFault ? 0xB000 : 0xC000;
+        // forge-lint: disable-next-line(unsafe-typecast)
+        return address(uint160(scenarioOffset + uint256(classSize) * 1_000 + uint256(seatIndex)));
     }
 
     function _runPath(PathInput memory input) internal returns (PathGas memory gasRow) {

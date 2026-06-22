@@ -24,6 +24,14 @@ type FollowupGasRow = {
   measurement_context: string;
 };
 
+type TeachingSizeGasRow = {
+  class_size: number;
+  paid_seats: number;
+  attendance_confirmations: number;
+  course_type_gas: number;
+  session_gas: number;
+};
+
 type ResearchGasRow = {
   path: string;
   gas: number;
@@ -84,6 +92,7 @@ type SummaryRow = {
 const root = process.cwd();
 const gasCsvPath = join(root, "teaching_gas_calibration.csv");
 const followupGasCsvPath = join(root, "teaching_followup_gas_calibration.csv");
+const classSizeGasCsvPath = join(root, "teaching_class_size_gas_calibration.csv");
 const researchGasCsvPath = join(root, "research_gas_calibration.csv");
 const feeAssumptionsPath = join(root, "simulation_inputs", "fee_assumptions.json");
 const outDir = join(root, "simulation_outputs");
@@ -174,6 +183,16 @@ function parseFollowupCsv(path: string): FollowupGasRow[] {
   }));
 }
 
+function parseTeachingSizeCsv(path: string): TeachingSizeGasRow[] {
+  return parseCsv(path).map((row) => ({
+    class_size: numberCell(row, "class_size", path),
+    paid_seats: numberCell(row, "paid_seats", path),
+    attendance_confirmations: numberCell(row, "attendance_confirmations", path),
+    course_type_gas: numberCell(row, "course_type_gas", path),
+    session_gas: numberCell(row, "session_gas", path),
+  }));
+}
+
 function parseResearchCsv(path: string): ResearchGasRow[] {
   return parseCsv(path).map((row) => ({
     path: row.path,
@@ -255,6 +274,40 @@ function validateFollowupRows(rows: FollowupGasRow[]) {
     );
   }
   assertPositiveGas(remedial.gas, "TF_REMEDIAL_WAGE_CLOSE.gas");
+}
+
+function validateTeachingSizeRows(rows: TeachingSizeGasRow[]) {
+  const expectedClassSizes = [1, 2, 5, 20, 50, 100];
+  if (rows.length !== expectedClassSizes.length) {
+    throw new Error(
+      `Expected ${expectedClassSizes.length} teaching class-size rows, got ${rows.length}`,
+    );
+  }
+
+  const rowsByClassSize = new Map<number, TeachingSizeGasRow>();
+  for (const row of rows) {
+    if (rowsByClassSize.has(row.class_size)) {
+      throw new Error(`Duplicate teaching class-size row: ${row.class_size}`);
+    }
+    rowsByClassSize.set(row.class_size, row);
+    if (row.paid_seats !== row.class_size) {
+      throw new Error(`Class size ${row.class_size} must have all seats paid`);
+    }
+    const expectedAttendance = Math.floor(row.class_size / 2) + 1;
+    if (row.attendance_confirmations !== expectedAttendance) {
+      throw new Error(
+        `Class size ${row.class_size} must close after ${expectedAttendance} attendance confirmations`,
+      );
+    }
+    assertPositiveGas(row.course_type_gas, `class_size_${row.class_size}.course_type_gas`);
+    assertPositiveGas(row.session_gas, `class_size_${row.class_size}.session_gas`);
+  }
+
+  for (const classSize of expectedClassSizes) {
+    if (!rowsByClassSize.has(classSize)) {
+      throw new Error(`Missing teaching class-size row: ${classSize}`);
+    }
+  }
 }
 
 function weightedGas(
@@ -343,6 +396,7 @@ function buildManifest(inputFiles: string[]) {
 
 const gasRows = parseTeachingCsv(gasCsvPath);
 const followupGasRows = parseFollowupCsv(followupGasCsvPath);
+const classSizeGasRows = parseTeachingSizeCsv(classSizeGasCsvPath);
 const researchGasRows = parseResearchCsv(researchGasCsvPath);
 const gasByPath = new Map(gasRows.map((row) => [row.path, row]));
 const researchGasByPath = new Map(researchGasRows.map((row) => [row.path, row.gas]));
@@ -352,6 +406,7 @@ const referenceUsdPerGas = feeAssumptions.referenceUsdPerGas;
 assertScenarioWeights();
 validateTeachingRows(gasRows);
 validateFollowupRows(followupGasRows);
+validateTeachingSizeRows(classSizeGasRows);
 
 const simulationRows: string[] = [
   [
@@ -576,6 +631,33 @@ const followupTable = [
       fmtGas(row.gas),
       row.measurement_context,
       row.path === "TF_REMEDIAL_WAGE_CLOSE" ? "no" : "unknown",
+    ].join(" | "),
+  ).map((line) => `| ${line} |`),
+];
+
+const classSizeCostSummaries = classSizeGasRows.map((row) => ({
+  ...row,
+  course_type_gas_per_seat: row.course_type_gas / row.paid_seats,
+  session_gas_per_seat: row.session_gas / row.paid_seats,
+  course_type_cost: row.course_type_gas * referenceUsdPerGas,
+  session_cost: row.session_gas * referenceUsdPerGas,
+  course_type_cost_per_seat: (row.course_type_gas * referenceUsdPerGas) / row.paid_seats,
+  session_cost_per_seat: (row.session_gas * referenceUsdPerGas) / row.paid_seats,
+}));
+
+const classSizeTable = [
+  "| Class size | Paid seats | Attendance confirmations | Course type gas | Session lifecycle gas | Session gas / seat | Session cost | Session cost / seat |",
+  "|---:|---:|---:|---:|---:|---:|---:|---:|",
+  ...classSizeCostSummaries.map((row) =>
+    [
+      row.class_size,
+      row.paid_seats,
+      row.attendance_confirmations,
+      fmtGas(row.course_type_gas),
+      fmtGas(row.session_gas),
+      fmtGas(row.session_gas_per_seat),
+      fmtMoney(row.session_cost),
+      fmtMoney(row.session_cost_per_seat),
     ].join(" | "),
   ).map((line) => `| ${line} |`),
 ];
@@ -896,6 +978,7 @@ const costShareTable = [
 const inputFiles = [
   "teaching_gas_calibration.csv",
   "teaching_followup_gas_calibration.csv",
+  "teaching_class_size_gas_calibration.csv",
   "research_gas_calibration.csv",
   "simulation_inputs/fee_assumptions.json",
 ];
@@ -923,6 +1006,12 @@ ${pathTable.join("\n")}
 ## Measured Follow-Up Primitives
 
 ${followupTable.join("\n")}
+
+## Measured Class-Size Paths
+
+These rows measure ordinary no-research Teaching sessions with all seats paid and majority attendance close.
+
+${classSizeTable.join("\n")}
 
 ## Coordinator-Extended Scenario Simulation
 
@@ -973,9 +1062,11 @@ writeFileSync(
       calibrationSchemaVersion,
       gasRows,
       followupGasRows,
+      classSizeGasRows,
       researchGasRows,
       feeAssumptions,
       researchGasPrimitives,
+      classSizeCostSummaries,
       summaries,
       chapterScaleSummaries,
       researchMaintenanceSummaries,

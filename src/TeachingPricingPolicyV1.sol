@@ -67,9 +67,12 @@ contract TeachingPricingPolicyV1 {
         returns (uint16 seatPriceBps, uint16 teacherSalaryBps)
     {
         if (classSize == 1) return (10_000, 10_000);
-        if (classSize <= 5) return (6_000, 15_000);
-        if (classSize <= 20) return (3_500, 20_000);
-        if (classSize <= 50) return (2_200, 25_000);
-        return (1_500, 30_000);
+        if (classSize == 2) return (8_000, 12_500);
+        if (classSize <= 5) return (6_250, 16_000);
+        if (classSize <= 10) return (4_444, 22_500);
+        if (classSize <= 20) return (3_510, 28_500);
+        if (classSize <= 35) return (2_860, 35_000);
+        if (classSize <= 50) return (2_222, 45_000);
+        return (2_000, 50_000);
     }
 }

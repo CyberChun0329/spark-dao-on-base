@@ -32,6 +32,30 @@ const commands: Command[] = [
     ],
   },
   {
+    label: "Write teaching class-size gas CSV",
+    command: "forge",
+    args: [
+      "test",
+      "--match-contract",
+      "TeachingGasCalibrationTest",
+      "--match-test",
+      "testWriteTeachingSizeGasCalibrationCsv",
+      "-vv",
+    ],
+  },
+  {
+    label: "Write teaching fault-size gas CSV",
+    command: "forge",
+    args: [
+      "test",
+      "--match-contract",
+      "TeachingGasCalibrationTest",
+      "--match-test",
+      "testWriteTeachingFaultSizeGasCalibrationCsv",
+      "-vv",
+    ],
+  },
+  {
     label: "Write research gas CSV",
     command: "forge",
     args: ["test", "--match-contract", "ResearchGasCalibrationTest", "-vv"],

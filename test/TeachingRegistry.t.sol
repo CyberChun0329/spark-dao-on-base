@@ -265,6 +265,44 @@ contract TeachingRegistryTest {
         teaching.confirmTeachingSchedule(teachingNftId, false);
     }
 
+    function testCreateTeachingCourseTypeRejectsAmountsAbovePackedCap() public {
+        uint256 tooLarge = uint256(type(uint128).max) + 1;
+
+        VM.expectRevert(SparkDaoErrors.InvalidAmount.selector);
+        VM.prank(coordinator);
+        teaching.createTeachingCourseType("Too Large Seat", tooLarge, 400_000, 0);
+
+        VM.expectRevert(SparkDaoErrors.InvalidAmount.selector);
+        VM.prank(coordinator);
+        teaching.createTeachingCourseType("Too Large Salary", 1_000_000, tooLarge, 0);
+    }
+
+    function testCreateTeachingSessionRejectsAggregateAmountsAbovePackedCap() public {
+        uint64 courseTypeId = _createCourseType(uint256(type(uint128).max) / 2, 1, 0);
+        address[] memory students = _students(100);
+
+        VM.expectRevert(SparkDaoErrors.InvalidAmount.selector);
+        VM.prank(coordinator);
+        teaching.createTeachingSession(
+            SparkTeachingTypes.CreateTeachingSessionParams({
+                courseTypeId: courseTypeId,
+                teacher: teacher,
+                students: students,
+                scheduledAt: uint64(block.timestamp + 1 days),
+                customerDiscountBps: 10_000,
+                linkedResearchAssetIds: _emptyAssetIds(),
+                linkedResearchWeightBps: _emptyWeights()
+            })
+        );
+    }
+
+    function testSettlementResearchLayerPackingMatchesConfiguredLinkLimit() public pure {
+        assertTrue(
+            SparkDaoTypes.MAX_TEACHING_RESEARCH_LINKS
+                <= SparkTeachingTypes.PACKED_SETTLEMENT_RESEARCH_LAYER_CAPACITY
+        );
+    }
+
     function testMajoritySecondRoundSignaturesAutoCloseValidWithoutCoordinator() public {
         uint64 courseTypeId = _createCourseType(1_000_000, 400_000, 0);
         address[] memory students = _students(3);
@@ -300,12 +338,12 @@ contract TeachingRegistryTest {
             uint256 serviceReserveUnits,
         ) = teaching.getTeachingSessionState(teachingNftId);
         assertTrue(closedStatus == 1);
-        assertTrue(teacherBondUnits == 1_200_000);
-        assertTrue(teacherPayoutOwedUnits == 600_000);
+        assertTrue(teacherBondUnits == 1_280_000);
+        assertTrue(teacherPayoutOwedUnits == 639_999);
         assertTrue(remedialWageOwedUnits == 0);
         assertTrue(researchRewardUnits == 0);
-        assertTrue(serviceReserveUnits == 1_200_000);
-        assertTrue(teaching.getVaultReservedUnits(address(stable)) == 600_000);
+        assertTrue(serviceReserveUnits == 1_235_001);
+        assertTrue(teaching.getVaultReservedUnits(address(stable)) == 639_999);
     }
 
     function testExactlyHalfSecondRoundSignaturesDoNotAutoClose() public {
@@ -332,6 +370,72 @@ contract TeachingRegistryTest {
 
         (uint8 halfStatus,,,,,,,,,,,) = teaching.getTeachingSessionState(teachingNftId);
         assertTrue(halfStatus == 0);
+
+        VM.prank(students[2]);
+        teaching.confirmTeachingAttendance(teachingNftId, 2);
+
+        (uint8 majorityStatus,,,,,,,,,,,) = teaching.getTeachingSessionState(teachingNftId);
+        assertTrue(majorityStatus == 1);
+    }
+
+    function testDuplicateAttendanceDoesNotCountTwiceTowardMajority() public {
+        uint64 courseTypeId = _createCourseType(1_000_000, 400_000, 0);
+        address[] memory students = _students(3);
+        uint64 teachingNftId =
+            _createClass(courseTypeId, students, _emptyAssetIds(), _emptyWeights());
+
+        for (uint16 i = 0; i < 3;) {
+            _paySeat(teachingNftId, students[i], i);
+            unchecked {
+                ++i;
+            }
+        }
+        _lockTeacherBond(teachingNftId);
+        VM.warp(block.timestamp + 8 days);
+
+        VM.prank(teacher);
+        teaching.confirmTeachingDelivery(teachingNftId);
+        VM.prank(students[0]);
+        teaching.confirmTeachingAttendance(teachingNftId, 0);
+        VM.prank(students[0]);
+        teaching.confirmTeachingAttendance(teachingNftId, 0);
+
+        (uint8 duplicateStatus,,,,,,,,,,,) = teaching.getTeachingSessionState(teachingNftId);
+        assertTrue(duplicateStatus == 0);
+
+        VM.prank(students[1]);
+        teaching.confirmTeachingAttendance(teachingNftId, 1);
+
+        (uint8 majorityStatus,,,,,,,,,,,) = teaching.getTeachingSessionState(teachingNftId);
+        assertTrue(majorityStatus == 1);
+    }
+
+    function testCustomerFaultRemovesPriorAttendanceFromMajority() public {
+        uint64 courseTypeId = _createCourseType(1_000_000, 400_000, 0);
+        address[] memory students = _students(3);
+        uint64 teachingNftId =
+            _createClass(courseTypeId, students, _emptyAssetIds(), _emptyWeights());
+
+        for (uint16 i = 0; i < 3;) {
+            _paySeat(teachingNftId, students[i], i);
+            unchecked {
+                ++i;
+            }
+        }
+        _lockTeacherBond(teachingNftId);
+        VM.warp(block.timestamp + 8 days);
+
+        VM.prank(students[0]);
+        teaching.confirmTeachingAttendance(teachingNftId, 0);
+        VM.prank(students[1]);
+        teaching.confirmTeachingAttendance(teachingNftId, 1);
+        VM.prank(coordinator);
+        teaching.markTeachingCustomerFault(teachingNftId, 1, 2);
+        VM.prank(teacher);
+        teaching.confirmTeachingDelivery(teachingNftId);
+
+        (uint8 afterFaultStatus,,,,,,,,,,,) = teaching.getTeachingSessionState(teachingNftId);
+        assertTrue(afterFaultStatus == 0);
 
         VM.prank(students[2]);
         teaching.confirmTeachingAttendance(teachingNftId, 2);
@@ -447,6 +551,28 @@ contract TeachingRegistryTest {
         assertTrue(teaching.getVaultReservedUnits(address(stable)) == 0);
     }
 
+    function testSeatWithdrawalClearsAttendanceBeforeTeacherBondWithdrawal() public {
+        uint64 courseTypeId = _createCourseType(1_000_000, 400_000, 0);
+        address[] memory students = _students(1);
+        uint64 teachingNftId =
+            _createClass(courseTypeId, students, _emptyAssetIds(), _emptyWeights());
+
+        _paySeat(teachingNftId, students[0], 0);
+        VM.prank(students[0]);
+        teaching.confirmTeachingAttendance(teachingNftId, 0);
+        VM.prank(students[0]);
+        teaching.withdrawUnmatchedTeachingSeatPayment(teachingNftId, 0);
+
+        (, bool paid, bool attendanceConfirmed,,,) = teaching.getTeachingSeat(teachingNftId, 0);
+        assertTrue(!paid);
+        assertTrue(!attendanceConfirmed);
+
+        _lockTeacherBond(teachingNftId);
+        VM.prank(teacher);
+        teaching.withdrawUnmatchedTeachingTeacherBond(teachingNftId);
+        assertTrue(teaching.getVaultReservedUnits(address(stable)) == 0);
+    }
+
     function testTeacherCanWithdrawUnmatchedTeachingBondBeforeAnySeatPays() public {
         uint64 courseTypeId = _createCourseType(1_000_000, 400_000, 0);
         address[] memory students = _students(1);
@@ -507,7 +633,7 @@ contract TeachingRegistryTest {
 
         (uint256 amount, uint64 unlockAt, bool claimed) =
             distributor.getTeachingRewardClaimable(teachingNftId, assetId, positionId);
-        assertTrue(amount == 1_500_000);
+        assertTrue(amount == 2_000_000);
         assertTrue(unlockAt != 0);
         assertTrue(!claimed);
 
@@ -518,11 +644,11 @@ contract TeachingRegistryTest {
         uint256 beforeHolderBalance = stable.balanceOf(contributorTwo);
         VM.prank(contributorTwo);
         distributor.claimTeachingReward(teachingNftId, assetId, positionId);
-        assertTrue(stable.balanceOf(contributorTwo) == beforeHolderBalance + 1_500_000);
+        assertTrue(stable.balanceOf(contributorTwo) == beforeHolderBalance + 2_000_000);
 
         SparkDaoTypes.ResearchPosition memory position =
             researchRegistry.getResearchPosition(assetId, positionId);
-        assertTrue(position.totalClaimedUnits == 1_500_000);
+        assertTrue(position.totalClaimedUnits == 2_000_000);
     }
 
     function testMixedCustomerFaultSeatsKeepRefundsIndependent() public {
@@ -545,23 +671,23 @@ contract TeachingRegistryTest {
         VM.prank(coordinator);
         teaching.coordinatorCloseTeachingValid(teachingNftId, 1);
 
-        assertTrue(teaching.getVaultReservedUnits(address(stable)) == 800_000);
+        assertTrue(teaching.getVaultReservedUnits(address(stable)) == 845_832);
 
         (,,,, uint256 refundOwedUnits, bool refundClaimed) =
             teaching.getTeachingSeat(teachingNftId, 1);
-        assertTrue(refundOwedUnits == 300_000);
+        assertTrue(refundOwedUnits == 312_500);
         assertTrue(!refundClaimed);
 
         uint256 beforeStudentBalance = stable.balanceOf(students[1]);
         VM.prank(students[1]);
         teaching.claimTeachingSeatRefund(teachingNftId, 1);
-        assertTrue(stable.balanceOf(students[1]) == beforeStudentBalance + 300_000);
-        assertTrue(teaching.getVaultReservedUnits(address(stable)) == 500_000);
+        assertTrue(stable.balanceOf(students[1]) == beforeStudentBalance + 312_500);
+        assertTrue(teaching.getVaultReservedUnits(address(stable)) == 533_332);
 
         uint256 beforeTeacherBalance = stable.balanceOf(teacher);
         VM.prank(teacher);
         teaching.redeemTeachingTeacherPayout(teachingNftId);
-        assertTrue(stable.balanceOf(teacher) == beforeTeacherBalance + 500_000);
+        assertTrue(stable.balanceOf(teacher) == beforeTeacherBalance + 533_332);
         assertTrue(teaching.getVaultReservedUnits(address(stable)) == 0);
     }
 
@@ -587,19 +713,19 @@ contract TeachingRegistryTest {
         ) = teaching.getTeachingSessionState(teachingNftId);
         assertTrue(status == 2);
         assertTrue(teacherPayoutOwedUnits == 0);
-        assertTrue(remedialWageOwedUnits == 300_000);
-        assertTrue(serviceReserveUnits == 300_000);
-        assertTrue(teaching.getVaultReservedUnits(address(stable)) == 900_000);
+        assertTrue(remedialWageOwedUnits == 250_000);
+        assertTrue(serviceReserveUnits == 550_000);
+        assertTrue(teaching.getVaultReservedUnits(address(stable)) == 1_050_000);
 
         VM.prank(students[0]);
         teaching.claimTeachingSeatRefund(teachingNftId, 0);
         VM.prank(students[1]);
         teaching.claimTeachingSeatRefund(teachingNftId, 1);
-        assertTrue(teaching.getVaultReservedUnits(address(stable)) == 300_000);
+        assertTrue(teaching.getVaultReservedUnits(address(stable)) == 250_000);
 
         VM.prank(teacher);
         teaching.redeemTeachingTeacherPayout(teachingNftId);
-        assertTrue(teaching.getVaultReservedUnits(address(stable)) == 300_000);
+        assertTrue(teaching.getVaultReservedUnits(address(stable)) == 250_000);
 
         VM.prank(coordinator);
         teaching.coordinatorSettleTeachingRemedialWage(teachingNftId);
@@ -637,6 +763,41 @@ contract TeachingRegistryTest {
             address(stable),
             100,
             100,
+            uint64(block.timestamp),
+            uint64(block.timestamp),
+            1,
+            10_000
+        );
+    }
+
+    function testTeachingRewardPoolRejectsAmountsAbovePackedCap() public {
+        MockTeachingRewardSource source = new MockTeachingRewardSource();
+        TeachingRewardDistributor testDistributor =
+            new TeachingRewardDistributor(address(source), address(researchRegistry));
+        uint256 tooLarge = uint256(type(uint128).max) + 1;
+
+        VM.expectRevert(SparkDaoErrors.InvalidAmount.selector);
+        source.recordPool(
+            testDistributor,
+            1,
+            2,
+            address(stable),
+            tooLarge,
+            100,
+            uint64(block.timestamp),
+            uint64(block.timestamp),
+            1,
+            10_000
+        );
+
+        VM.expectRevert(SparkDaoErrors.InvalidAmount.selector);
+        source.recordPool(
+            testDistributor,
+            2,
+            2,
+            address(stable),
+            100,
+            tooLarge,
             uint64(block.timestamp),
             uint64(block.timestamp),
             1,
@@ -776,10 +937,10 @@ contract TeachingRegistryTest {
         VM.prank(coordinator);
         teaching.coordinatorCloseTeachingValid(teachingNftId, 1);
 
-        assertTrue(teaching.getVaultReservedUnits(address(stable)) == 800_000);
+        assertTrue(teaching.getVaultReservedUnits(address(stable)) == 845_832);
         VM.prank(authority);
-        teaching.withdrawTeachingIdleFor(address(stable), 1_000_000);
-        assertTrue(teaching.getVaultReservedUnits(address(stable)) == 800_000);
+        teaching.withdrawTeachingIdleFor(address(stable), 1_029_168);
+        assertTrue(teaching.getVaultReservedUnits(address(stable)) == 845_832);
 
         VM.expectRevert(SparkDaoErrors.VaultFundsReserved.selector);
         VM.prank(authority);

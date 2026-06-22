@@ -11,6 +11,16 @@ contract TeachingRewardDistributor {
     address public immutable TEACHING_REGISTRY;
     address public immutable RESEARCH_REGISTRY;
 
+    struct TeachingRewardPosition {
+        address currentHolder;
+        uint64 activatedAt;
+        uint64 readyAt;
+        uint16 layerIndex;
+        uint16 layerShareBps;
+        uint16 retainedShareBps;
+        bool rolloverReady;
+    }
+
     mapping(
         uint64 teachingNftId => mapping(uint64 assetId => SparkTeachingTypes.TeachingRewardPool)
     ) internal teachingRewardPools;
@@ -63,8 +73,8 @@ contract TeachingRewardDistributor {
 
         pool.exists = true;
         pool.stableAsset = stableAsset;
-        pool.assetPoolUnits = assetPoolUnits;
-        pool.distributedUnits = distributedUnits;
+        pool.assetPoolUnits = _toUint128(assetPoolUnits);
+        pool.distributedUnits = _toUint128(distributedUnits);
         pool.snapshotAt = snapshotAt;
         pool.unlockAt = unlockAt;
         pool.snapshotActiveLayer = snapshotActiveLayer;
@@ -82,9 +92,7 @@ contract TeachingRewardDistributor {
     {
         SparkTeachingTypes.TeachingRewardPool storage pool =
             _requireTeachingRewardPool(teachingNftId, assetId);
-        SparkDaoTypes.ResearchPosition memory position = IResearchRegistryForTeaching(
-                RESEARCH_REGISTRY
-            ).getResearchPosition(assetId, positionId);
+        TeachingRewardPosition memory position = _loadTeachingRewardPosition(assetId, positionId);
         uint16 effectiveShareBps = _effectiveClaimShareBps(pool, position);
         amount = _computeWeightedAmount(pool.assetPoolUnits, effectiveShareBps);
         claimed = teachingRewardClaimed[teachingNftId][assetId][positionId];
@@ -119,9 +127,7 @@ contract TeachingRewardDistributor {
         uint64 assetId,
         uint64 positionId
     ) internal {
-        SparkDaoTypes.ResearchPosition memory position = IResearchRegistryForTeaching(
-                RESEARCH_REGISTRY
-            ).getResearchPosition(assetId, positionId);
+        TeachingRewardPosition memory position = _loadTeachingRewardPosition(assetId, positionId);
         if (position.currentHolder != claimant) revert SparkDaoErrors.UnauthorizedHolder();
 
         SparkTeachingTypes.TeachingRewardPool storage pool =
@@ -137,13 +143,13 @@ contract TeachingRewardDistributor {
         if (effectiveShareBps == 0) revert SparkDaoErrors.InvalidTeachingRewardPool();
 
         uint256 claimAmount = _computeWeightedAmount(pool.assetPoolUnits, effectiveShareBps);
-        uint256 remainingUnits = pool.distributedUnits - pool.claimedUnits;
+        uint256 remainingUnits = uint256(pool.distributedUnits) - pool.claimedUnits;
         if (claimAmount > remainingUnits) claimAmount = remainingUnits;
 
         claimedByPosition[positionId] = true;
         pool.claimedShareBps += effectiveShareBps;
         if (claimAmount != 0) {
-            pool.claimedUnits += claimAmount;
+            pool.claimedUnits = _toUint128(uint256(pool.claimedUnits) + claimAmount);
         }
 
         uint256 dustUnits = _releaseTeachingRewardDustIfComplete(pool);
@@ -153,6 +159,24 @@ contract TeachingRewardDistributor {
             );
 
         emit TeachingRewardClaimed(teachingNftId, assetId, positionId, claimant, claimAmount);
+    }
+
+    function _loadTeachingRewardPosition(uint64 assetId, uint64 positionId)
+        internal
+        view
+        returns (TeachingRewardPosition memory position)
+    {
+        (
+            position.currentHolder,
+            position.activatedAt,
+            position.readyAt,
+            position.layerIndex,
+            position.layerShareBps,
+            position.retainedShareBps,
+            position.rolloverReady
+        ) =
+            IResearchRegistryForTeaching(RESEARCH_REGISTRY)
+                .getTeachingRewardPosition(assetId, positionId);
     }
 
     function _onlyTeachingRegistry() internal view {
@@ -181,13 +205,13 @@ contract TeachingRewardDistributor {
         if (claimedUnits >= distributedUnits) return 0;
 
         dustUnits = distributedUnits - claimedUnits;
-        pool.claimedUnits = distributedUnits;
+        pool.claimedUnits = _toUint128(distributedUnits);
         pool.dustReleased = true;
     }
 
     function _effectiveClaimShareBps(
         SparkTeachingTypes.TeachingRewardPool storage pool,
-        SparkDaoTypes.ResearchPosition memory position
+        TeachingRewardPosition memory position
     ) internal view returns (uint16) {
         return _computeEffectiveTeachingShareBps(
             pool.snapshotActiveLayer,
@@ -229,5 +253,11 @@ contract TeachingRewardDistributor {
         returns (uint256)
     {
         return (baseAmount * weightBps) / SparkDaoTypes.BASIS_POINTS_DENOMINATOR;
+    }
+
+    function _toUint128(uint256 value) internal pure returns (uint128) {
+        if (value > type(uint128).max) revert SparkDaoErrors.InvalidAmount();
+        // forge-lint: disable-next-line(unsafe-typecast)
+        return uint128(value);
     }
 }

@@ -53,8 +53,8 @@ future claims route to the treasury holder.
 Stable assets are frozen when protocol objects are created. Reserves are tracked by stable
 asset, and authority withdrawals are limited to idle balance.
 
-Teaching pricing uses the tier table in `TeachingPricingPolicyV1`. A logarithmic
-class-size reference curve is not executable policy.
+Teaching pricing uses a power-law capacity multiplier approximated by the tier table
+in `TeachingPricingPolicyV1`.
 
 ## Commands
 
@@ -68,7 +68,7 @@ npm run simulate:teaching-cost
 npm run check:calibration
 ```
 
-`npm run check:calibration` regenerates Teaching lifecycle calibration CSVs and cost
+`npm run check:calibration` regenerates Teaching lifecycle, class-size, and cost
 outputs. Generated outputs should not be edited by hand.
 
 ## Deployment And Demos

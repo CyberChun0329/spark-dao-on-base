@@ -118,6 +118,69 @@ contract ResearchRegistryTest {
         assertTrue(researchToken.ownerOf(_tokenId(assetId, positionId)) == contributorOne);
     }
 
+    function testCreatePatchPositionRejectsBuybackFloorAbovePackedCap() public {
+        VM.prank(coordinator);
+        uint64 assetId = registry.createResearchAsset("Packed Cap", "ipfs://paper");
+
+        VM.expectRevert(SparkDaoErrors.InvalidAmount.selector);
+        VM.prank(coordinator);
+        registry.createPatchPosition(
+            SparkDaoTypes.CreatePatchPositionParams({
+                assetId: assetId,
+                layerIndex: 1,
+                layerShareBps: 6_000,
+                buybackFloor: uint256(type(uint128).max) + 1,
+                decayWaitSeconds: 365 days,
+                decayPeriodSeconds: 365 days,
+                decayRateBps: 5_000,
+                beneficiary: contributorOne
+            })
+        );
+    }
+
+    function testTeachingRewardPositionGetterReturnsClaimFields() public {
+        VM.prank(coordinator);
+        uint64 assetId = registry.createResearchAsset("Teaching Position", "ipfs://teaching");
+
+        VM.prank(coordinator);
+        uint64 positionId = registry.createPatchPosition(
+            SparkDaoTypes.CreatePatchPositionParams({
+                assetId: assetId,
+                layerIndex: 1,
+                layerShareBps: 6_000,
+                buybackFloor: 100 ether,
+                decayWaitSeconds: 365 days,
+                decayPeriodSeconds: 365 days,
+                decayRateBps: 5_000,
+                beneficiary: contributorOne
+            })
+        );
+
+        VM.prank(contributorOne);
+        registry.transferResearchPosition(assetId, positionId, contributorTwo);
+
+        SparkDaoTypes.ResearchPosition memory position =
+            registry.getResearchPosition(assetId, positionId);
+        (
+            address currentHolder,
+            uint64 activatedAt,
+            uint64 readyAt,
+            uint16 layerIndex,
+            uint16 layerShareBps,
+            uint16 retainedShareBps,
+            bool rolloverReady
+        ) = registry.getTeachingRewardPosition(assetId, positionId);
+
+        assertTrue(currentHolder == position.currentHolder);
+        assertTrue(currentHolder == contributorTwo);
+        assertTrue(activatedAt == position.activatedAt);
+        assertTrue(readyAt == position.readyAt);
+        assertTrue(layerIndex == position.layerIndex);
+        assertTrue(layerShareBps == position.layerShareBps);
+        assertTrue(retainedShareBps == position.retainedShareBps);
+        assertTrue(rolloverReady == position.rolloverReady);
+    }
+
     function testSealPrepareAndAdvanceLayer() public {
         VM.startPrank(coordinator);
         uint64 assetId = registry.createResearchAsset("Physics", "ipfs://physics");
@@ -342,6 +405,32 @@ contract ResearchRegistryTest {
         uint256 afterBalance = stable.balanceOf(contributorOne);
 
         assertTrue(afterBalance == beforeBalance + 500_000);
+    }
+
+    function testCreateRevenueEscrowRejectsAmountAbovePackedCap() public {
+        VM.prank(coordinator);
+        uint64 assetId = registry.createResearchAsset("Revenue Cap", "ipfs://revenue-cap");
+
+        VM.prank(coordinator);
+        uint64 positionId = registry.createPatchPosition(
+            SparkDaoTypes.CreatePatchPositionParams({
+                assetId: assetId,
+                layerIndex: 1,
+                layerShareBps: 7_000,
+                buybackFloor: 100 ether,
+                decayWaitSeconds: 365 days,
+                decayPeriodSeconds: 365 days,
+                decayRateBps: 5_000,
+                beneficiary: contributorOne
+            })
+        );
+
+        VM.prank(coordinator);
+        registry.sealLayer(assetId, 1);
+
+        VM.expectRevert(SparkDaoErrors.InvalidAmount.selector);
+        VM.prank(authority);
+        registry.createRevenueEscrow(assetId, positionId, uint256(type(uint128).max) + 1);
     }
 
     function testSellPositionBackToDao() public {

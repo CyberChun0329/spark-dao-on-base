@@ -124,6 +124,16 @@ assertIncludes(
   "checkCalibration.ts",
 );
 assertIncludes(
+  requireText("client/scripts/checkCalibration.ts"),
+  "testWriteTeachingSizeGasCalibrationCsv",
+  "checkCalibration.ts",
+);
+assertIncludes(
+  requireText("client/scripts/checkCalibration.ts"),
+  "testWriteTeachingFaultSizeGasCalibrationCsv",
+  "checkCalibration.ts",
+);
+assertIncludes(
   requireText("client/scripts/simulateTeachingCost.ts"),
   "test/TeachingGasCalibration.t.sol",
   "simulateTeachingCost.ts",
@@ -150,6 +160,8 @@ const foundryToml = requireText("foundry.toml");
 for (const outputPath of [
   "./teaching_gas_calibration.csv",
   "./teaching_followup_gas_calibration.csv",
+  "./teaching_class_size_gas_calibration.csv",
+  "./teaching_fault_size_gas_calibration.csv",
   "./research_gas_calibration.csv",
 ]) {
   assertIncludes(foundryToml, outputPath, "foundry.toml");
