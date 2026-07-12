@@ -508,7 +508,8 @@ contract ResearchRegistry is SparkDaoConfig {
         address stableAsset = daoState.stableAsset;
         _safeTransferFrom(stableAsset, msg.sender, address(this), amount);
 
-        uint64 unlockAt = uint64(block.timestamp) + daoState.rewardUnlockSeconds;
+        uint64 unlockAt =
+            _saturatingTimestampAdd(uint64(block.timestamp), daoState.rewardUnlockSeconds);
         SparkDaoTypes.RevenueEscrow storage escrow = revenueEscrows[assetId][positionId][revenueId];
         escrow.stableAsset = stableAsset;
         escrow.amount = packedAmount;
@@ -745,16 +746,5 @@ contract ResearchRegistry is SparkDaoConfig {
         position.totalClaimedUnits = aggregateClaimedUnits > type(uint128).max
             ? type(uint128).max
             : _toUint128(aggregateClaimedUnits);
-    }
-
-    function _saturatingTimestampAdd(uint64 timestamp, uint64 offset)
-        internal
-        pure
-        returns (uint64)
-    {
-        uint256 result = uint256(timestamp) + offset;
-        if (result > type(uint64).max) return type(uint64).max;
-        // forge-lint: disable-next-line(unsafe-typecast)
-        return uint64(result);
     }
 }

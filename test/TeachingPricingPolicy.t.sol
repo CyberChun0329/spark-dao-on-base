@@ -18,33 +18,41 @@ contract TeachingPricingPolicyTest {
         assert(policy.TEACHING_PRICING_POLICY_VERSION() == 1);
     }
 
-    function testTierBoundariesFreezeSeatPriceAndClassSalary() public view {
+    function testPowerLawAnchorsFreezeSeatPriceAndClassSalary() public view {
         _assertQuote(1, 1_000_000, 400_000, 400_000);
-        _assertQuote(2, 800_000, 500_000, 250_000);
-        _assertQuote(3, 625_000, 640_000, 213_333);
-        _assertQuote(5, 625_000, 640_000, 128_000);
-        _assertQuote(6, 444_400, 900_000, 150_000);
-        _assertQuote(10, 444_400, 900_000, 90_000);
-        _assertQuote(11, 351_000, 1_140_000, 103_636);
-        _assertQuote(20, 351_000, 1_140_000, 57_000);
-        _assertQuote(21, 286_000, 1_400_000, 66_666);
-        _assertQuote(35, 286_000, 1_400_000, 40_000);
-        _assertQuote(36, 222_200, 1_800_000, 50_000);
-        _assertQuote(50, 222_200, 1_800_000, 36_000);
-        _assertQuote(51, 200_000, 2_000_000, 39_215);
-        _assertQuote(100, 200_000, 2_000_000, 20_000);
+        _assertQuote(2, 784_500, 509_840, 254_920);
+        _assertQuote(3, 696_700, 574_080, 191_360);
+        _assertQuote(5, 569_300, 702_600, 140_520);
+        _assertQuote(6, 539_600, 741_160, 123_526);
+        _assertQuote(10, 446_600, 895_480, 89_548);
+        _assertQuote(11, 434_700, 920_040, 83_640);
+        _assertQuote(20, 350_400, 1_141_360, 57_068);
+        _assertQuote(21, 345_400, 1_157_800, 55_133);
+        _assertQuote(35, 288_100, 1_388_320, 39_666);
+        _assertQuote(36, 285_500, 1_400_600, 38_905);
+        _assertQuote(50, 254_300, 1_572_880, 31_457);
+        _assertQuote(51, 252_900, 1_581_480, 31_009);
+        _assertQuote(100, 199_500, 2_004_760, 20_047);
     }
 
-    function testTeacherSalaryGrowthDoesNotExceedGrossRevenueGrowth() public view {
-        for (uint16 classSize = 1; classSize <= 100;) {
-            SparkTeachingTypes.TeachingQuote memory quote =
+    function testEachAddedStudentKeepsRevenueMonotonicAndSalaryGrowthBounded() public view {
+        SparkTeachingTypes.TeachingQuote memory previous =
+            policy.quoteTeachingSession(1_000_000, 400_000, 0, 1, 10_000);
+        uint256 previousRevenueUnits = previous.seatPriceUnits;
+
+        for (uint16 classSize = 2; classSize <= 100;) {
+            SparkTeachingTypes.TeachingQuote memory current =
                 policy.quoteTeachingSession(1_000_000, 400_000, 0, classSize, 10_000);
+            uint256 currentRevenueUnits = current.seatPriceUnits * classSize;
 
-            uint256 grossRevenueUnits = quote.seatPriceUnits * classSize;
-            uint256 teacherSalaryGrowthBps = (quote.classTeacherSalaryUnits * 10_000) / 400_000;
-            uint256 grossRevenueGrowthBps = (grossRevenueUnits * 10_000) / 1_000_000;
-            assert(teacherSalaryGrowthBps <= grossRevenueGrowthBps);
+            assert(currentRevenueUnits >= previousRevenueUnits);
+            assert(
+                current.classTeacherSalaryUnits * previousRevenueUnits
+                    <= previous.classTeacherSalaryUnits * currentRevenueUnits
+            );
 
+            previous = current;
+            previousRevenueUnits = currentRevenueUnits;
             unchecked {
                 ++classSize;
             }

@@ -147,6 +147,17 @@ abstract contract SparkDaoConfig {
         if (target.code.length == 0) revert SparkDaoErrors.InvalidContractAddress();
     }
 
+    function _saturatingTimestampAdd(uint64 timestamp, uint64 offset)
+        internal
+        pure
+        returns (uint64)
+    {
+        uint256 result = uint256(timestamp) + offset;
+        if (result > type(uint64).max) return type(uint64).max;
+        // forge-lint: disable-next-line(unsafe-typecast)
+        return uint64(result);
+    }
+
     function _safeTransfer(address token, address to, uint256 amount) internal {
         _callToken(token, abi.encodeCall(IERC20.transfer, (to, amount)));
     }

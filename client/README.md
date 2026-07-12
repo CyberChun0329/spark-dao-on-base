@@ -38,8 +38,8 @@ version, and optional bytecode hashes.
 ## Helpers
 
 - `research.ts`: research registry reads, including per-stable claim totals
-- `teaching.ts`: teaching reads, schedule confirmation, seat actions, settlement calls,
-  and claims
+- `teaching.ts`: teaching reads, schedule and progress confirmation, seat actions,
+  settlement calls, and claims
 - `inspect.ts`: read-only environment inspection
 
 ## Teaching Compatibility
@@ -49,7 +49,7 @@ version, and optional bytecode hashes.
 - Fault refunds are per-seat claim-pull.
 - Customer-fault teacher half wage follows the teacher payout redeem delay.
 - Customer fault remains per-seat state inside a valid closed teaching session.
-- Clients should read teaching state through `getTeachingSessionState`, `getTeachingSeat`, and teaching reward distributor getters.
+- Clients should read teaching state through `getTeachingSessionState`, `getTeachingProgressState`, `getTeachingSeat`, and teaching reward distributor getters.
 - Teaching events are the teaching event surface for demos.
 
 The client layer is intentionally thin. Contract behaviour is defined by the Solidity

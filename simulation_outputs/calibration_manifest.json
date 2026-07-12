@@ -10,19 +10,19 @@
   "inputFiles": [
     {
       "path": "teaching_gas_calibration.csv",
-      "sha256": "df111820d1f5cbabb659124b6ea33e6af6df454543cdd1f20a8c5922294539f1"
+      "sha256": "02768804259985ddc06877ce9f2ae87b0aa1253c9b73b95923a7251238d08cc4"
     },
     {
       "path": "teaching_followup_gas_calibration.csv",
-      "sha256": "97ec1c162e9ab48d536deda04060f6cb1268578962b7b7db266e5c5c99e4fdab"
+      "sha256": "d4d23d294d2fa26b5d18a72a70b40c7f8337eacbf4384cd69b436216b23751c1"
     },
     {
       "path": "teaching_class_size_gas_calibration.csv",
-      "sha256": "f08e1b47d6aaf6977867d06c4d0b89341ebd8420ba26560255cddeabc0584a32"
+      "sha256": "d2dd56274e5c2c14ad657b2beed7083c78d3c6b846eec58b334ec1640b3ebdda"
     },
     {
       "path": "research_gas_calibration.csv",
-      "sha256": "7033ef500dbe331379c5d9417ac4fb737c33b9922a4fd37f5aec1a1b0b1379ce"
+      "sha256": "e7cb0f8fe8fba7f3eacbf470b45c60a54f5510d515e19bf8e22ff618ea859f97"
     },
     {
       "path": "simulation_inputs/fee_assumptions.json",
@@ -40,11 +40,11 @@
     },
     {
       "path": "client/scripts/simulateTeachingCost.ts",
-      "sha256": "94cc8597c394cd46e03f9d60e229c2b9dd158ea527cc78ee093c910a60d5946e"
+      "sha256": "ced3992dbb112b311ee280eb5f1bbb4b72f5439839b028c7083f07fdf85eea82"
     },
     {
       "path": "foundry.toml",
-      "sha256": "b32ce70b29ad60c20b0c7a1a697876e5bf68e87bd39182fc9df7d78d9f710947"
+      "sha256": "8e05a36a33cda7ee46e8143d14f677e4da6a35c49a34b144231518610244b99b"
     },
     {
       "path": "package.json",

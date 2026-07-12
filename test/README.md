@@ -11,7 +11,7 @@ Foundry tests for the Base implementation.
   batch atomicity, dust release, and buyback claim routing.
 - `TeachingSingleSeatCompatibility.t.sol`: class-size-1 economic, reserve, claim,
   dust, buyback, and stable-asset invariants.
-- `TeachingPricingPolicy.t.sol`: quote-module boundaries.
+- `TeachingPricingPolicy.t.sol`: power-law quote boundaries and growth constraints.
 
 Teaching compatibility notes:
 
@@ -20,7 +20,7 @@ Teaching compatibility notes:
 - Fault refunds are per-seat claim-pull.
 - Customer-fault teacher half wage follows the teacher payout redeem delay.
 - Customer fault remains per-seat state inside a valid closed teaching session.
-- Clients should read teaching state through `getTeachingSessionState`, `getTeachingSeat`, and teaching reward distributor getters.
+- Clients should read teaching state through `getTeachingSessionState`, `getTeachingProgressState`, `getTeachingSeat`, and teaching reward distributor getters.
 - Teaching events are the teaching event surface for demos.
 
 Run:

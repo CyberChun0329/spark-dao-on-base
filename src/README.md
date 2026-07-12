@@ -31,7 +31,10 @@ paid seat.
 `TeachingRewardDistributor` mirrors the claim-pull distributor pattern for teaching
 reward pools.
 
-`TeachingPricingPolicyV1` uses a tier table for class sizes `1..100`.
+`TeachingPricingPolicyV1` uses a piecewise-linear power-law approximation for class sizes
+`1..100`.
+`TeachingRegistry` independently validates pricing-policy class size and settlement
+accounting before storing a quote.
 
 `TeachingNftToken` is used by the teaching protocol. Each teaching session mints one
 non-transferable teaching token to the teacher.

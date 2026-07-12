@@ -296,6 +296,98 @@ contract TeachingRegistryTest {
         );
     }
 
+    function testTeachingSessionRejectsPolicyClassSizeMismatch() public {
+        MismatchedClassSizeTeachingPolicy invalidPolicy = new MismatchedClassSizeTeachingPolicy();
+        TeachingRegistry invalidTeaching = _deployTeachingRegistryWithPolicy(address(invalidPolicy));
+
+        VM.prank(coordinator);
+        uint64 courseTypeId =
+            invalidTeaching.createTeachingCourseType("Invalid class size", 1_000_000, 400_000, 0);
+        address[] memory students = _students(3);
+
+        VM.expectRevert(SparkDaoErrors.InvalidTeachingPricingPolicyQuote.selector);
+        VM.prank(coordinator);
+        invalidTeaching.createTeachingSession(
+            SparkTeachingTypes.CreateTeachingSessionParams({
+                courseTypeId: courseTypeId,
+                teacher: teacher,
+                students: students,
+                scheduledAt: uint64(block.timestamp + 1 days),
+                customerDiscountBps: 10_000,
+                linkedResearchAssetIds: _emptyAssetIds(),
+                linkedResearchWeightBps: _emptyWeights()
+            })
+        );
+    }
+
+    function testTeachingCourseTypeRejectsInsolventPolicyQuote() public {
+        InsolventTeachingPolicy invalidPolicy = new InsolventTeachingPolicy();
+        TeachingRegistry invalidTeaching = _deployTeachingRegistryWithPolicy(address(invalidPolicy));
+
+        VM.expectRevert(SparkDaoErrors.InvalidTeachingPricingPolicyQuote.selector);
+        VM.prank(coordinator);
+        invalidTeaching.createTeachingCourseType("Insolvent", 1_000_000, 400_000, 0);
+    }
+
+    function testTeachingCourseTypeRejectsPolicyThatIgnoresResearchShare() public {
+        PermissiveTeachingPolicy invalidPolicy = new PermissiveTeachingPolicy();
+        TeachingRegistry invalidTeaching = _deployTeachingRegistryWithPolicy(address(invalidPolicy));
+
+        VM.expectRevert(SparkDaoErrors.InvalidTeachingPricingPolicyQuote.selector);
+        VM.prank(coordinator);
+        invalidTeaching.createTeachingCourseType("Wrong research share", 1_000_000, 400_000, 1_000);
+    }
+
+    function testTeachingRegistryValidatesPricingInputsIndependently() public {
+        PermissiveTeachingPolicy invalidPolicy = new PermissiveTeachingPolicy();
+        TeachingRegistry invalidTeaching = _deployTeachingRegistryWithPolicy(address(invalidPolicy));
+
+        VM.expectRevert(SparkDaoErrors.InvalidResearchShareBps.selector);
+        VM.prank(coordinator);
+        invalidTeaching.createTeachingCourseType("Excess research share", 1_000_000, 400_000, 2_501);
+
+        VM.prank(coordinator);
+        uint64 courseTypeId =
+            invalidTeaching.createTeachingCourseType("Invalid discount", 1_000_000, 400_000, 0);
+
+        VM.expectRevert(SparkDaoErrors.InvalidDiscountBps.selector);
+        VM.prank(coordinator);
+        invalidTeaching.createTeachingSession(
+            SparkTeachingTypes.CreateTeachingSessionParams({
+                courseTypeId: courseTypeId,
+                teacher: teacher,
+                students: _students(1),
+                scheduledAt: uint64(block.timestamp + 1 days),
+                customerDiscountBps: 0,
+                linkedResearchAssetIds: _emptyAssetIds(),
+                linkedResearchWeightBps: _emptyWeights()
+            })
+        );
+    }
+
+    function testTeachingSessionRejectsOverflowingPolicyQuoteWithoutPanic() public {
+        OverflowingTeachingPolicy invalidPolicy = new OverflowingTeachingPolicy();
+        TeachingRegistry invalidTeaching = _deployTeachingRegistryWithPolicy(address(invalidPolicy));
+
+        VM.prank(coordinator);
+        uint64 courseTypeId =
+            invalidTeaching.createTeachingCourseType("Overflowing quote", 1_000_000, 400_000, 0);
+
+        VM.expectRevert(SparkDaoErrors.InvalidAmount.selector);
+        VM.prank(coordinator);
+        invalidTeaching.createTeachingSession(
+            SparkTeachingTypes.CreateTeachingSessionParams({
+                courseTypeId: courseTypeId,
+                teacher: teacher,
+                students: _students(2),
+                scheduledAt: uint64(block.timestamp + 1 days),
+                customerDiscountBps: 10_000,
+                linkedResearchAssetIds: _emptyAssetIds(),
+                linkedResearchWeightBps: _emptyWeights()
+            })
+        );
+    }
+
     function testSettlementResearchLayerPackingMatchesConfiguredLinkLimit() public pure {
         assertTrue(
             SparkDaoTypes.MAX_TEACHING_RESEARCH_LINKS
@@ -338,12 +430,12 @@ contract TeachingRegistryTest {
             uint256 serviceReserveUnits,
         ) = teaching.getTeachingSessionState(teachingNftId);
         assertTrue(closedStatus == 1);
-        assertTrue(teacherBondUnits == 1_280_000);
-        assertTrue(teacherPayoutOwedUnits == 639_999);
+        assertTrue(teacherBondUnits == 1_148_160);
+        assertTrue(teacherPayoutOwedUnits == 574_080);
         assertTrue(remedialWageOwedUnits == 0);
         assertTrue(researchRewardUnits == 0);
-        assertTrue(serviceReserveUnits == 1_235_001);
-        assertTrue(teaching.getVaultReservedUnits(address(stable)) == 639_999);
+        assertTrue(serviceReserveUnits == 1_516_020);
+        assertTrue(teaching.getVaultReservedUnits(address(stable)) == 574_080);
     }
 
     function testExactlyHalfSecondRoundSignaturesDoNotAutoClose() public {
@@ -408,6 +500,40 @@ contract TeachingRegistryTest {
 
         (uint8 majorityStatus,,,,,,,,,,,) = teaching.getTeachingSessionState(teachingNftId);
         assertTrue(majorityStatus == 1);
+    }
+
+    function testTeachingProgressStateExposesDeliveryAndAggregateCounters() public {
+        uint64 courseTypeId = _createCourseType(1_000_000, 400_000, 0);
+        address[] memory students = _students(3);
+        uint64 teachingNftId =
+            _createClass(courseTypeId, students, _emptyAssetIds(), _emptyWeights());
+
+        _paySeat(teachingNftId, students[0], 0);
+        _paySeat(teachingNftId, students[1], 1);
+        _lockTeacherBond(teachingNftId);
+        VM.warp(block.timestamp + 8 days);
+        VM.prank(students[0]);
+        teaching.confirmTeachingAttendance(teachingNftId, 0);
+        VM.prank(coordinator);
+        teaching.markTeachingCustomerFault(teachingNftId, 1, 2);
+        VM.prank(teacher);
+        teaching.confirmTeachingDelivery(teachingNftId);
+
+        (
+            uint64 scheduledAt,
+            bool teacherBondLocked,
+            bool teacherDeliveryConfirmed,
+            uint16 paidSeatCount,
+            uint16 paidAttendanceCount,
+            uint16 customerFaultSeatCount
+        ) = teaching.getTeachingProgressState(teachingNftId);
+
+        assertTrue(scheduledAt != 0);
+        assertTrue(teacherBondLocked);
+        assertTrue(teacherDeliveryConfirmed);
+        assertTrue(paidSeatCount == 2);
+        assertTrue(paidAttendanceCount == 1);
+        assertTrue(customerFaultSeatCount == 1);
     }
 
     function testCustomerFaultRemovesPriorAttendanceFromMajority() public {
@@ -514,6 +640,21 @@ contract TeachingRegistryTest {
         );
     }
 
+    function testCreateTeachingSessionRejectsDuplicateStudents() public {
+        uint64 courseTypeId = _createCourseType(1_000_000, 400_000, 0);
+        address[] memory students = _students(2);
+        students[1] = students[0];
+
+        VM.expectRevert(SparkDaoErrors.AccountMismatch.selector);
+        _createUnconfirmedClassAt(
+            courseTypeId,
+            students,
+            uint64(block.timestamp + 1 days),
+            _emptyAssetIds(),
+            _emptyWeights()
+        );
+    }
+
     function testCoordinatorCannotCloseTeachingBeforeScheduledAt() public {
         uint64 courseTypeId = _createCourseType(1_000_000, 400_000, 0);
         address[] memory students = _students(1);
@@ -571,6 +712,22 @@ contract TeachingRegistryTest {
         assertTrue(!paid);
         assertTrue(!refundClaimed);
         assertTrue(stable.balanceOf(students[0]) == fundedBalance);
+        assertTrue(teaching.getVaultReservedUnits(address(stable)) == 0);
+    }
+
+    function testCustomerFaultCannotBeMarkedBeforeTeacherBondLocks() public {
+        uint64 courseTypeId = _createCourseType(1_000_000, 400_000, 0);
+        address[] memory students = _students(1);
+        uint64 teachingNftId =
+            _createClass(courseTypeId, students, _emptyAssetIds(), _emptyWeights());
+        _paySeat(teachingNftId, students[0], 0);
+
+        VM.expectRevert(SparkDaoErrors.TeachingCollateralNotLocked.selector);
+        VM.prank(coordinator);
+        teaching.markTeachingCustomerFault(teachingNftId, 0, 2);
+
+        VM.prank(students[0]);
+        teaching.withdrawUnmatchedTeachingSeatPayment(teachingNftId, 0);
         assertTrue(teaching.getVaultReservedUnits(address(stable)) == 0);
     }
 
@@ -657,7 +814,7 @@ contract TeachingRegistryTest {
 
         (uint256 amount, uint64 unlockAt, bool claimed) =
             distributor.getTeachingRewardClaimable(teachingNftId, assetId, positionId);
-        assertTrue(amount == 2_000_000);
+        assertTrue(amount == 1_995_000);
         assertTrue(unlockAt != 0);
         assertTrue(!claimed);
 
@@ -668,15 +825,15 @@ contract TeachingRegistryTest {
         uint256 beforeHolderBalance = stable.balanceOf(contributorTwo);
         VM.prank(contributorTwo);
         distributor.claimTeachingReward(teachingNftId, assetId, positionId);
-        assertTrue(stable.balanceOf(contributorTwo) == beforeHolderBalance + 2_000_000);
+        assertTrue(stable.balanceOf(contributorTwo) == beforeHolderBalance + 1_995_000);
 
         SparkDaoTypes.ResearchPosition memory position =
             researchRegistry.getResearchPosition(assetId, positionId);
-        assertTrue(position.totalClaimedUnits == 2_000_000);
+        assertTrue(position.totalClaimedUnits == 1_995_000);
         assertTrue(
             researchRegistry.getResearchPositionClaimedUnitsFor(
                     assetId, positionId, address(stable)
-                ) == 2_000_000
+                ) == 1_995_000
         );
     }
 
@@ -700,23 +857,23 @@ contract TeachingRegistryTest {
         VM.prank(coordinator);
         teaching.coordinatorCloseTeachingValid(teachingNftId, 1);
 
-        assertTrue(teaching.getVaultReservedUnits(address(stable)) == 845_832);
+        assertTrue(teaching.getVaultReservedUnits(address(stable)) == 826_750);
 
         (,,,, uint256 refundOwedUnits, bool refundClaimed) =
             teaching.getTeachingSeat(teachingNftId, 1);
-        assertTrue(refundOwedUnits == 312_500);
+        assertTrue(refundOwedUnits == 348_350);
         assertTrue(!refundClaimed);
 
         uint256 beforeStudentBalance = stable.balanceOf(students[1]);
         VM.prank(students[1]);
         teaching.claimTeachingSeatRefund(teachingNftId, 1);
-        assertTrue(stable.balanceOf(students[1]) == beforeStudentBalance + 312_500);
-        assertTrue(teaching.getVaultReservedUnits(address(stable)) == 533_332);
+        assertTrue(stable.balanceOf(students[1]) == beforeStudentBalance + 348_350);
+        assertTrue(teaching.getVaultReservedUnits(address(stable)) == 478_400);
 
         uint256 beforeTeacherBalance = stable.balanceOf(teacher);
         VM.prank(teacher);
         teaching.redeemTeachingTeacherPayout(teachingNftId);
-        assertTrue(stable.balanceOf(teacher) == beforeTeacherBalance + 533_332);
+        assertTrue(stable.balanceOf(teacher) == beforeTeacherBalance + 478_400);
         assertTrue(teaching.getVaultReservedUnits(address(stable)) == 0);
     }
 
@@ -742,19 +899,19 @@ contract TeachingRegistryTest {
         ) = teaching.getTeachingSessionState(teachingNftId);
         assertTrue(status == 2);
         assertTrue(teacherPayoutOwedUnits == 0);
-        assertTrue(remedialWageOwedUnits == 250_000);
-        assertTrue(serviceReserveUnits == 550_000);
-        assertTrue(teaching.getVaultReservedUnits(address(stable)) == 1_050_000);
+        assertTrue(remedialWageOwedUnits == 254_920);
+        assertTrue(serviceReserveUnits == 529_580);
+        assertTrue(teaching.getVaultReservedUnits(address(stable)) == 1_039_420);
 
         VM.prank(students[0]);
         teaching.claimTeachingSeatRefund(teachingNftId, 0);
         VM.prank(students[1]);
         teaching.claimTeachingSeatRefund(teachingNftId, 1);
-        assertTrue(teaching.getVaultReservedUnits(address(stable)) == 250_000);
+        assertTrue(teaching.getVaultReservedUnits(address(stable)) == 254_920);
 
         VM.prank(teacher);
         teaching.redeemTeachingTeacherPayout(teachingNftId);
-        assertTrue(teaching.getVaultReservedUnits(address(stable)) == 250_000);
+        assertTrue(teaching.getVaultReservedUnits(address(stable)) == 254_920);
 
         VM.prank(coordinator);
         teaching.coordinatorSettleTeachingRemedialWage(teachingNftId);
@@ -763,6 +920,52 @@ contract TeachingRegistryTest {
         VM.expectRevert(SparkDaoErrors.TeachingRemedialWageAlreadySettled.selector);
         VM.prank(coordinator);
         teaching.coordinatorSettleTeachingRemedialWage(teachingNftId);
+    }
+
+    function testTeacherFaultRefundClaimsRemainPerPaidSeatWithMixedSeatStates() public {
+        uint64 courseTypeId = _createCourseType(1_000_000, 400_000, 0);
+        address[] memory students = _students(3);
+        uint64 teachingNftId =
+            _createClass(courseTypeId, students, _emptyAssetIds(), _emptyWeights());
+
+        _paySeat(teachingNftId, students[0], 0);
+        _paySeat(teachingNftId, students[1], 1);
+        _lockTeacherBond(teachingNftId);
+        VM.prank(coordinator);
+        teaching.markTeachingCustomerFault(teachingNftId, 1, 2);
+        _warpPastTeachingCoordinatorTimeout();
+
+        VM.prank(coordinator);
+        teaching.coordinatorCloseTeachingTeacherFault(teachingNftId, 4);
+
+        (,,,, uint256 firstRefund, bool firstClaimed) = teaching.getTeachingSeat(teachingNftId, 0);
+        (,,,, uint256 secondRefund, bool secondClaimed) = teaching.getTeachingSeat(teachingNftId, 1);
+        (,,,, uint256 unpaidRefund,) = teaching.getTeachingSeat(teachingNftId, 2);
+        assertTrue(firstRefund == 348_350);
+        assertTrue(secondRefund == 348_350);
+        assertTrue(unpaidRefund == 0);
+        assertTrue(!firstClaimed && !secondClaimed);
+        assertTrue(teaching.getVaultReservedUnits(address(stable)) == 888_060);
+
+        VM.expectRevert(SparkDaoErrors.InvalidAmount.selector);
+        VM.prank(students[2]);
+        teaching.claimTeachingSeatRefund(teachingNftId, 2);
+
+        VM.prank(students[0]);
+        teaching.claimTeachingSeatRefund(teachingNftId, 0);
+        VM.prank(students[1]);
+        teaching.claimTeachingSeatRefund(teachingNftId, 1);
+        assertTrue(teaching.getVaultReservedUnits(address(stable)) == 191_360);
+
+        VM.prank(teacher);
+        teaching.redeemTeachingTeacherPayout(teachingNftId);
+        VM.prank(coordinator);
+        teaching.coordinatorSettleTeachingRemedialWage(teachingNftId);
+        assertTrue(teaching.getVaultReservedUnits(address(stable)) == 0);
+
+        VM.expectRevert(SparkDaoErrors.TeachingRefundAlreadyClaimed.selector);
+        VM.prank(students[0]);
+        teaching.claimTeachingSeatRefund(teachingNftId, 0);
     }
 
     function testWrongDistributorCannotCallTeachingCallback() public {
@@ -916,6 +1119,83 @@ contract TeachingRegistryTest {
         assertTrue(source.totalDustUnits() == 1);
     }
 
+    function testSameTimestampRolloverCannotRewriteRecordedTeachingReward() public {
+        uint64 scheduledAt = uint64(block.timestamp + 1 days);
+        VM.startPrank(coordinator);
+        uint64 assetId =
+            researchRegistry.createResearchAsset("Snapshot Boundary", "ipfs://snapshot-boundary");
+        uint64 positionId = researchRegistry.createPatchPosition(
+            SparkDaoTypes.CreatePatchPositionParams({
+                assetId: assetId,
+                layerIndex: 1,
+                layerShareBps: 10_000,
+                buybackFloor: 250_000,
+                decayWaitSeconds: 1 days,
+                decayPeriodSeconds: 1 days,
+                decayRateBps: 5_000,
+                beneficiary: contributorOne
+            })
+        );
+        researchRegistry.sealLayer(assetId, 1);
+        VM.stopPrank();
+
+        uint64[] memory assetIds = new uint64[](1);
+        assetIds[0] = assetId;
+        uint64 courseTypeId = _createCourseType(1_000_000, 400_000, 1_000);
+        address[] memory students = _students(1);
+        uint64 teachingNftId =
+            _createClassAt(courseTypeId, students, scheduledAt, assetIds, _emptyWeights());
+        _paySeat(teachingNftId, students[0], 0);
+        _lockTeacherBond(teachingNftId);
+
+        VM.warp(scheduledAt);
+        VM.prank(teacher);
+        teaching.confirmTeachingDelivery(teachingNftId);
+        VM.prank(students[0]);
+        teaching.confirmTeachingAttendance(teachingNftId, 0);
+
+        (uint256 amountBeforeReady, uint64 unlockAt,) =
+            distributor.getTeachingRewardClaimable(teachingNftId, assetId, positionId);
+        assertTrue(amountBeforeReady == 100_000);
+
+        researchRegistry.markPositionReady(assetId, positionId);
+        (uint256 amountAfterReady,,) =
+            distributor.getTeachingRewardClaimable(teachingNftId, assetId, positionId);
+        assertTrue(amountAfterReady == amountBeforeReady);
+
+        VM.warp(uint256(scheduledAt) + SparkDaoTypes.TEACHING_REDEEM_DELAY_SECONDS);
+        VM.prank(teacher);
+        teaching.redeemTeachingTeacherPayout(teachingNftId);
+        VM.warp(unlockAt);
+        VM.prank(contributorOne);
+        distributor.claimTeachingReward(teachingNftId, assetId, positionId);
+
+        assertTrue(teaching.getVaultReservedUnits(address(stable)) == 0);
+    }
+
+    function testMaximumRewardUnlockDelaySaturatesTeachingRewardTimestamp() public {
+        (uint64 assetId, uint64 positionId) = _createReadyResearchAsset(contributorOne, 10_000);
+        uint64[] memory assetIds = new uint64[](1);
+        assetIds[0] = assetId;
+        uint64 courseTypeId = _createCourseType(1_000_000, 400_000, 1_000);
+        address[] memory students = _students(1);
+        uint64 teachingNftId = _createClass(courseTypeId, students, assetIds, _emptyWeights());
+        _paySeat(teachingNftId, students[0], 0);
+        _lockTeacherBond(teachingNftId);
+
+        VM.prank(authority);
+        teaching.updateRewardUnlockSeconds(type(uint64).max);
+        _warpPastTeachingCoordinatorTimeout();
+        VM.prank(coordinator);
+        teaching.coordinatorCloseTeachingValid(teachingNftId, 1);
+
+        (uint256 amount, uint64 unlockAt, bool claimed) =
+            distributor.getTeachingRewardClaimable(teachingNftId, assetId, positionId);
+        assertTrue(amount == 100_000);
+        assertTrue(unlockAt == type(uint64).max);
+        assertTrue(!claimed);
+    }
+
     function testBoughtBackTeachingRewardClaimRoutesToTreasury() public {
         (uint64 assetId, uint64 positionId) = _createReadyResearchAsset(contributorOne, 10_000);
         uint64[] memory assetIds = new uint64[](1);
@@ -966,10 +1246,10 @@ contract TeachingRegistryTest {
         VM.prank(coordinator);
         teaching.coordinatorCloseTeachingValid(teachingNftId, 1);
 
-        assertTrue(teaching.getVaultReservedUnits(address(stable)) == 845_832);
+        assertTrue(teaching.getVaultReservedUnits(address(stable)) == 826_750);
         VM.prank(authority);
-        teaching.withdrawTeachingIdleFor(address(stable), 1_029_168);
-        assertTrue(teaching.getVaultReservedUnits(address(stable)) == 845_832);
+        teaching.withdrawTeachingIdleFor(address(stable), 1_263_350);
+        assertTrue(teaching.getVaultReservedUnits(address(stable)) == 826_750);
 
         VM.expectRevert(SparkDaoErrors.VaultFundsReserved.selector);
         VM.prank(authority);
@@ -1009,6 +1289,112 @@ contract TeachingRegistryTest {
         assertTrue(teaching.getVaultReservedUnits(address(stable)) == 0);
     }
 
+    function testFuzzMixedFaultSettlementReserveConservation(
+        uint16 rawClassSize,
+        uint16 rawPaidSeatCount,
+        uint16 rawCustomerFaultSeatCount,
+        bool teacherFault,
+        uint256 claimSeed
+    ) public {
+        uint16 classSize = uint16((rawClassSize % 100) + 1);
+        uint16 paidSeatCount = uint16((rawPaidSeatCount % classSize) + 1);
+        uint16 customerFaultSeatCount = uint16(rawCustomerFaultSeatCount % (paidSeatCount + 1));
+        uint64 courseTypeId = _createCourseType(1_000_001, 400_001, 0);
+        address[] memory students = _students(classSize);
+        uint64 teachingNftId =
+            _createClass(courseTypeId, students, _emptyAssetIds(), _emptyWeights());
+
+        for (uint16 i = 0; i < paidSeatCount;) {
+            _paySeat(teachingNftId, students[i], i);
+            unchecked {
+                ++i;
+            }
+        }
+        _lockTeacherBond(teachingNftId);
+        for (uint16 i = 0; i < customerFaultSeatCount;) {
+            VM.prank(coordinator);
+            teaching.markTeachingCustomerFault(teachingNftId, i, 2);
+            unchecked {
+                ++i;
+            }
+        }
+        _warpPastTeachingCoordinatorTimeout();
+
+        VM.prank(coordinator);
+        if (teacherFault) {
+            teaching.coordinatorCloseTeachingTeacherFault(teachingNftId, 4);
+        } else {
+            teaching.coordinatorCloseTeachingValid(teachingNftId, 1);
+        }
+
+        (
+            ,,,,
+            uint256 seatPriceUnits,
+            uint256 seatTeacherSalaryUnits,,
+            uint256 teacherPayoutOwedUnits,
+            uint256 remedialWageOwedUnits,
+            uint256 researchRewardUnits,
+            uint256 serviceReserveUnits,
+        ) = teaching.getTeachingSessionState(teachingNftId);
+        uint256 refundPerSeat = seatPriceUnits - seatPriceUnits / 2;
+        uint256 refundableSeatCount = teacherFault ? paidSeatCount : customerFaultSeatCount;
+        uint256 expectedRefundUnits = refundableSeatCount * refundPerSeat;
+        uint256 expectedTeacherPayoutUnits =
+            uint256(customerFaultSeatCount) * (seatTeacherSalaryUnits / 2);
+        uint256 expectedRemedialWageUnits;
+        if (teacherFault) {
+            expectedRemedialWageUnits =
+                uint256(paidSeatCount - customerFaultSeatCount) * (seatTeacherSalaryUnits / 2);
+        } else {
+            expectedTeacherPayoutUnits += uint256(paidSeatCount - customerFaultSeatCount)
+            * seatTeacherSalaryUnits;
+        }
+        uint256 expectedServiceReserveUnits = uint256(paidSeatCount) * seatPriceUnits
+            - expectedRefundUnits - expectedTeacherPayoutUnits - expectedRemedialWageUnits;
+
+        assertTrue(teacherPayoutOwedUnits == expectedTeacherPayoutUnits);
+        assertTrue(remedialWageOwedUnits == expectedRemedialWageUnits);
+        assertTrue(researchRewardUnits == 0);
+        assertTrue(serviceReserveUnits == expectedServiceReserveUnits);
+        assertTrue(
+            teaching.getVaultReservedUnits(address(stable))
+                == expectedRefundUnits + expectedTeacherPayoutUnits + expectedRemedialWageUnits
+        );
+
+        if (!teacherFault && customerFaultSeatCount < paidSeatCount) {
+            VM.expectRevert(SparkDaoErrors.InvalidAmount.selector);
+            VM.prank(students[customerFaultSeatCount]);
+            teaching.claimTeachingSeatRefund(teachingNftId, customerFaultSeatCount);
+        }
+
+        if (refundableSeatCount != 0) {
+            uint256 firstClaimIndex = claimSeed % refundableSeatCount;
+            for (uint256 offset = 0; offset < refundableSeatCount;) {
+                // The session class-size cap limits the modulo result to at most 99.
+                // forge-lint: disable-next-line(unsafe-typecast)
+                uint16 seatIndex = uint16((firstClaimIndex + offset) % refundableSeatCount);
+                uint256 reservedBeforeClaim = teaching.getVaultReservedUnits(address(stable));
+                VM.prank(students[seatIndex]);
+                teaching.claimTeachingSeatRefund(teachingNftId, seatIndex);
+                assertTrue(
+                    teaching.getVaultReservedUnits(address(stable))
+                        == reservedBeforeClaim - refundPerSeat
+                );
+                unchecked {
+                    ++offset;
+                }
+            }
+        }
+
+        VM.prank(teacher);
+        teaching.redeemTeachingTeacherPayout(teachingNftId);
+        if (expectedRemedialWageUnits != 0) {
+            VM.prank(coordinator);
+            teaching.coordinatorSettleTeachingRemedialWage(teachingNftId);
+        }
+        assertTrue(teaching.getVaultReservedUnits(address(stable)) == 0);
+    }
+
     function _createCourseType(
         uint256 baseSeatPriceUnits,
         uint256 baseTeacherSalaryUnits,
@@ -1018,6 +1404,25 @@ contract TeachingRegistryTest {
         courseTypeId = teaching.createTeachingCourseType(
             "Demo Teaching", baseSeatPriceUnits, baseTeacherSalaryUnits, researchShareBps
         );
+    }
+
+    function _deployTeachingRegistryWithPolicy(address policy)
+        internal
+        returns (TeachingRegistry invalidTeaching)
+    {
+        invalidTeaching = new TeachingRegistry(
+            authority,
+            coordinator,
+            treasury,
+            address(stable),
+            90 days,
+            30 days,
+            address(researchRegistry),
+            policy,
+            address(teachingToken)
+        );
+        VM.prank(authority);
+        teachingToken.setMinter(address(invalidTeaching));
     }
 
     function _createClass(
@@ -1194,5 +1599,82 @@ contract MockTeachingRewardSource {
     ) external {
         totalClaimAmount += claimAmount;
         totalDustUnits += dustUnits;
+    }
+}
+
+contract MismatchedClassSizeTeachingPolicy {
+    function quoteTeachingSession(
+        uint256 baseSeatPriceUnits,
+        uint256 baseTeacherSalaryUnits,
+        uint16,
+        uint16,
+        uint16
+    ) external pure returns (SparkTeachingTypes.TeachingQuote memory quote) {
+        quote.seatPriceUnits = baseSeatPriceUnits;
+        quote.classTeacherSalaryUnits = baseTeacherSalaryUnits;
+        quote.seatTeacherSalaryUnits = baseTeacherSalaryUnits;
+        quote.teacherBondUnits = baseTeacherSalaryUnits * 2;
+        quote.seatServiceReserveUnits = baseSeatPriceUnits - baseTeacherSalaryUnits;
+        quote.classSize = 1;
+    }
+}
+
+contract InsolventTeachingPolicy {
+    function quoteTeachingSession(uint256, uint256, uint16, uint16 classSize, uint16)
+        external
+        pure
+        returns (SparkTeachingTypes.TeachingQuote memory quote)
+    {
+        quote.seatPriceUnits = 100;
+        quote.classTeacherSalaryUnits = 100 * classSize;
+        quote.seatTeacherSalaryUnits = 100;
+        quote.teacherBondUnits = quote.classTeacherSalaryUnits * 2;
+        quote.seatResearchRewardUnits = 1;
+        quote.seatTeacherFaultResearchRewardUnits = 2;
+        quote.classSize = classSize;
+    }
+}
+
+contract PermissiveTeachingPolicy {
+    function quoteTeachingSession(
+        uint256 baseSeatPriceUnits,
+        uint256 baseTeacherSalaryUnits,
+        uint16,
+        uint16 classSize,
+        uint16
+    ) external pure returns (SparkTeachingTypes.TeachingQuote memory quote) {
+        quote.seatPriceUnits = baseSeatPriceUnits;
+        quote.classTeacherSalaryUnits = baseTeacherSalaryUnits * classSize;
+        quote.seatTeacherSalaryUnits = baseTeacherSalaryUnits;
+        quote.teacherBondUnits = quote.classTeacherSalaryUnits * 2;
+        quote.seatServiceReserveUnits = baseSeatPriceUnits - baseTeacherSalaryUnits;
+        quote.classSize = classSize;
+    }
+}
+
+contract OverflowingTeachingPolicy {
+    function quoteTeachingSession(
+        uint256 baseSeatPriceUnits,
+        uint256 baseTeacherSalaryUnits,
+        uint16,
+        uint16 classSize,
+        uint16
+    ) external pure returns (SparkTeachingTypes.TeachingQuote memory quote) {
+        if (classSize == 1) {
+            quote.seatPriceUnits = baseSeatPriceUnits;
+            quote.classTeacherSalaryUnits = baseTeacherSalaryUnits;
+            quote.seatTeacherSalaryUnits = baseTeacherSalaryUnits;
+            quote.teacherBondUnits = baseTeacherSalaryUnits * 2;
+            quote.seatServiceReserveUnits = baseSeatPriceUnits - baseTeacherSalaryUnits;
+            quote.classSize = 1;
+            return quote;
+        }
+
+        quote.seatPriceUnits = type(uint256).max;
+        quote.classTeacherSalaryUnits = classSize;
+        quote.seatTeacherSalaryUnits = 1;
+        quote.teacherBondUnits = classSize * 2;
+        quote.seatServiceReserveUnits = 1;
+        quote.classSize = classSize;
     }
 }

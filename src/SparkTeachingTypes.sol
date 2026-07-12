@@ -34,6 +34,7 @@ library SparkTeachingTypes {
         bool attendanceConfirmed;
         bool customerFault;
         bool refundClaimed;
+        // Retained for storage-layout compatibility; settled refunds are derived lazily.
         uint128 refundOwedUnits;
     }
 

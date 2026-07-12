@@ -30,7 +30,7 @@ Core contracts:
   customer fault, session-level teacher fault, and reward callback. A single-learner
   lesson uses one seat.
 - `TeachingRewardDistributor`: teaching reward pools and claim-pull distribution.
-- `TeachingPricingPolicyV1`: tiered teaching quote module for class sizes `1..100`.
+- `TeachingPricingPolicyV1`: power-law teaching quote module for class sizes `1..100`.
 - `TeachingNftToken`: non-transferable teaching token minted for each teaching session.
 - `ResearchPositionToken`: non-transferable registry-minted research position token.
 
@@ -54,8 +54,7 @@ future claims route to the treasury holder. Claim totals are tracked per stable 
 Stable assets are frozen when protocol objects are created. Reserves are tracked by stable
 asset, and authority withdrawals are limited to idle balance.
 
-Teaching pricing uses a power-law capacity multiplier approximated by the tier table
-in `TeachingPricingPolicyV1`.
+Teaching pricing uses a piecewise-linear approximation of a power-law capacity multiplier.
 
 ## Commands
 
@@ -71,6 +70,8 @@ npm run check:calibration
 
 `npm run check:calibration` regenerates Teaching lifecycle, class-size, and cost
 outputs. Generated outputs should not be edited by hand.
+Scenario tables use the single-seat lifecycle calibration; measured multi-seat costs are
+reported separately for class sizes `1`, `2`, `5`, `20`, `50`, and `100`.
 
 ## Deployment And Demos
 

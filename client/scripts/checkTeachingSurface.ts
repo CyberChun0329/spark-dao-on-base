@@ -204,7 +204,7 @@ const teachingCompatibilityNeedles = [
   "Fault refunds are per-seat claim-pull.",
   "Customer-fault teacher half wage follows the teacher payout redeem delay.",
   "Customer fault remains per-seat state inside a valid closed teaching session.",
-  "Clients should read teaching state through `getTeachingSessionState`, `getTeachingSeat`, and teaching reward distributor getters.",
+  "Clients should read teaching state through `getTeachingSessionState`, `getTeachingProgressState`, `getTeachingSeat`, and teaching reward distributor getters.",
   "Teaching events are the teaching event surface for demos.",
 ] as const;
 
@@ -219,6 +219,25 @@ const teachingApiUpgradeNeedle =
   "`TeachingRegistry` keeps the Teaching protocol surface while the session API supports";
 for (const path of ["docs/RUNBOOK.md", "src/README.md"] as const) {
   assertIncludes(readText(path), teachingApiUpgradeNeedle, path);
+}
+
+const teachingRegistry = readText("src/TeachingRegistry.sol");
+for (const needle of [
+  "function getTeachingProgressState",
+  "event TeachingAttendanceConfirmed",
+  "event TeachingDeliveryConfirmed",
+] as const) {
+  assertIncludes(teachingRegistry, needle, "TeachingRegistry.sol");
+}
+
+const teachingClient = readText("client/src/teaching.ts");
+for (const needle of [
+  "function getTeachingProgressState",
+  "function lockTeachingTeacherBond",
+  "function confirmTeachingAttendance",
+  "function confirmTeachingDelivery",
+] as const) {
+  assertIncludes(teachingClient, needle, "client/src/teaching.ts");
 }
 
 console.log("Teaching surface check passed");

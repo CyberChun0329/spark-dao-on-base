@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import type { Address } from "viem";
 import {
+  assertIntegerMatch,
   assertTokenMinterState,
   contractDescriptorFromArtifact,
   expectedAddressByKey,
@@ -145,4 +146,10 @@ test("manifest descriptor construction rejects artifacts without ABI", () => {
     () => contractDescriptorFromArtifact(manifest.contracts[0], {}),
     /artifact has no ABI/,
   );
+});
+
+test("integer compatibility checks accept viem number and bigint results", () => {
+  assert.doesNotThrow(() => assertIntegerMatch("policy version", 1, 1n));
+  assert.doesNotThrow(() => assertIntegerMatch("policy version", 1n, 1n));
+  assert.throws(() => assertIntegerMatch("policy version", 2, 1n), /version mismatch/);
 });

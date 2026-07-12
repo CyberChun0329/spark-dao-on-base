@@ -81,6 +81,18 @@ export async function getTeachingScheduleState(
   });
 }
 
+export async function getTeachingProgressState(
+  config: SparkDaoClientConfig,
+  teachingNftId: bigint,
+) {
+  const client = createTeachingClient(config);
+  return client.publicClient.readContract({
+    ...requireTeachingRegistry(client),
+    functionName: "getTeachingProgressState",
+    args: [teachingNftId],
+  });
+}
+
 export async function createTeachingCourseType(
   config: SparkDaoClientConfig,
   privateKey: Hex,
@@ -143,6 +155,52 @@ export async function payTeachingSeat(
     chain: config.chain,
     functionName: "payTeachingSeat",
     args: [teachingNftId, seatIndex],
+  });
+}
+
+export async function lockTeachingTeacherBond(
+  config: SparkDaoClientConfig,
+  privateKey: Hex,
+  teachingNftId: bigint,
+) {
+  const client = requireWallet(createTeachingClient(config, privateKey));
+  return client.walletClient.writeContract({
+    ...requireTeachingRegistry(client),
+    account: client.account,
+    chain: config.chain,
+    functionName: "lockTeachingTeacherBond",
+    args: [teachingNftId],
+  });
+}
+
+export async function confirmTeachingAttendance(
+  config: SparkDaoClientConfig,
+  privateKey: Hex,
+  teachingNftId: bigint,
+  seatIndex: number,
+) {
+  const client = requireWallet(createTeachingClient(config, privateKey));
+  return client.walletClient.writeContract({
+    ...requireTeachingRegistry(client),
+    account: client.account,
+    chain: config.chain,
+    functionName: "confirmTeachingAttendance",
+    args: [teachingNftId, seatIndex],
+  });
+}
+
+export async function confirmTeachingDelivery(
+  config: SparkDaoClientConfig,
+  privateKey: Hex,
+  teachingNftId: bigint,
+) {
+  const client = requireWallet(createTeachingClient(config, privateKey));
+  return client.walletClient.writeContract({
+    ...requireTeachingRegistry(client),
+    account: client.account,
+    chain: config.chain,
+    functionName: "confirmTeachingDelivery",
+    args: [teachingNftId],
   });
 }
 

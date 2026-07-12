@@ -76,8 +76,12 @@ function assertNumberMatch(label: string, actual: number, expected: number): voi
   }
 }
 
-function assertBigIntMatch(label: string, actual: bigint, expected: bigint): void {
-  if (actual !== expected) {
+export function assertIntegerMatch(
+  label: string,
+  actual: number | bigint,
+  expected: bigint,
+): void {
+  if (BigInt(actual) !== expected) {
     throw new Error(`${label} mismatch: actual=${actual}, expected=${expected}`);
   }
 }
@@ -313,15 +317,15 @@ async function readBool(
   })) as boolean;
 }
 
-async function readBigInt(
+async function readInteger(
   client: SparkDaoClient,
   contract: SparkDaoContractDescriptor,
   functionName: string,
-): Promise<bigint> {
+): Promise<number | bigint> {
   return (await client.publicClient.readContract({
     ...contract,
     functionName,
-  })) as bigint;
+  })) as number | bigint;
 }
 
 async function checkOnchainCompatibility(
@@ -417,12 +421,12 @@ async function checkOnchainCompatibility(
     config.addresses.researchRegistry,
   );
 
-  const pricingPolicyVersion = await readBigInt(
+  const pricingPolicyVersion = await readInteger(
     client,
     pricingPolicy,
     "TEACHING_PRICING_POLICY_VERSION",
   );
-  assertBigIntMatch("teaching pricing policy version", pricingPolicyVersion, 1n);
+  assertIntegerMatch("teaching pricing policy version", pricingPolicyVersion, 1n);
 
   await checkTokenMinterLocks(
     client,

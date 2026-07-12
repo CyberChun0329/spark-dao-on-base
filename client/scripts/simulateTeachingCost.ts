@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 
 const calibrationSchemaVersion = 2;
+const lifecycleCalibrationClassSize = 1;
 
 type TeachingGasRow = {
   path: string;
@@ -1013,9 +1014,9 @@ These rows measure ordinary no-research Teaching sessions with all seats paid an
 
 ${classSizeTable.join("\n")}
 
-## Coordinator-Extended Scenario Simulation
+## Single-Seat Coordinator-Extended Scenario Simulation
 
-Values use the reference fee coefficient at \`1x\`.
+Values use the \`classSize = ${lifecycleCalibrationClassSize}\` lifecycle calibration and the reference fee coefficient at \`1x\`. Measured multi-seat scaling is reported in the class-size table above.
 
 ${scenarioTable.join("\n")}
 
@@ -1060,6 +1061,7 @@ writeFileSync(
   JSON.stringify(
     {
       calibrationSchemaVersion,
+      lifecycleCalibrationClassSize,
       gasRows,
       followupGasRows,
       classSizeGasRows,

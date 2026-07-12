@@ -30,11 +30,11 @@ contract TeachingPricingPolicyV1 {
             revert SparkDaoErrors.InvalidResearchShareBps();
         }
 
-        (uint16 seatPriceBps, uint16 teacherSalaryBps) = _tierBps(classSize);
-        uint256 tierSeatPriceUnits =
+        (uint16 seatPriceBps, uint16 teacherSalaryBps) = _powerLawBps(classSize);
+        uint256 scaledSeatPriceUnits =
             (baseSeatPriceUnits * seatPriceBps) / SparkDaoTypes.BASIS_POINTS_DENOMINATOR;
         quote.seatPriceUnits =
-            (tierSeatPriceUnits * customerDiscountBps) / SparkDaoTypes.BASIS_POINTS_DENOMINATOR;
+            (scaledSeatPriceUnits * customerDiscountBps) / SparkDaoTypes.BASIS_POINTS_DENOMINATOR;
         quote.classTeacherSalaryUnits =
             (baseTeacherSalaryUnits * teacherSalaryBps) / SparkDaoTypes.BASIS_POINTS_DENOMINATOR;
         quote.seatTeacherSalaryUnits = quote.classTeacherSalaryUnits / classSize;
@@ -61,18 +61,38 @@ contract TeachingPricingPolicyV1 {
         quote.classSize = classSize;
     }
 
-    function _tierBps(uint16 classSize)
+    function _powerLawBps(uint16 classSize)
         internal
         pure
         returns (uint16 seatPriceBps, uint16 teacherSalaryBps)
     {
-        if (classSize == 1) return (10_000, 10_000);
-        if (classSize == 2) return (8_000, 12_500);
-        if (classSize <= 5) return (6_250, 16_000);
-        if (classSize <= 10) return (4_444, 22_500);
-        if (classSize <= 20) return (3_510, 28_500);
-        if (classSize <= 35) return (2_860, 35_000);
-        if (classSize <= 50) return (2_222, 45_000);
-        return (2_000, 50_000);
+        teacherSalaryBps = _capacityMultiplierBps(classSize);
+        // m(n) scales total salary while its reciprocal scales the per-seat price.
+        // forge-lint: disable-next-line(unsafe-typecast)
+        seatPriceBps = uint16(100_000_000 / teacherSalaryBps);
+    }
+
+    function _capacityMultiplierBps(uint16 classSize) internal pure returns (uint16) {
+        if (classSize <= 2) return _interpolate(classSize, 1, 10_000, 2, 12_746);
+        if (classSize <= 5) return _interpolate(classSize, 2, 12_746, 5, 17_565);
+        if (classSize <= 10) return _interpolate(classSize, 5, 17_565, 10, 22_387);
+        if (classSize <= 20) return _interpolate(classSize, 10, 22_387, 20, 28_534);
+        if (classSize <= 35) return _interpolate(classSize, 20, 28_534, 35, 34_708);
+        if (classSize <= 50) return _interpolate(classSize, 35, 34_708, 50, 39_322);
+        return _interpolate(classSize, 50, 39_322, 100, 50_119);
+    }
+
+    function _interpolate(
+        uint16 classSize,
+        uint16 lowerClassSize,
+        uint16 lowerMultiplierBps,
+        uint16 upperClassSize,
+        uint16 upperMultiplierBps
+    ) internal pure returns (uint16) {
+        uint256 offset = classSize - lowerClassSize;
+        uint256 span = upperClassSize - lowerClassSize;
+        uint256 delta = upperMultiplierBps - lowerMultiplierBps;
+        // forge-lint: disable-next-line(unsafe-typecast)
+        return uint16(uint256(lowerMultiplierBps) + (delta * offset) / span);
     }
 }

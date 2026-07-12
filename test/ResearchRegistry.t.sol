@@ -461,6 +461,36 @@ contract ResearchRegistryTest {
         assertTrue(afterBalance == beforeBalance + 500_000);
     }
 
+    function testMaximumRewardUnlockDelayDoesNotOverflowRevenueEscrowCreation() public {
+        VM.prank(coordinator);
+        uint64 assetId = registry.createResearchAsset("Max Unlock", "ipfs://max-unlock");
+
+        VM.prank(coordinator);
+        uint64 positionId = registry.createPatchPosition(
+            SparkDaoTypes.CreatePatchPositionParams({
+                assetId: assetId,
+                layerIndex: 1,
+                layerShareBps: 10_000,
+                buybackFloor: 100 ether,
+                decayWaitSeconds: 365 days,
+                decayPeriodSeconds: 365 days,
+                decayRateBps: 5_000,
+                beneficiary: contributorOne
+            })
+        );
+
+        VM.prank(coordinator);
+        registry.sealLayer(assetId, 1);
+
+        VM.startPrank(authority);
+        registry.updateRewardUnlockSeconds(type(uint64).max);
+        stable.approve(address(registry), 500_000);
+        registry.createRevenueEscrow(assetId, positionId, 500_000);
+        VM.stopPrank();
+
+        assertTrue(registry.getVaultReservedUnits(address(stable)) == 500_000);
+    }
+
     function testClaimAccountingSeparatesStableAssetsForOnePosition() public {
         VM.prank(coordinator);
         uint64 assetId = registry.createResearchAsset("Multi Stable", "ipfs://multi-stable");

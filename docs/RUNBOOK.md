@@ -96,9 +96,13 @@ Single-learner lessons use the teaching path with one seat.
 - Attendance auto-close requires paid attendance over half of total `classSize`.
 - Attendance and teacher delivery can be confirmed only at or after `scheduledAt`.
 - Attendance auto-close has no upper time window after `scheduledAt`; coordinator fallback starts after the timeout.
-- Customer fault remains per-seat state inside a valid closed teaching session. It is coordinator-only, must be marked while the session is open, and requires a paid seat.
-- Clients should read teaching state through `getTeachingSessionState`, `getTeachingSeat`, and teaching reward distributor getters.
+- Customer fault remains per-seat state inside a valid closed teaching session. It is coordinator-only, must be marked while the session is open, and requires a paid seat and locked teacher bond.
+- Clients should read teaching state through `getTeachingSessionState`, `getTeachingProgressState`, `getTeachingSeat`, and teaching reward distributor getters.
 - Teaching events are the teaching event surface for demos.
+
+Teaching reward entitlement is frozen from research state immediately before the scheduled
+second. Cost scenario tables use the single-seat lifecycle calibration; the class-size table
+contains measured ordinary-session paths for `1`, `2`, `5`, `20`, `50`, and `100` seats.
 
 Use `getResearchPositionClaimedUnitsFor` for claim totals by stable asset.
 
