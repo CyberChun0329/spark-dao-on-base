@@ -23,6 +23,10 @@ contract ResearchRegistry is SparkDaoConfig {
             uint64 positionId => mapping(uint64 revenueId => SparkDaoTypes.RevenueEscrow)
         )
     ) internal revenueEscrows;
+    mapping(
+        uint64 assetId
+            => mapping(uint64 positionId => mapping(address stableAsset => uint128 claimedUnits))
+    ) internal researchPositionClaimedUnitsByStableAsset;
 
     event ResearchAssetCreated(
         uint64 indexed assetId, address indexed createdBy, string title, string metadataUri
@@ -132,6 +136,15 @@ contract ResearchRegistry is SparkDaoConfig {
         SparkDaoTypes.ResearchPosition memory position = researchPositions[assetId][positionId];
         if (!position.exists) revert SparkDaoErrors.PositionNotFound();
         return position;
+    }
+
+    function getResearchPositionClaimedUnitsFor(
+        uint64 assetId,
+        uint64 positionId,
+        address stableAsset
+    ) external view returns (uint256) {
+        _requirePosition(assetId, positionId);
+        return researchPositionClaimedUnitsByStableAsset[assetId][positionId][stableAsset];
     }
 
     function getTeachingRewardPosition(uint64 assetId, uint64 positionId)
@@ -279,8 +292,8 @@ contract ResearchRegistry is SparkDaoConfig {
 
         position.isActivated = true;
         position.activatedAt = nowTs;
-        position.buybackUnlockAt = nowTs + position.buybackWaitSeconds;
-        position.decayStartAt = nowTs + position.decayWaitSeconds;
+        position.buybackUnlockAt = _saturatingTimestampAdd(nowTs, position.buybackWaitSeconds);
+        position.decayStartAt = _saturatingTimestampAdd(nowTs, position.decayWaitSeconds);
 
         asset.currentLayerPositionCount += 1;
         asset.currentLayerShareBpsTotal = updatedShareTotal;
@@ -424,8 +437,8 @@ contract ResearchRegistry is SparkDaoConfig {
 
             position.isActivated = true;
             position.activatedAt = nowTs;
-            position.buybackUnlockAt = nowTs + position.buybackWaitSeconds;
-            position.decayStartAt = nowTs + position.decayWaitSeconds;
+            position.buybackUnlockAt = _saturatingTimestampAdd(nowTs, position.buybackWaitSeconds);
+            position.decayStartAt = _saturatingTimestampAdd(nowTs, position.decayWaitSeconds);
             unchecked {
                 ++i;
             }
@@ -516,7 +529,7 @@ contract ResearchRegistry is SparkDaoConfig {
         if (block.timestamp < escrow.unlockAt) revert SparkDaoErrors.RevenueStillLocked();
 
         escrow.claimed = true;
-        position.totalClaimedUnits = _toUint128(uint256(position.totalClaimedUnits) + escrow.amount);
+        _recordClaimedUnits(position, assetId, positionId, escrow.stableAsset, escrow.amount);
         _releaseVaultUnits(escrow.stableAsset, escrow.amount);
 
         _safeTransfer(escrow.stableAsset, msg.sender, escrow.amount);
@@ -544,17 +557,17 @@ contract ResearchRegistry is SparkDaoConfig {
         totalEffectiveShareBps = _snapshotEffectiveShareBps(assetId, snapshotAt);
     }
 
-    function recordTeachingRewardClaim(uint64 assetId, uint64 positionId, uint256 claimAmount)
-        external
-    {
+    function recordTeachingRewardClaim(
+        uint64 assetId,
+        uint64 positionId,
+        address stableAsset,
+        uint256 claimAmount
+    ) external {
         if (msg.sender != teachingRegistry) {
             revert SparkDaoErrors.UnauthorizedTeachingRegistry();
         }
         SparkDaoTypes.ResearchPosition storage position = _requirePosition(assetId, positionId);
-        if (claimAmount != 0) {
-            position.totalClaimedUnits =
-                _toUint128(uint256(position.totalClaimedUnits) + claimAmount);
-        }
+        _recordClaimedUnits(position, assetId, positionId, stableAsset, claimAmount);
     }
 
     function fundDaoVault(uint256 amount) external onlyAuthority {
@@ -712,5 +725,36 @@ contract ResearchRegistry is SparkDaoConfig {
         if (value > type(uint128).max) revert SparkDaoErrors.InvalidAmount();
         // forge-lint: disable-next-line(unsafe-typecast)
         return uint128(value);
+    }
+
+    function _recordClaimedUnits(
+        SparkDaoTypes.ResearchPosition storage position,
+        uint64 assetId,
+        uint64 positionId,
+        address stableAsset,
+        uint256 claimAmount
+    ) internal {
+        if (claimAmount == 0) return;
+
+        uint128 stableAssetClaimedUnits =
+            researchPositionClaimedUnitsByStableAsset[assetId][positionId][stableAsset];
+        researchPositionClaimedUnitsByStableAsset[assetId][positionId][stableAsset] =
+            _toUint128(uint256(stableAssetClaimedUnits) + claimAmount);
+
+        uint256 aggregateClaimedUnits = uint256(position.totalClaimedUnits) + claimAmount;
+        position.totalClaimedUnits = aggregateClaimedUnits > type(uint128).max
+            ? type(uint128).max
+            : _toUint128(aggregateClaimedUnits);
+    }
+
+    function _saturatingTimestampAdd(uint64 timestamp, uint64 offset)
+        internal
+        pure
+        returns (uint64)
+    {
+        uint256 result = uint256(timestamp) + offset;
+        if (result > type(uint64).max) return type(uint64).max;
+        // forge-lint: disable-next-line(unsafe-typecast)
+        return uint64(result);
     }
 }

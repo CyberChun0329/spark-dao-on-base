@@ -1,8 +1,8 @@
 path,gas
 createResearchAsset,218269
-createPatchPosition_current,295165
+createPatchPosition_current,295305
 sealLayer_current,3959
 createPatchPosition_prepared,259267
 sealLayer_prepared,3994
 approveEarlyDecay,29933
-advanceLayer,54892
+advanceLayer,55032

@@ -21,7 +21,7 @@
     "deploy:registry": "forge script script/DeployRegistry.s.sol:DeployRegistry --rpc-url $BASE_RPC_URL --broadcast",
     "deploy:set-minters": "forge script script/SetTokenMinters.s.sol:SetTokenMinters --rpc-url $BASE_RPC_URL --broadcast",
     "demo:research": "forge script script/DemoResearch.s.sol:DemoResearch --rpc-url $BASE_RPC_URL --broadcast",
-    "demo:teaching": "forge script script/DemoTeaching.s.sol:DemoTeaching --rpc-url $BASE_RPC_URL --broadcast"
+    "demo:teaching": "forge script script/DemoTeaching.s.sol:DemoTeaching"
   },
   "dependencies": {
     "dotenv": "^17.2.3",

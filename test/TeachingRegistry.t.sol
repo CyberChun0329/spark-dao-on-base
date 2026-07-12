@@ -476,6 +476,29 @@ contract TeachingRegistryTest {
         teaching.confirmTeachingAttendance(teachingNftId, 0);
     }
 
+    function testAttendanceCannotBeConfirmedBeforeScheduledAt() public {
+        uint64 courseTypeId = _createCourseType(1_000_000, 400_000, 0);
+        address[] memory students = _students(1);
+        uint64 teachingNftId =
+            _createClass(courseTypeId, students, _emptyAssetIds(), _emptyWeights());
+        _paySeat(teachingNftId, students[0], 0);
+
+        VM.expectRevert(SparkDaoErrors.TeachingCompletionTooEarly.selector);
+        VM.prank(students[0]);
+        teaching.confirmTeachingAttendance(teachingNftId, 0);
+    }
+
+    function testDeliveryCannotBeConfirmedBeforeScheduledAt() public {
+        uint64 courseTypeId = _createCourseType(1_000_000, 400_000, 0);
+        address[] memory students = _students(1);
+        uint64 teachingNftId =
+            _createClass(courseTypeId, students, _emptyAssetIds(), _emptyWeights());
+
+        VM.expectRevert(SparkDaoErrors.TeachingCompletionTooEarly.selector);
+        VM.prank(teacher);
+        teaching.confirmTeachingDelivery(teachingNftId);
+    }
+
     function testCreateTeachingRejectsPastOrCurrentScheduledAt() public {
         uint64 courseTypeId = _createCourseType(1_000_000, 400_000, 0);
         address[] memory students = _students(1);
@@ -558,6 +581,7 @@ contract TeachingRegistryTest {
             _createClass(courseTypeId, students, _emptyAssetIds(), _emptyWeights());
 
         _paySeat(teachingNftId, students[0], 0);
+        _warpPastTeachingSchedule();
         VM.prank(students[0]);
         teaching.confirmTeachingAttendance(teachingNftId, 0);
         VM.prank(students[0]);
@@ -649,6 +673,11 @@ contract TeachingRegistryTest {
         SparkDaoTypes.ResearchPosition memory position =
             researchRegistry.getResearchPosition(assetId, positionId);
         assertTrue(position.totalClaimedUnits == 2_000_000);
+        assertTrue(
+            researchRegistry.getResearchPositionClaimedUnitsFor(
+                    assetId, positionId, address(stable)
+                ) == 2_000_000
+        );
     }
 
     function testMixedCustomerFaultSeatsKeepRefundsIndependent() public {

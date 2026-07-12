@@ -462,6 +462,9 @@ contract TeachingRegistry is SparkDaoConfig {
         SparkTeachingTypes.TeachingSeat storage seat = _requireSeat(session, seatIndex);
         if (seat.student != msg.sender) revert SparkDaoErrors.UnauthorizedCustomer();
         if (!seat.paid) revert SparkDaoErrors.TeachingSeatNotPaid();
+        if (block.timestamp < session.scheduledAt) {
+            revert SparkDaoErrors.TeachingCompletionTooEarly();
+        }
         if (!seat.attendanceConfirmed) {
             seat.attendanceConfirmed = true;
             if (!seat.customerFault) {
@@ -475,6 +478,9 @@ contract TeachingRegistry is SparkDaoConfig {
         SparkTeachingTypes.TeachingSession storage session = _requireOpenTeaching(teachingNftId);
         _assertTeachingScheduleConfirmed(session);
         if (session.teacher != msg.sender) revert SparkDaoErrors.UnauthorizedTeacher();
+        if (block.timestamp < session.scheduledAt) {
+            revert SparkDaoErrors.TeachingCompletionTooEarly();
+        }
         session.teacherDeliveryConfirmed = true;
         _autoCloseTeachingValidIfReady(session);
     }
@@ -585,7 +591,7 @@ contract TeachingRegistry is SparkDaoConfig {
         }
 
         IResearchRegistryForTeaching(RESEARCH_REGISTRY)
-            .recordTeachingRewardClaim(assetId, positionId, claimAmount);
+            .recordTeachingRewardClaim(assetId, positionId, stableAsset, claimAmount);
         uint256 releasedUnits = claimAmount + dustUnits;
         if (releasedUnits != 0) {
             _releaseVaultUnits(stableAsset, releasedUnits);

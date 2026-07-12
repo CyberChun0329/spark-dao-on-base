@@ -41,14 +41,15 @@ the distributor, and the current research-position holder claims later.
 
 Teaching sessions are scheduled by teacher and coordinator confirmation. Valid sessions can
 close through coordinator fallback after the timeout, or automatically after `scheduledAt`
-when teacher delivery and paid attendance over half of `classSize` are recorded.
+when teacher delivery and paid attendance over half of `classSize` are recorded. Attendance
+and delivery confirmations are accepted only at or after `scheduledAt`.
 
 On valid close, paid seats that are not marked customer-fault are treated as completed
 seats and receive no refund. Customer fault is coordinator-marked while the session is
 open and requires a paid seat.
 
 Research claim rights follow current holder state. If a position is bought back by the DAO,
-future claims route to the treasury holder.
+future claims route to the treasury holder. Claim totals are tracked per stable asset.
 
 Stable assets are frozen when protocol objects are created. Reserves are tracked by stable
 asset, and authority withdrawals are limited to idle balance.
@@ -83,6 +84,9 @@ Local demos:
 
 - `DemoResearch.s.sol`
 - `DemoTeaching.s.sol`
+
+`demo:teaching` is a self-contained local EVM simulation. Persistent local deployments use
+the deployment scripts above.
 
 The registry deployment script wires the teaching stack. Use `classSize = 1`
 for a single-learner lesson.

@@ -31,6 +31,10 @@ interface IResearchRegistryForTeaching {
         view
         returns (uint16 snapshotActiveLayer, uint16 totalEffectiveShareBps);
 
-    function recordTeachingRewardClaim(uint64 assetId, uint64 positionId, uint256 claimAmount)
-        external;
+    function recordTeachingRewardClaim(
+        uint64 assetId,
+        uint64 positionId,
+        address stableAsset,
+        uint256 claimAmount
+    ) external;
 }

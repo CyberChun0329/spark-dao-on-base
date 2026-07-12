@@ -16,6 +16,7 @@ interface Vm {
     function addr(uint256 privateKey) external returns (address);
     function startBroadcast(uint256 privateKey) external;
     function stopBroadcast() external;
+    function warp(uint256 timestamp) external;
 }
 
 contract DemoTeaching {
@@ -154,8 +155,18 @@ contract DemoTeaching {
         teaching.payTeachingSeat(teachingNftId, 1);
         VM.stopBroadcast();
 
-        VM.startBroadcast(coordinatorPk);
-        teaching.coordinatorCloseTeachingValid(teachingNftId, 1);
+        VM.warp(block.timestamp + 1);
+
+        VM.startBroadcast(customerPk);
+        teaching.confirmTeachingAttendance(teachingNftId, 0);
+        VM.stopBroadcast();
+
+        VM.startBroadcast(contributorTwoPk);
+        teaching.confirmTeachingAttendance(teachingNftId, 1);
+        VM.stopBroadcast();
+
+        VM.startBroadcast(teacherPk);
+        teaching.confirmTeachingDelivery(teachingNftId);
         VM.stopBroadcast();
 
         VM.startBroadcast(contributorOnePk);

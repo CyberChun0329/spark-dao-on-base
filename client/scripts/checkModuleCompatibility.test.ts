@@ -2,8 +2,10 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import type { Address } from "viem";
 import {
+  assertTokenMinterState,
   contractDescriptorFromArtifact,
   expectedAddressByKey,
+  expectedTokenMinterAddress,
 } from "./checkModuleCompatibility.js";
 import type { ModuleCompatibilityManifest } from "./checkModuleCompatibility.js";
 
@@ -71,6 +73,59 @@ test("env token address remains authoritative when both env and manifest provide
   };
 
   assert.equal(expectedAddressByKey(config, manifest, "researchPositionToken"), ENV_TOKEN);
+});
+
+test("token minter expectations follow the registry wiring", () => {
+  const config = {
+    rpcUrl: "http://127.0.0.1:8545",
+    chain: { id: 84532, name: "base-sepolia" },
+    addresses: {
+      researchRegistry: RESEARCH_REGISTRY,
+      teachingRegistry: TEACHING_REGISTRY,
+      teachingRewardDistributor: TEACHING_REWARD_DISTRIBUTOR,
+      teachingPricingPolicy: TEACHING_PRICING_POLICY,
+    },
+  };
+
+  assert.equal(
+    expectedTokenMinterAddress(config, "researchPositionToken"),
+    RESEARCH_REGISTRY,
+  );
+  assert.equal(
+    expectedTokenMinterAddress(config, "teachingNftToken"),
+    TEACHING_REGISTRY,
+  );
+});
+
+test("token minter state requires the expected locked minter", () => {
+  assert.doesNotThrow(() =>
+    assertTokenMinterState(
+      "research position token",
+      RESEARCH_REGISTRY,
+      RESEARCH_REGISTRY,
+      true,
+    ),
+  );
+  assert.throws(
+    () =>
+      assertTokenMinterState(
+        "research position token",
+        ENV_TOKEN,
+        RESEARCH_REGISTRY,
+        true,
+      ),
+    /minter mismatch/,
+  );
+  assert.throws(
+    () =>
+      assertTokenMinterState(
+        "research position token",
+        RESEARCH_REGISTRY,
+        RESEARCH_REGISTRY,
+        false,
+      ),
+    /minter is not locked/,
+  );
 });
 
 test("manifest entry and artifact ABI can construct a read descriptor", () => {

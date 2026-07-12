@@ -76,6 +76,12 @@ function assertNumberMatch(label: string, actual: number, expected: number): voi
   }
 }
 
+function assertBigIntMatch(label: string, actual: bigint, expected: bigint): void {
+  if (actual !== expected) {
+    throw new Error(`${label} mismatch: actual=${actual}, expected=${expected}`);
+  }
+}
+
 function isAddress(value: string): value is Address {
   return /^0x[a-fA-F0-9]{40}$/.test(value);
 }
@@ -224,6 +230,27 @@ export function expectedAddressByKey(
   return addressByKey(config, key) ?? manifestEntryByKey(manifest, key)?.address;
 }
 
+export function expectedTokenMinterAddress(
+  config: SparkDaoClientConfig,
+  key: "researchPositionToken" | "teachingNftToken",
+): Address {
+  return key === "researchPositionToken"
+    ? config.addresses.researchRegistry
+    : config.addresses.teachingRegistry;
+}
+
+export function assertTokenMinterState(
+  label: string,
+  actualMinter: Address,
+  expectedMinter: Address,
+  minterLocked: boolean,
+): void {
+  assertAddressMatch(`${label} minter`, actualMinter, expectedMinter);
+  if (!minterLocked) {
+    throw new Error(`${label} minter is not locked`);
+  }
+}
+
 export function contractDescriptorFromArtifact(
   entry: ManifestContract,
   artifact: ArtifactJson,
@@ -286,6 +313,17 @@ async function readBool(
   })) as boolean;
 }
 
+async function readBigInt(
+  client: SparkDaoClient,
+  contract: SparkDaoContractDescriptor,
+  functionName: string,
+): Promise<bigint> {
+  return (await client.publicClient.readContract({
+    ...contract,
+    functionName,
+  })) as bigint;
+}
+
 async function checkOnchainCompatibility(
   config: SparkDaoClientConfig,
   client: SparkDaoClient,
@@ -333,6 +371,24 @@ async function checkOnchainCompatibility(
     );
   }
 
+  const expectedResearchPositionToken = expectedAddressByKey(
+    config,
+    manifest,
+    "researchPositionToken",
+  );
+  if (expectedResearchPositionToken) {
+    const moduleResearchPositionToken = await readAddress(
+      client,
+      client.contracts.researchRegistry,
+      "RESEARCH_POSITION_TOKEN",
+    );
+    assertAddressMatch(
+      "research registry research position token",
+      moduleResearchPositionToken,
+      expectedResearchPositionToken,
+    );
+  }
+
   const researchTeachingRegistry = await readAddress(
     client,
     client.contracts.researchRegistry,
@@ -361,17 +417,26 @@ async function checkOnchainCompatibility(
     config.addresses.researchRegistry,
   );
 
+  const pricingPolicyVersion = await readBigInt(
+    client,
+    pricingPolicy,
+    "TEACHING_PRICING_POLICY_VERSION",
+  );
+  assertBigIntMatch("teaching pricing policy version", pricingPolicyVersion, 1n);
+
   await checkTokenMinterLocks(
     client,
     manifest,
     "researchPositionToken",
     "research position token",
+    expectedTokenMinterAddress(config, "researchPositionToken"),
   );
   await checkTokenMinterLocks(
     client,
     manifest,
     "teachingNftToken",
     "teaching NFT token",
+    expectedTokenMinterAddress(config, "teachingNftToken"),
   );
 
   if (manifest) {
@@ -384,13 +449,13 @@ async function checkTokenMinterLocks(
   manifest: ModuleCompatibilityManifest | undefined,
   key: "researchPositionToken" | "teachingNftToken",
   label: string,
+  expectedMinter: Address,
 ): Promise<void> {
   const token = contractByKeyOrManifest(client, manifest, key);
   if (!token) return;
+  const minter = await readAddress(client, token, "minter");
   const minterLocked = await readBool(client, token, "minterLocked");
-  if (!minterLocked) {
-    throw new Error(`${label} minter is not locked`);
-  }
+  assertTokenMinterState(label, minter, expectedMinter, minterLocked);
 }
 
 async function checkManifestAgainstChain(

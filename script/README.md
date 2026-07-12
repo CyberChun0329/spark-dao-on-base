@@ -52,14 +52,15 @@ npm run check:module-compatibility
 
 ## Demos
 
-- `DemoResearch.s.sol`: local research registry path
-- `DemoTeaching.s.sol`: local teaching and reward claim path
+- `DemoResearch.s.sol`: local research registry broadcast path
+- `DemoTeaching.s.sol`: self-contained teaching and reward claim simulation
 
-Demo scripts deploy temporary mock stable assets and local protocol contracts. They are
-for local execution, not production deployment.
+Demo scripts deploy temporary mock stable assets and protocol contracts. The Teaching demo
+runs in Forge's local EVM and does not persist state. Use the deployment scripts for a
+persistent local chain.
 
-The teaching demo uses the teaching-session path. A single-learner lesson is represented as a
-teaching class with one seat.
+The teaching demo closes a two-seat session through post-schedule attendance majority and
+teacher delivery. A single-learner lesson is represented as a teaching session with one seat.
 
 Required demo keys:
 

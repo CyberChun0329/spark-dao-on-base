@@ -60,6 +60,20 @@ export async function getResearchPosition(
   });
 }
 
+export async function getResearchPositionClaimedUnitsFor(
+  config: SparkDaoClientConfig,
+  assetId: bigint,
+  positionId: bigint,
+  stableAsset: Address,
+) {
+  const client = createResearchClient(config);
+  return client.publicClient.readContract({
+    ...client.contracts.researchRegistry,
+    functionName: "getResearchPositionClaimedUnitsFor",
+    args: [assetId, positionId, stableAsset],
+  });
+}
+
 export async function createResearchAsset(
   config: SparkDaoClientConfig,
   privateKey: Hex,

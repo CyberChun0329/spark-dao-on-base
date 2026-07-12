@@ -6,6 +6,8 @@ Solidity contracts for the Base implementation.
 
 `ResearchRegistry` owns research assets, contribution positions, direct revenue escrow,
 buybacks, reward-claim accounting, and research-side reserves.
+Claim totals are tracked per position and stable asset; `totalClaimedUnits` is a capped raw
+aggregate retained for compatibility.
 
 `ResearchPositionToken` is a registry-minted non-transferable position token. User
 transfers revert; protocol-mediated movement is handled by the registry.
@@ -17,7 +19,8 @@ its own refund. Customer fault is per-seat. Teacher fault is session-level.
 Schedules are confirmed by the teacher and coordinator. Valid sessions may close by
 coordinator fallback after the timeout, or automatically after `scheduledAt` when teacher
 delivery and paid attendance over half of `classSize` are recorded. Paid, unmarked,
-non-attending seats are completed seats with no refund.
+non-attending seats are completed seats with no refund. Attendance and delivery cannot be
+confirmed before `scheduledAt`.
 
 Customer fault is coordinator-only, must be marked while the session is open, and requires a
 paid seat.
@@ -46,7 +49,7 @@ One-time wiring calls:
 - token minters for `ResearchPositionToken` and teaching `TeachingNftToken`
 
 The teaching distributor calls back into `TeachingRegistry` to release reserved units
-and record research-position claim totals.
+and record research-position claim totals for the pool's frozen stable asset.
 
 ## Stable Assets
 

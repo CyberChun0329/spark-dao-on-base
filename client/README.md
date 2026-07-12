@@ -32,11 +32,12 @@ Validate the example manifest without chain access:
 npm run check:module-compatibility:example
 ```
 
-`check:module-compatibility` checks deployed wiring and optional bytecode hashes.
+`check:module-compatibility` checks deployed wiring, token minters and locks, pricing policy
+version, and optional bytecode hashes.
 
 ## Helpers
 
-- `research.ts`: research registry reads
+- `research.ts`: research registry reads, including per-stable claim totals
 - `teaching.ts`: teaching reads, schedule confirmation, seat actions, settlement calls,
   and claims
 - `inspect.ts`: read-only environment inspection

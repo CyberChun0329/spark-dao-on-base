@@ -290,6 +290,12 @@ contract TeachingSingleSeatCompatibilityTest {
         assertEq(
             researchRegistry.getResearchPosition(assetId, positionId).totalClaimedUnits, 100_000
         );
+        assertEq(
+            researchRegistry.getResearchPositionClaimedUnitsFor(
+                assetId, positionId, address(stable)
+            ),
+            100_000
+        );
     }
 
     function testClassSizeOneBoughtBackRewardRoutesToTreasury() public {

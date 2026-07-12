@@ -140,7 +140,7 @@ assertIncludes(
 );
 if (
   packageJson.scripts?.["demo:teaching"]
-  !== "forge script script/DemoTeaching.s.sol:DemoTeaching --rpc-url $BASE_RPC_URL --broadcast"
+  !== "forge script script/DemoTeaching.s.sol:DemoTeaching"
 ) {
   throw new Error("package.json is missing demo:teaching");
 }
@@ -155,6 +155,21 @@ assertIncludes(
   "teachingNftToken",
   "client/module-compatibility.example.json",
 );
+
+const moduleCompatibilityChecker = requireText("client/scripts/checkModuleCompatibility.ts");
+for (const requiredCheck of [
+  "RESEARCH_POSITION_TOKEN",
+  "TEACHING_PRICING_POLICY_VERSION",
+  "expectedTokenMinterAddress",
+  'readAddress(client, token, "minter")',
+  'readBool(client, token, "minterLocked")',
+]) {
+  assertIncludes(
+    moduleCompatibilityChecker,
+    requiredCheck,
+    "checkModuleCompatibility.ts",
+  );
+}
 
 const foundryToml = requireText("foundry.toml");
 for (const outputPath of [

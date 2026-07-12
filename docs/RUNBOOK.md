@@ -81,6 +81,9 @@ Teaching path:
 npm run demo:teaching
 ```
 
+The Teaching demo is a self-contained EVM simulation. It does not persist contracts to the
+configured RPC chain.
+
 Single-learner lessons use the teaching path with one seat.
 `TeachingRegistry` keeps the Teaching protocol surface while the session API supports
 `classSize` and per-seat accounting for fresh deployments.
@@ -91,10 +94,13 @@ Single-learner lessons use the teaching path with one seat.
 - Customer-fault teacher half wage follows the teacher payout redeem delay.
 - Valid close treats paid, unmarked, non-attending seats as completed seats with no refund.
 - Attendance auto-close requires paid attendance over half of total `classSize`.
+- Attendance and teacher delivery can be confirmed only at or after `scheduledAt`.
 - Attendance auto-close has no upper time window after `scheduledAt`; coordinator fallback starts after the timeout.
 - Customer fault remains per-seat state inside a valid closed teaching session. It is coordinator-only, must be marked while the session is open, and requires a paid seat.
 - Clients should read teaching state through `getTeachingSessionState`, `getTeachingSeat`, and teaching reward distributor getters.
 - Teaching events are the teaching event surface for demos.
+
+Use `getResearchPositionClaimedUnitsFor` for claim totals by stable asset.
 
 Read-only inspection:
 

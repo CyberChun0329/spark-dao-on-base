@@ -10,7 +10,7 @@
   "inputFiles": [
     {
       "path": "teaching_gas_calibration.csv",
-      "sha256": "1232da60c627e579afa98bccf10f509372ca29749cdc7ddae09225a7c38e85f8"
+      "sha256": "df111820d1f5cbabb659124b6ea33e6af6df454543cdd1f20a8c5922294539f1"
     },
     {
       "path": "teaching_followup_gas_calibration.csv",
@@ -18,11 +18,11 @@
     },
     {
       "path": "teaching_class_size_gas_calibration.csv",
-      "sha256": "2cb7a11061a4d76dd495812300f4f46a0471d44a9f979b36a140725c62dc2dfd"
+      "sha256": "f08e1b47d6aaf6977867d06c4d0b89341ebd8420ba26560255cddeabc0584a32"
     },
     {
       "path": "research_gas_calibration.csv",
-      "sha256": "7d5cae52af0be513bb32887a5bafe686bbea0db1a37f2b0bf324d6dae15ad6b1"
+      "sha256": "7033ef500dbe331379c5d9417ac4fb737c33b9922a4fd37f5aec1a1b0b1379ce"
     },
     {
       "path": "simulation_inputs/fee_assumptions.json",
@@ -48,7 +48,7 @@
     },
     {
       "path": "package.json",
-      "sha256": "83e1221cc3331022631ca5a3b8b91c95db8e4738bf06c4e662a865b9933d8948"
+      "sha256": "35cf95d495e71beca21c47ad2fc53108af3f194bd275f84f2966fbd0fc30f773"
     },
     {
       "path": "package-lock.json",
